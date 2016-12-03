@@ -224,14 +224,58 @@ def print_packet(packet):
 			spd_msb = instructions[0] & 0b00001111
 
 			spd = spd_msb << 1 | (spd_lsb and 1 or 0)
-			if spd == 0 or spd == 1:
+			if spd == 0:
 				print_loco(loco, "Stop")
-			elif spd == 2 or spd == 3:
+			elif spd == 1:
+				print_loco(loco, "Stop (I)")
+			elif spd == 2:
 				print_loco(loco, "E-Stop")
+			elif spd == 3:
+				print_loco(loco, "E-Stop (I)")
 			else:
 				sspd = "%s %d/28" % (fwd and "fwd" or "rev", spd - 3)
 				print_loco(loco, sspd)
 
+			instructions = instructions[1:]
+
+		elif instruction == 0b100:
+			f = []
+			if instructions[0] & 0b00010000:
+				f.append("FL")
+			if instructions[0] & 0b00000001:
+				f.append("F1")
+			if instructions[0] & 0b00000010:
+				f.append("F2")
+			if instructions[0] & 0b00000100:
+				f.append("F3")
+			if instructions[0] & 0b00001000:
+				f.append("F4")
+
+			print_loco(loco, "FG1 " + " ".join(f))
+			instructions = instructions[1:]
+
+		elif instruction == 0b101:
+			f = []
+			if instructions[0] & 0b00010000:
+				if instructions[0] & 0b00000001:
+					f.append("F5")
+				if instructions[0] & 0b00000010:
+					f.append("F6")
+				if instructions[0] & 0b00000100:
+					f.append("F7")
+				if instructions[0] & 0b00001000:
+					f.append("F8")
+			else:
+				if instructions[0] & 0b00000001:
+					f.append("F9")
+				if instructions[0] & 0b00000010:
+					f.append("F10")
+				if instructions[0] & 0b00000100:
+					f.append("F11")
+				if instructions[0] & 0b00001000:
+					f.append("F12")
+
+			print_loco(loco, "FG2 " + " ".join(f))
 			instructions = instructions[1:]
 
 		elif loco == 0 and instructions[0] == 0b00000000:
