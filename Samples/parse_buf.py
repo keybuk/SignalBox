@@ -207,9 +207,9 @@ def print_packet(packet):
 				spd = instructions[1] & 0b01111111
 
 				if spd == 0:
-					print_loco(loco, "Stop")
+					print_loco(loco, (fwd and "fwd" or "rev") + " Stop")
 				elif spd == 1:
-					print_loco(loco, "E-Stop")
+					print_loco(loco, (fwd and "fwd" or "rev") + " E-Stop")
 				else:
 					sspd = "%s %d/126" % (fwd and "fwd" or "rev", spd - 1)
 					print_loco(loco, sspd)
@@ -225,11 +225,11 @@ def print_packet(packet):
 
 			spd = spd_msb << 1 | (spd_lsb and 1 or 0)
 			if spd == 0:
-				print_loco(loco, "Stop")
+				print_loco(loco, (fwd and "fwd" or "rev") + " Stop")
 			elif spd == 1:
 				print_loco(loco, "Stop (I)")
 			elif spd == 2:
-				print_loco(loco, "E-Stop")
+				print_loco(loco, (fwd and "fwd" or "rev") + " E-Stop")
 			elif spd == 3:
 				print_loco(loco, "E-Stop (I)")
 			else:
