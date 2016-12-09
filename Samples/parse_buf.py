@@ -180,7 +180,7 @@ def print_packet(packet):
 
 	elif (packet[0] >> 6 == 0b11) and len(packet) > 1:
 		# Multi-function decoder with 14-bit address
-		loco = packet[0] & 0b00111111 | packet[1]
+		loco = ((packet[0] & 0b00111111) << 8) | packet[1]
 		instructions = packet[2:]
 
 	elif (packet[0] >> 6 == 0b10):
