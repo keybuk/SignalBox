@@ -12,6 +12,7 @@
     import Darwin
 #endif
 
+
 let gpioRegistersOffset = 0x200000
 let gpioFunctionSelectOffset = 0x00
 let gpioPinOutputSetOffset = 0x1c

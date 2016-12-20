@@ -19,6 +19,8 @@ let pwmDmaCOffset = 0x08
 let pwmRange1Offset = 0x010
 let pwmData1Offset = 0x14
 let pwmFifoOffset = 0x18
+let pwmRange2Offset = 0x020
+let pwmData2Offset = 0x24
 
 let pwmRegisters = mapPeripheral(at: pwmRegistersOffset)
 
@@ -28,10 +30,13 @@ let pwmDmaC = pwmRegisters.advanced(by: pwmDmaCOffset).bindMemory(to: Int.self, 
 let pwmRange1 = pwmRegisters.advanced(by: pwmRange1Offset).bindMemory(to: Int.self, capacity: 1)
 let pwmData1 = pwmRegisters.advanced(by: pwmData1Offset).bindMemory(to: Int.self, capacity: 1)
 let pwmFifo = pwmRegisters.advanced(by: pwmFifoOffset).bindMemory(to: Int.self, capacity: 1)
+let pwmRange2 = pwmRegisters.advanced(by: pwmRange2Offset).bindMemory(to: Int.self, capacity: 1)
+let pwmData2 = pwmRegisters.advanced(by: pwmData2Offset).bindMemory(to: Int.self, capacity: 1)
 
 
 let pwmRange1BusAddress = peripheralBusBaseAddress + pwmRegistersOffset + pwmRange1Offset
 let pwmFifoBusAddress = peripheralBusBaseAddress + pwmRegistersOffset + pwmFifoOffset
+let pwmRange2BusAddress = peripheralBusBaseAddress + pwmRegistersOffset + pwmRange2Offset
 
 
 let pwmCtlMarkspaceEnable2 = 1 << 15
@@ -80,5 +85,6 @@ func pwmReset() {
     pwmControl.pointee = pwmCtlClearFifo
     pwmStatus.pointee = pwmStatusBusError | pwmStatusFifoReadError | pwmStatusFifoWriteError | pwmStatusChannel1GapOccurred | pwmStatusChannel2GapOccurred | pwmStatusChannel3GapOccurred | pwmStatusChannel4GapOccurred
     pwmData1.pointee = 0
+    pwmData2.pointee = 0
     usleep(100)
 }

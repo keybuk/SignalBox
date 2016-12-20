@@ -50,7 +50,7 @@ func clockDisable() {
     clockPwmControl.pointee = clockPassword | 0
     usleep(10)
     clockPwmControl.pointee = clockPassword | clockCtlKill
-    while clockPwmControl.pointee & clockCtlBusy != 0 { print(String(clockPwmControl.pointee, radix: 16)) }
+    while clockPwmControl.pointee & clockCtlBusy != 0 { }
 }
 
 func clockConfigure(clock: Int, divi: Int, divf: Int) {
@@ -62,5 +62,5 @@ func clockConfigure(clock: Int, divi: Int, divf: Int) {
     // Enable, with the source still set to OSC.
     clockPwmControl.pointee = clockPassword | (clock << clockCtlSourceShift) | clockCtlEnable
     usleep(10)
-    //while clockPwmControl.pointee & clockCtlBusy == 0 { }
+    while clockPwmControl.pointee & clockCtlBusy == 0 { }
 }
