@@ -5,201 +5,115 @@
 #endif
 
 
-let triggerPin = 17
-let pwmPin = 18
-let otherPin = 19
+let railcomGpio = 17
+let dccGpio = 18
+let debugGpio = 19
+
+
 
 
 // Allocate control block and instructions
 let (dataHandle, dataBusAddress, dataPhysicalAddress, data) = makeUncachedMap(pages: 1)
 
-// 128 0s and 128 1s
-let dataOffset = 512
-let zeroOffset = dataOffset
-let zeroBusAddress = dataBusAddress + MemoryLayout<Int>.stride * zeroOffset
-for i in 0..<128 {
-    data[zeroOffset + i] = Int(bitPattern: 0x00000000)
-}
-
-let oneOffset = dataOffset + 128
-let oneBusAddress = dataBusAddress + MemoryLayout<Int>.stride * oneOffset
-for i in 0..<128 {
-    data[oneOffset + i] = Int(bitPattern: 0xffffffff)
-}
-
-// Two words here, for the two Set/Clear registers
-let gpioOffset = dataOffset + 256
-let gpioBusAddress = dataBusAddress + MemoryLayout<Int>.stride * gpioOffset
-data[gpioOffset + 0] = 0
-data[gpioOffset + 1] = 0
-
-data[gpioOffset + 2] = (1 << triggerPin)
-data[gpioOffset + 3] = 0
-
-
-// Flags
-// still experimenting with Dreq on Gpio
 let pwmFlags = dmaTiNoWideBursts | dmaTiPwm | dmaTiSrcInc | dmaTiDestDreq | dmaTiWaitResp
 let gpioFlags = dmaTiNoWideBursts | dmaTiWaitResp | dmaTiPwm | dmaTiDestDreq
 let rangeFlags = dmaTiNoWideBursts | dmaTiWaitResp | dmaTiPwm | dmaTiDestDreq
 
 var cbOffset = 0
+var dataOffset = 512
+var adjustOffset = 768
 
-func insertZeros(number: Int = 1) {
-    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: pwmFlags, source: zeroBusAddress, dest: pwmFifoBusAddress, length: MemoryLayout<Int>.stride * number, stride: 0)
+func addData(values: [Int]) {
+    for (index, value) in values.enumerated() {
+        data[dataOffset + index] = value
+    }
+    
+    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: pwmFlags, source: dataBusAddress + MemoryLayout<Int>.stride * dataOffset, dest: pwmFifoBusAddress, length: MemoryLayout<Int>.stride * values.count, stride: 0)
+    
+    dataOffset += values.count
 }
 
-func insertOnes(number: Int = 1) {
-    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: pwmFlags, source: oneBusAddress, dest: pwmFifoBusAddress, length: MemoryLayout<Int>.stride * number, stride: 0)
+func addRangeChange(range: Int) {
+    data[adjustOffset] = range
+    
+    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: rangeFlags, source: dataBusAddress + MemoryLayout<Int>.stride * adjustOffset, dest: pwmRange1BusAddress, length: MemoryLayout<Int>.size, stride: 0)
+    
+    adjustOffset += 1
 }
 
-func insertGpioChange(pins: Int, value: Bool) {
-    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: gpioFlags, source: gpioBusAddress + MemoryLayout<Int>.stride * pins * 2, dest: value ? gpioPinOutputSetBusAddress : gpioPinOutputClearBusAddress, length: MemoryLayout<Int>.stride * 2, stride: 0)
+func addGpio(pin: Int, value: Bool) {
+    data[adjustOffset] = 1 << pin
+    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: gpioFlags, source: dataBusAddress + MemoryLayout<Int>.stride * adjustOffset, dest: value ? gpioPinOutputSetBusAddress : gpioPinOutputClearBusAddress, length: MemoryLayout<Int>.size, stride: 0)
+    adjustOffset += 1
 }
 
-insertZeros(number: 16)
 
-insertOnes(number: 2)
-insertZeros(number: 2)
-insertOnes(number: 2)
-insertZeros(number: 2)
+addData(values: [
+    0, 0, 0, 0,
+    Int(bitPattern: 0b11110000_11110000_11110000_11110000)
+    ])
 
-// want the gpio and range here
-insertOnes(number: 2)
+addData(values: [
+    Int(bitPattern: 0b11110000_11110000_11110000_11110000),
+    Int(bitPattern: 0b11110000_11110000_11110000_11110000),
+    Int(bitPattern: 0b11110000_11110000) << 16
+    ])
+addRangeChange(range: 16)
 
-// after just one with dreq - ie. write to fifo, wait for dreq to indicate it's going to pwm, change range for it
-data[768] = 16
-addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: rangeFlags, source: dataBusAddress + MemoryLayout<Int>.stride * 768, dest: pwmRange1BusAddress, length: MemoryLayout<Int>.size, stride: 0)
-addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: rangeFlags, source: dataBusAddress + MemoryLayout<Int>.stride * 768, dest: pwmRange2BusAddress, length: MemoryLayout<Int>.size, stride: 0)
+addData(values: [
+    Int(bitPattern: 0b11111110_00000011_11111000_00001111)
+    ])
+addRangeChange(range: 32)
 
-insertZeros(number: 2)
+addData(values: [
+    Int(bitPattern: 0b11100000_00111111_10000000_11111110)
+    ])
+addGpio(pin: debugGpio, value: true)
 
-// after two with dreq - ie. it's gone in and out of the fifo, and then there's obviously one more "next" word in there
-insertGpioChange(pins: 1, value: true)
+addData(values: [
+    Int(bitPattern: 0b00000011_11111000_00001111_11100000),
+    Int(bitPattern: 0b00111100_00111100_00111111_10000000),
+    Int(bitPattern: 0b11111110_00000011_11000011_11000011),
+    Int(bitPattern: 0b11000011_11000011_11111000_00001111),
+    Int(bitPattern: 0b11100000_00111111_10000000_11111110),
+    Int(bitPattern: 0b00000011_11111000_00001111_00001111),
+    Int(bitPattern: 0b00001111_00001111_00001111_11100000),
+    Int(bitPattern: 0b00111100_00111100_00111100_0011) << 4
+    ])
+addRangeChange(range: 28)
 
-insertOnes(number: 2)
-insertZeros(number: 2)
+addData(values: [
+    Int(bitPattern: 0b11000011_11000011_11000011_11000011)
+    ])
+addRangeChange(range: 32)
 
-// want the gpio and range here
-insertOnes(number: 2)
+addData(values: [
+    Int(bitPattern: 0b110000) << 26,
+    ])
+addRangeChange(range: 6)
+addGpio(pin: railcomGpio, value: false)
 
-data[769] = 32
-addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: rangeFlags, source: dataBusAddress + MemoryLayout<Int>.stride * 769, dest: pwmRange1BusAddress, length: MemoryLayout<Int>.size, stride: 0)
-addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: rangeFlags, source: dataBusAddress + MemoryLayout<Int>.stride * 769, dest: pwmRange2BusAddress, length: MemoryLayout<Int>.size, stride: 0)
+addData(values: [
+    Int(bitPattern: 0b11110000_11110000_11110000_11110000)
+    ])
+addRangeChange(range: 32)
+addGpio(pin: railcomGpio, value: true)
+addGpio(pin: debugGpio, value: false)
 
-insertZeros(number: 2)
-
-insertGpioChange(pins: 1, value: false)
-
-insertOnes(number: 2)
-insertZeros(number: 2)
-insertOnes(number: 2)
-insertZeros(number: 2)
-
-insertOnes(number: 8)
-
-/*
-// GPIO FIRST
- 
-insertGpioChange(pins: 1, value: true)
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: false)
-insertOnes(number: 2)
-
-insertGpioChange(pins: 1, value: true)
-insertOnes(number: 4)
-insertGpioChange(pins: 1, value: false)
-insertOnes(number: 4)
-
-insertGpioChange(pins: 1, value: true)
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: false)
-insertOnes(number: 2)
-
-insertGpioChange(pins: 1, value: true)
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: false)
-insertOnes(number: 2)
-*/
-
-/*
-// GPIO SECOND
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: true)
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: false)
-
-insertOnes(number: 4)
-insertGpioChange(pins: 1, value: true)
-insertOnes(number: 4)
-insertGpioChange(pins: 1, value: false)
-
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: true)
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: false)
-
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: true)
-insertOnes(number: 2)
-insertGpioChange(pins: 1, value: false)
-*/
-
-/*
-// RANGE AFTER TWO
-insertGpioChange(pins: 1, value: true)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-let rangeFlags = dmaTiNoWideBursts | dmaTiWaitResp //| dmaTiPwm | dmaTiDestDreq
-data[768] = 5
-addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: rangeFlags, source: dataBusAddress + MemoryLayout<Int>.stride * 768, dest: pwmRange1BusAddress, length: MemoryLayout<Int>.size, stride: 0)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-data[769] = 10
-addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: rangeFlags, source: dataBusAddress + MemoryLayout<Int>.stride * 769, dest: pwmRange1BusAddress, length: MemoryLayout<Int>.size, stride: 0)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-
-insertOnes(number: 1)
-insertZeros(number: 1)
-*/
+addData(values: [0])
 
 
-// PWM often ignores "don't repeat last" so explicitly zero and also explicitly drop the trigger pin in case I left it up.
-insertZeros(number: 4)
-insertGpioChange(pins: 1, value: false)
 
+// Set the railcom gpio for output and raise high.
+setGpioFunction(gpio: railcomGpio, function: gpioOut)
+setGpioValue(gpio: railcomGpio, value: true)
 
-// Set the trigger pin for output and clear.
-setGpioFunction(gpio: triggerPin, function: gpioOut)
-setGpioValue(gpio: triggerPin, value: 0)
+// Set the debug gpio for output and clear
+setGpioFunction(gpio: debugGpio, function: gpioOut)
+setGpioValue(gpio: debugGpio, value: false)
 
-// Set the GPIO pin for PWM output
-setGpioFunction(gpio: pwmPin, function: gpioAlternate5)
-setGpioFunction(gpio: otherPin, function: gpioAlternate5)
+// Set the dcc gpio for PWM output
+setGpioFunction(gpio: dccGpio, function: gpioAlternate5)
 
 pwmDisable()
 pwmReset()
@@ -207,19 +121,18 @@ pwmReset()
 dmaDisable()
 dmaEnableChannel()
 
-// Set the source to OSC (19.2 MHz) and divisor to 1920, giving us a 10KHz clock.
+// Set the source to OSC (19.2 MHz) and divisor to 278, giving us a clock with 14.48µs bits.
 clockDisable()
-clockConfigure(clock: clockSrcOsc, divi: 600, divf: 0)
+clockConfigure(clock: clockSrcOsc, divi: 278, divf: 0)
 
 // Use 32-bits at a time.
 pwmRange1.pointee = 32
-pwmRange2.pointee = 32
 
 // Enable DMA on the PWM.
-pwmDmaC.pointee = pwmDmacEnable | (2 << pwmDmacPanicShift) | (2 << pwmDmacDreqShift)
+pwmDmaC.pointee = pwmDmacEnable | (1 << pwmDmacPanicShift) | (1 << pwmDmacDreqShift)
 
 // Enable PWM1 in serializer mode, using the FIFO as a source.
-pwmControl.pointee = pwmCtlUseFifo1 | pwmCtlSerializerMode1 | pwmCtlPwmEnable1 | pwmCtlUseFifo2 | pwmCtlSerializerMode2 | pwmCtlPwmEnable2
+pwmControl.pointee = pwmCtlUseFifo1 | pwmCtlSerializerMode1 | pwmCtlPwmEnable1
 
 // Start DMA.
 dmaControlBlockAddress.pointee = dataBusAddress

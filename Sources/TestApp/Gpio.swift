@@ -39,11 +39,11 @@ func setGpioFunction(gpio: Int, function: Int) {
     gpioFunctionSelect[gpio / 10] |= function << ((gpio % 10) * 3)
 }
 
-func setGpioValue(gpio: Int, value: Int) {
+func setGpioValue(gpio: Int, value: Bool) {
     let index = gpio / 32
     let bit = 1 << (gpio % 32)
 
-    if value > 0 {
+    if value {
         gpioPinOutputSet[index] = bit
     } else {
         gpioPinOutputClear[index] = bit
