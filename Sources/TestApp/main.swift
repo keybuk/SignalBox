@@ -100,7 +100,8 @@ addRangeChange(range: 32)
 addGpio(pin: railcomGpio, value: true)
 addGpio(pin: debugGpio, value: false)
 
-addData(values: [0])
+// Loop it
+data[(cbOffset - 8) + dmaCbNextControlBlockAddressIndex] = dataBusAddress + MemoryLayout<Int>.stride * 8
 
 
 
@@ -154,7 +155,7 @@ while dmaControlStatus.pointee & dmaCsEnd == 0 { }
 debug("DMA complete")
 
 
-sleep(2)
+sleep(30)
 
 pwmDisable()
 dmaDisable()
