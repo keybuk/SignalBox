@@ -15,7 +15,7 @@
 /// Additional events such as the RailCom cutout period, and a debug packet period, are included in the bitstream. These markers are placed in the stream prior to the data to which they should be synchronized.
 ///
 /// This bitstream can be passed to a `Driver`.
-class Bitstream {
+struct Bitstream : Collection {
     
     /// Size of words.
     ///
@@ -47,38 +47,58 @@ class Bitstream {
     /// Events generated from the input.
     var events: [Event] = []
     
-    /// Adds logical bits to `events`.
+    // Conformance to Collection.
+    var startIndex: Array<Event>.Index { return events.startIndex }
+    var endIndex: Array<Event>.Index { return events.endIndex }
+    
+    subscript(index: Array<Event>.Index) -> Event {
+        return events[index]
+    }
+    
+    func index(after i: Int) -> Int {
+        return events.index(after: i)
+    }
+    
+    /// Append an event.
+    ///
+    /// - Parameters:
+    ///   - event: event to append.
+    mutating func append(_ event: Event) {
+        events.append(event)
+    }
+    
+    /// Append logical bits.
     ///
     /// Logical bits represent the DCC signal. A logical bit value of 1 has a duration of +3V for 58µs, followed by 0V for the same duration; while a logical bit value of 0 has a duration of +3V for 101.5µs, followed by 0V for the same duration.
     ///
-    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
-    ///   - bit: logical bit to be added, must be the value 1 or 0.
+    ///   - bit: logical bit to append, must be the value 1 or 0.
     ///
     /// - Note:
     ///   NMRA S-9.1 recommends a minimum duration of 100µs for a logical 0 bit. We use a slightly longer value because it allows for much more efficient usage of the PWM and DMA hardware. This is permitted as the standard allows the duration to be in the range 99—9,900µs.
-    func addLogicalBit(_ bit: Int) {
+    mutating func append(logicalBit bit: Int) {
         switch bit {
         case 1:
-            addPhysicalBits(0b11110000, count: 8)
+            append(physicalBits: 0b11110000, count: 8)
         case 0:
-            addPhysicalBits(0b11111110000000, count: 14)
+            append(physicalBits: 0b11111110000000, count: 14)
         default:
-            fatalError("Bit must be 1 or 0")
+            assertionFailure("Bit must be 1 or 0")
         }
     }
     
-    /// Adds physical bits to `events`.
+    /// Append physical bits.
     ///
     /// Physical bits are the input to the PWM, with a duration of 14.5µs. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
     ///
-    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - bits: physical bits to be added, this is an LSB-aligned value.
     ///   - count: number of right-most bits from `bits` to be added.
-    func addPhysicalBits(_ bits: Int, count: Int) {
+    mutating func append(physicalBits bits: Int, count: Int) {
         var count = count
 
         // Where the last events type is already data, remove and extend it.
@@ -88,9 +108,9 @@ class Bitstream {
             // This is a little more complex because the values in `bits` are lsb-aligned while the values in `words` are msb-aligned, and we have to beware of one-fill when shifting to the right.
             let mask = (1 << (wordSize - size)) - 1
             let alignedBits = (bits << (wordSize - count)) >> size
-            
+
             events.removeLast()
-            events.append(.data(word: word | (alignedBits & mask), size: min(size + count, wordSize)))
+            events.append(.data(word: word | (alignedBits & mask), size: Swift.min(size + count, wordSize)))
             
             count -= wordSize - size
         }
@@ -107,93 +127,85 @@ class Bitstream {
         }
     }
     
-    /// Add an event to `events`.
-    ///
-    /// - Parameters:
-    ///   - event: event to be added to `events`.
-    func addEvent(_ event: Event) {
-        events.append(event)
-    }
-    
-    /// Add a DCC packet for use in Operations Mode to `events`.
+    /// Append a DCC packet for use in Operations Mode.
     ///
     /// An operations mode packet consists of a 14-bit preamble, followed by the packet and a RailCom cutout.
     ///
-    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - packet: individual bytes for the packet, including the error detection data byte.
     ///   - debug: `true` if the debug GPIO pin should be raised during this packet transmission and RailCom cutout.
-    func addOperationsModePacket(_ packet: Packet, debug: Bool = false) {
-        addPreamble()
+    mutating func append(operationsModePacket packet: Packet, debug: Bool = false) {
+        appendPreamble()
         
         // If we are debugging this packet, place a marker at the end of the preamble and before the packet start bit.
         if debug {
-            addEvent(.debugStart)
+            append(.debugStart)
         }
         
-        addPacket(packet)
+        append(packet: packet)
         
-        addRailComCutout()
+        appendRailComCutout()
 
         // If we were debugging this packet, clear the marker for that too; thus the debug duration includes the full packet, and the RailCom cutout.
         if debug {
-            addEvent(.debugEnd)
+            append(.debugEnd)
         }
     }
     
-    /// Add a DCC preamble to `events`.
+    /// Append a DCC preamble.
     ///
-    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - length: number of preamble bits (default: 14).
     ///
     /// - Note:
     ///   NMRA S-9.2 recommends that the preamble consist of a minimum of 14 bits. For service mode programming, NMRA S-9.2.3 specifies a long preamble of 20 bits.
-    func addPreamble(length: Int = 14) {
+    mutating func appendPreamble(length: Int = 14) {
         for _ in 0..<length {
-            addLogicalBit(1)
+            append(logicalBit: 1)
         }
     }
     
-    /// Add a DCC packet to `events`.
+    /// Append a DCC packet.
     ///
-    /// The contents of the packet are added to `events` along with the packet start bit, data byte start bits, and packet end bit.
+    /// The contents of the packet are appended along with the packet start bit, data byte start bits, and packet end bit.
     ///
-    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - packet: DCC packet to be added, including the error detection data byte.
-    func addPacket(_ packet: Packet) {
+    mutating func append(packet: Packet) {
         // Each packet byte, starting with the first, is preceeded by a 0 bit.
         for byte in packet.bytes {
-            addLogicalBit(0)
+            append(logicalBit: 0)
             
             for bit in 0..<8 {
-                addLogicalBit((byte >> (7 - bit)) & 0x1)
+                append(logicalBit: (byte >> (7 - bit)) & 0x1)
             }
         }
 
         // Packet End Bit: 1 x 1-bit.
-        addLogicalBit(1)
+        append(logicalBit: 1)
     }
     
-    /// Add a RailCom cutout to `events`.
+    /// Append a RailCom cutout.
     ///
     /// The RailCom cutout is a period of logical 1 bits, combined with the `.railComCutoutStart` and `.railComCutoutEnd` events at points to produce the correct timings. If the RailCom cutout signal is ignored, this thus simply extends the preamble of the following command without interrupting the DCC signal.
     ///
-    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Note:
     ///   NMRA S-9.1 specifies that the DCC signal must continue for at least 26µs after the packet end bit, which delays the time for the start of the RailCom cutout. NMRA S-9.3.2 further specifies a maximum delay of 32µs. Since physical bits in the stream are 14.5µs, two bits are used to give a delay of 29µs.
     ///
     ///   For the duration of the cutout, NMRA S-9.3.2 provides a valid range of 454–488µs after the packet end bit, and thus including the cutout delay. A total of 32 physical bits are used—2 in the delay above, 30 in the remainder—giving a total cutout duration of 464µs.
-    func addRailComCutout() {
-        addPhysicalBits(0b11, count: 2)
-        addEvent(.railComCutoutStart)
-        addPhysicalBits(0b110000111100001111000011110000, count: 30)
-        addEvent(.railComCutoutEnd)
+    mutating func appendRailComCutout() {
+        append(physicalBits: 0b11, count: 2)
+        append(.railComCutoutStart)
+        append(physicalBits: 0b110000111100001111000011110000, count: 30)
+        append(.railComCutoutEnd)
     }
 
 }

@@ -55,6 +55,10 @@ struct Driver {
         return dueEvents
     }
     
+    // outputs from this are:
+    // 1. words.
+    // 2. ranges.
+    // 3. gpio sets.
     func go(bitstream: Bitstream) throws {
         var range = 0
         var words: [Int] = []
@@ -68,7 +72,7 @@ struct Driver {
             delayedEvents = []
             
             var dataIndex = 0
-            for event in bitstream.events {
+            for event in bitstream {
                 switch event {
                 case let .data(word: word, size: size):
                     if repeating && laggingEvents.count == 0 && words.count == 0,
