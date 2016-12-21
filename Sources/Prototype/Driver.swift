@@ -6,6 +6,13 @@
 //
 //
 
+/// Driver utilizes the Raspberry Pi hardware to output a DCC bitstream.
+///
+/// The PWM is used to generate the basic bitstream, with the FIFO sourced from memory by the DMA engine. Combining the two in this way reduces the memory bandwidth by a factor of 32, since the PWM can receive 32 physical bits with each DMA transfer.
+///
+/// Since there are not sufficient PWM channels, GPIOs are used directly from the DMA engine for the RailCom cutout, and the debug signal. Testing revealed that the control blocks to adjust the GPIOs must be synchronized with the second DREQ after the one for the word they are to be synchronized with, to allow that word to pass through the FIFO and into the PWM hardware. Much of the logic of this class is handling that delaying compared to the bitstream, including across the loop at the end of the data.
+///
+/// In addition, since the DREQ is synchronized to PWM word boundaries, it is necessary to regularly use the DMA engine to adjust the Range register of the PWM so a GPIO can be raised or lowered at the correct physical bit boundary, which may not otherwise fall on a word boundary. Testing revealed that the control block for this Range register change must be synchronized with the first DREQ after the one for the word it is to adjust. The need to shortern a word is already conveyed in the bitstream through the `size` payload.
 struct Driver {
     
     enum DriverError: Error {

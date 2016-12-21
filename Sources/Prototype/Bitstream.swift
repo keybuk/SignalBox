@@ -6,14 +6,27 @@
 //
 //
 
+/// Bitstream serializes logical DCC packets into a physical bitstream.
+///
+/// The physical bitstream assumes that bits have an individual duration of 14.5µs. A physical bit value of 1 means the output will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration. Given these constraints, the resulting stream conforms to NMRA S-9.1.
+///
+/// Individual words within the bitstream are msb-aligned according to `wordSize`, but may contain fewer bits as denoted by their `size` payload. The output should not be padded.
+///
+/// Additional events such as the RailCom cutout period, and a debug packet period, are included in the bitstream. These markers are placed in the stream prior to the data to which they should be synchronized.
+///
+/// This bitstream can be passed to a `Driver`.
 class Bitstream {
     
+    /// Size of words.
+    ///
+    /// Generally the platform's word size, but can be overriden at initialization for testing purposes.
     let wordSize: Int
     
     init(wordSize: Int =  MemoryLayout<Int>.size * 8) {
         self.wordSize = wordSize
     }
 
+    /// Event than can occur within the DCC bitstream.
     enum Event {
         /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than `wordSize`.
         case data(word: Int, size: Int)
@@ -31,6 +44,7 @@ class Bitstream {
         case debugEnd
     }
 
+    /// Events generated from the input.
     var events: [Event] = []
     
     /// Adds logical bits to `events`.
