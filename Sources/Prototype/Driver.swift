@@ -8,6 +8,10 @@
 
 struct Driver {
     
+    enum DriverError: Error {
+        case infiniteLoop
+    }
+    
     let eventDelay = 2
     
     func printData(_ words: [Int], wordSize: Int, lastWordSize: Int) {
@@ -27,107 +31,101 @@ struct Driver {
         }
     }
     
-    func go(bitstream: Bitstream) {
-        var range = 0
-        var delayedEvents: [(Int, Bitstream.Event)] = []
-        var addresses: [Int] = []
-        var repeating = false
+    func dueDelayedEvents(_ delayedEvents: inout [(Int, Bitstream.Event)]) -> [Bitstream.Event] {
+        let oldDelayedEvents = delayedEvents
+        delayedEvents.removeAll()
         
+        var dueEvents: [Bitstream.Event] = []
+
+        for (delay, event) in oldDelayedEvents {
+            if delay == 1 {
+                dueEvents.append(event)
+            } else {
+                delayedEvents.append((delay - 1, event))
+            }
+        }
+        
+        return dueEvents
+    }
+    
+    func go(bitstream: Bitstream) throws {
+        var range = 0
+        var words: [Int] = []
+        var delayedEvents: [(Int, Bitstream.Event)] = []
+        var addresses: [Int: Int] = [:]
+        var address = 0
+
+        var repeating = false
         loop: repeat {
-            var dataAddress = 0
-            var nextAddress = 0
+            var laggingEvents = delayedEvents
+            delayedEvents = []
+            
+            var dataIndex = 0
             for event in bitstream.events {
                 switch event {
-                case let .data(words: words, lastWordSize: lastWordSize):
-                    if !repeating {
-                        print(String(dataAddress) + "::")
-                        addresses.append(dataAddress)
-                        dataAddress += 1
-                    } else {
-                        nextAddress += 1
-                    }
-
-                    // Slice up the words list, if necessary.
-                    var slices: [ArraySlice<Int>] = []
-                    
-                    var lastSlice = 0
-                    
-                    if words.count > 1 && range != bitstream.wordSize {
-                        slices.append(words[lastSlice..<1])
-                        lastSlice = 1
-                    }
-                    
-                    for (delay, _) in delayedEvents {
-                        if delay < words.count {
-                            if delay > lastSlice {
-                                slices.append(words[lastSlice..<delay])
-                                lastSlice = delay
-                            }
-                        } else {
-                            break
-                        }
-                    }
-                    
-                    slices.append(words[lastSlice..<words.count])
-                    
-                    for (index, slice) in slices.enumerated() {
-                        let lastWordSize = index == slices.count - 1 ? lastWordSize : bitstream.wordSize
-                        printData([Int](slice), wordSize: bitstream.wordSize, lastWordSize: lastWordSize)
-                        if range != lastWordSize {
-                            print("RANGE " + String(lastWordSize))
-                            range = lastWordSize
-                        }
-                        
-                        delayedEvents = delayedEvents.map({ ($0 - slice.count, $1) })
-                        
-                        while case let (delay, event)? = delayedEvents.first,
-                            delay == 0
-                        {
-                            delayedEvents.removeFirst()
-                            
-                            switch event {
-                            case .railComCutoutStart:
-                                print("RAILCOM START")
-                            case .railComCutoutEnd:
-                                print("RAILCOM END")
-                            case .debugStart:
-                                print("DEBUG START")
-                            case .debugEnd:
-                                print("DEBUG END")
-                            default:
-                                print("hmm")
-                            }
-                        }
-                        
-                        print()
-                    }
-                    
-                    if repeating && delayedEvents.count == 0 {
-                        print("---> " + String(addresses[nextAddress]))
+                case let .data(word: word, size: size):
+                    if repeating && laggingEvents.count == 0 && words.count == 0,
+                        let address = addresses[dataIndex]
+                    {
+                        print("--> " + String(address))
                         break loop
                     }
-
-                    // possibilities here:
-                    //
-                    // all words go in one control block
-                    // all words go in one control block, followed by a range
-                    // first word goes in one, followed by a range, followed by the rest, followed by a range
                     
-                    // some words go in a control block, followed by a gpio change
+                    words.append(word)
 
-                    // split words based on the following:
-                    //   index != last && range != bitstream.wordSize
-                    //   index is a delay in delayedEvents
+                    var dueEvents: [Bitstream.Event] = []
+                    dueEvents.append(contentsOf: dueDelayedEvents(&laggingEvents))
+                    dueEvents.append(contentsOf: dueDelayedEvents(&delayedEvents))
                     
+                    if size != range || dueEvents.count > 0 {
+                        let rootIndex = dataIndex - words.count + 1
+                        print(String(address) + "::")
+
+                        printData(words, wordSize: bitstream.wordSize, lastWordSize: size)
+                        words = []
+
+                        addresses[rootIndex] = address
+                        address += 1
+                    }
+                
+                    if size != range {
+                        print("RANGE " + String(size))
+                        range = size
+                    }
+
+                    for event in dueEvents {
+                        switch event {
+                        case .railComCutoutStart:
+                            print("RAILCOM START")
+                        case .railComCutoutEnd:
+                            print("RAILCOM END")
+                        case .debugStart:
+                            print("DEBUG START")
+                        case .debugEnd:
+                            print("DEBUG END")
+                        default:
+                            print("hmm")
+                        }
+                    }
+                    
+                    dataIndex += 1
                 default:
                     delayedEvents.append((eventDelay, event))
                 }
             }
-        
+            
             print(delayedEvents)
-            repeating = true
+            if repeating {
+                throw DriverError.infiniteLoop
+            } else {
+                repeating = true
+            }
         } while delayedEvents.count > 0
-        
+
+        if words.count > 0 {
+            printData(words, wordSize: bitstream.wordSize, lastWordSize: range)
+        }
+
         // data becomes a DMAControlBlock with a total length of the number of words
         // if the current range is not 32, it has to instead be a CB for the first word, followed by a range set CB to 32, followed by a CB for the remainder
         // if the lastWordSize is not 32, it has to be followed by a range set CB to the lastWordSize

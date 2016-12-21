@@ -12,4 +12,8 @@ let bitstream = Bitstream(wordSize: 32)
 bitstream.addOperationsModePacket(packet, debug: true)
 
 let driver = Driver()
-driver.go(bitstream: bitstream)
+do {
+    try driver.go(bitstream: bitstream)
+} catch {
+    print("FAILED")
+}

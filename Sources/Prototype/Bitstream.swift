@@ -15,19 +15,19 @@ class Bitstream {
     }
 
     enum Event {
-        /// Physical bit data for PWM input consisting of msb-aligned `words`, where the last word in the set has the size `lastWordSize` and may be less than `wordSize`.
-        case data(words: [Int], lastWordSize: Int)
+        /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than `wordSize`.
+        case data(word: Int, size: Int)
         
-        /// Indicates that the RailCom cutout period should begin aligned with the start of the next data word.
+        /// Indicates that the RailCom cutout period should begin aligned with the start of the next `.data`.
         case railComCutoutStart
         
-        /// Indicates that the RailCom cutout period should end aligned with the start of the next data word.
+        /// Indicates that the RailCom cutout period should end aligned with the start of the next `.data`.
         case railComCutoutEnd
         
-        /// Indicates that the debug packet period should begin aligned with the start of the next data word.
+        /// Indicates that the debug packet period should begin aligned with the start of the next `.data`.
         case debugStart
         
-        /// Indicates that the debug packet period should end aligned with the start of the next data word.
+        /// Indicates that the debug packet period should end aligned with the start of the next `.data`.
         case debugEnd
     }
 
@@ -37,7 +37,7 @@ class Bitstream {
     ///
     /// Logical bits represent the DCC signal. A logical bit value of 1 has a duration of +3V for 58µs, followed by 0V for the same duration; while a logical bit value of 0 has a duration of +3V for 101.5µs, followed by 0V for the same duration.
     ///
-    /// If the last event in `events` is `.data` it will be extended to include the new bits, otherwise a new `.data` event is added to `events`.
+    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
     ///
     /// - Parameters:
     ///   - bit: logical bit to be added, must be the value 1 or 0.
@@ -59,55 +59,38 @@ class Bitstream {
     ///
     /// Physical bits are the input to the PWM, with a duration of 14.5µs. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
     ///
-    /// If the last event in `events` is `.data` it will be extended to include the new bits, otherwise a new `.data` event is added to `events`.
+    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
     ///
     /// - Parameters:
     ///   - bits: physical bits to be added, this is an LSB-aligned value.
     ///   - count: number of right-most bits from `bits` to be added.
     func addPhysicalBits(_ bits: Int, count: Int) {
-        var words: [Int] = []
-        var lastWordSize = wordSize
-        
-        // Where the last events type is already data, remove and extend it.
-        if case let .data(words: oldWords, lastWordSize: oldLastWordSize)? = events.last {
-            events.removeLast()
+        var count = count
 
-            words = oldWords
-            lastWordSize = oldLastWordSize
-        }
-        
-        // If the last serialized word is not yet full, add as many bits as we can to the end of it.
-        var remainingCount = count
-        if lastWordSize < wordSize {
-            guard let lastWord = words.popLast() else { fatalError("Should always be a last word") }
-            
+        // Where the last events type is already data, remove and extend it.
+        if case let .data(word: word, size: size)? = events.last,
+            size < wordSize
+        {
             // This is a little more complex because the values in `bits` are lsb-aligned while the values in `words` are msb-aligned, and we have to beware of one-fill when shifting to the right.
-            let mask = (1 << (wordSize - lastWordSize)) - 1
-            let alignedBits = (bits << (wordSize - remainingCount)) >> lastWordSize
-            words.append(lastWord | (alignedBits & mask))
+            let mask = (1 << (wordSize - size)) - 1
+            let alignedBits = (bits << (wordSize - count)) >> size
             
-            if lastWordSize + remainingCount <= wordSize {
-                lastWordSize += remainingCount
-                remainingCount = 0
-            } else {
-                remainingCount = lastWordSize + remainingCount - wordSize
-            }
+            events.removeLast()
+            events.append(.data(word: word | (alignedBits & mask), size: min(size + count, wordSize)))
+            
+            count -= wordSize - size
         }
         
         // If any bits remain, add a new word with them.
-        if remainingCount > 0 {
-            lastWordSize = remainingCount
-            
+        if count > 0 {
             // For testing, wordSize can be defined as shorter than the size of Int on this platform; so be sure to mask out the left-most excess part.
-            var alignedBits = bits << (wordSize - lastWordSize)
+            var word = bits << (wordSize - count)
             if wordSize < MemoryLayout<Int>.size * 8 {
-                alignedBits &= (1 << wordSize) - 1
+                word &= (1 << wordSize) - 1
             }
             
-            words.append(alignedBits)
+            events.append(.data(word: word, size: count))
         }
-        
-        events.append(.data(words: words, lastWordSize: lastWordSize))
     }
     
     /// Add an event to `events`.
@@ -122,7 +105,7 @@ class Bitstream {
     ///
     /// An operations mode packet consists of a 14-bit preamble, followed by the packet and a RailCom cutout.
     ///
-    /// If the last event in `events` is `.data` it will be extended to include the data of the new packet, otherwise only new events are added.
+    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
     ///
     /// - Parameters:
     ///   - packet: individual bytes for the packet, including the error detection data byte.
@@ -147,7 +130,7 @@ class Bitstream {
     
     /// Add a DCC preamble to `events`.
     ///
-    /// If the last event in `events` is `.data` it will be extended to include the bits of the preamble, otherwise only new events are added.
+    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
     ///
     /// - Parameters:
     ///   - length: number of preamble bits (default: 14).
@@ -164,7 +147,7 @@ class Bitstream {
     ///
     /// The contents of the packet are added to `events` along with the packet start bit, data byte start bits, and packet end bit.
     ///
-    /// If the last event in `events` is `.data` it will be extended to include the data of the new packet, otherwise only new events are added.
+    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
     ///
     /// - Parameters:
     ///   - packet: DCC packet to be added, including the error detection data byte.
@@ -186,7 +169,7 @@ class Bitstream {
     ///
     /// The RailCom cutout is a period of logical 1 bits, combined with the `.railComCutoutStart` and `.railComCutoutEnd` events at points to produce the correct timings. If the RailCom cutout signal is ignored, this thus simply extends the preamble of the following command without interrupting the DCC signal.
     ///
-    /// If the last event in `events` is `.data` it will be extended to include the bits that delay the start of the cutout, otherwise only new events are added.
+    /// If the last event in `events` is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is added to `events`.
     ///
     /// - Note:
     ///   NMRA S-9.1 specifies that the DCC signal must continue for at least 26µs after the packet end bit, which delays the time for the start of the RailCom cutout. NMRA S-9.3.2 further specifies a maximum delay of 32µs. Since physical bits in the stream are 14.5µs, two bits are used to give a delay of 29µs.
