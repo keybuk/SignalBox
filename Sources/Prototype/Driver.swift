@@ -75,7 +75,7 @@ struct Driver {
             for event in bitstream {
                 switch event {
                 case let .data(word: word, size: size):
-                    if repeating && laggingEvents.count == 0 && words.count == 0,
+                    if repeating && laggingEvents.isEmpty && words.isEmpty,
                         let address = addresses[dataIndex]
                     {
                         print("--> " + String(address))
@@ -88,7 +88,7 @@ struct Driver {
                     dueEvents.append(contentsOf: dueDelayedEvents(&laggingEvents))
                     dueEvents.append(contentsOf: dueDelayedEvents(&delayedEvents))
                     
-                    if size != range || dueEvents.count > 0 {
+                    if size != range || !dueEvents.isEmpty {
                         let rootIndex = dataIndex - words.count + 1
                         print(String(address) + "::")
 
@@ -131,9 +131,9 @@ struct Driver {
             } else {
                 repeating = true
             }
-        } while delayedEvents.count > 0
+        } while !delayedEvents.isEmpty
 
-        if words.count > 0 {
+        if !words.isEmpty {
             printData(words, wordSize: bitstream.wordSize, lastWordSize: range)
         }
 

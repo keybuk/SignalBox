@@ -45,18 +45,19 @@ struct Bitstream : Collection {
     }
 
     /// Events generated from the input.
-    var events: [Event] = []
+    private var events: [Event] = []
     
     // Conformance to Collection.
+    // Forward to the private `events` array.
     var startIndex: Array<Event>.Index { return events.startIndex }
     var endIndex: Array<Event>.Index { return events.endIndex }
     
-    subscript(index: Array<Event>.Index) -> Event {
-        return events[index]
+    func index(after i: Array<Event>.Index) -> Array<Event>.Index {
+        return events.index(after: i)
     }
     
-    func index(after i: Int) -> Int {
-        return events.index(after: i)
+    subscript(index: Array<Event>.Index) -> Event {
+        return events[index]
     }
     
     /// Append an event.
