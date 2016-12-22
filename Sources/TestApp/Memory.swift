@@ -18,7 +18,7 @@
 
 import Foundation
 
-import Cmailbox
+import Mailbox
 
 
 let pageSize = 4096
@@ -70,30 +70,31 @@ func mapPeripheral(at offset: Int) -> UnsafeMutableRawPointer {
 }
 
 
-let mailboxFd: Int32 = {
-    let mailboxFd = mbox_open()
-    guard mailboxFd >= 0 else { fatalError("Couldn't open mailbox") }
-    return mailboxFd
+let mailbox: Mailbox = {
+    return try! Mailbox()
 }()
+
+//let mailbox = try! Mailbox()
 
 
 func makeUncachedMap(pages: Int) -> (UInt32, Int, Int, UnsafeMutablePointer<Int>) {
-    let handle = mem_alloc(mailboxFd, UInt32(pageSize * pages), UInt32(pageSize * pages), 0x4)
-    let busAddress = mem_lock(mailboxFd, handle)
-
-    let physicalAddress = busAddress & ~0xc0000000
-    let block = mapmem(physicalAddress, 4096)
-
+    let handle = try! mailbox.allocateMemory(size: pageSize * pages, alignment: pageSize * pages, flags: .direct)
+    let busAddress = try! mailbox.lockMemory(handle: handle)
+    
+    let physicalAddress = busAddress & Int(bitPattern: ~0xc0000000)
+    guard let block = mmap(nil, pageSize, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, off_t(physicalAddress)),
+        block != MAP_FAILED else { fatalError("Couldn't mmap") }
+    
     print("Mapped")
-    print("  BUS  0x" + String(busAddress, radix: 16))
-    print("  PHYS  0x" + String(physicalAddress, radix: 16))
-    print("  VIRT 0x" + String(Int(bitPattern: block!), radix: 16))
+    print("  BUS  0x" + String(UInt(bitPattern: busAddress), radix: 16))
+    print("  PHYS  0x" + String(UInt(bitPattern: physicalAddress), radix: 16))
+    print("  VIRT 0x" + String(Int(bitPattern: block), radix: 16))
     print("")
     
-    return (handle, Int(bitPattern: UInt(busAddress)), Int(bitPattern: UInt(physicalAddress)), block!.bindMemory(to: Int.self, capacity: pageSize / MemoryLayout<Int>.stride * pages))
+    return (handle, busAddress, physicalAddress, block.bindMemory(to: Int.self, capacity: pageSize / MemoryLayout<Int>.stride * pages))
 }
 
-func cleanup(handle: UInt32) {
-    mem_unlock(mailboxFd, handle)
-    mem_free(mailboxFd, handle)
+func cleanup(handle: Mailbox.MemoryHandle) {
+    try! mailbox.unlockMemory(handle: handle)
+    try! mailbox.releaseMemory(handle: handle)
 }
