@@ -8,49 +8,84 @@ import RaspberryPi
 
 
 let raspberryPi = try! RaspberryPi()
+let gpio = try! GPIO.on(raspberryPi)
+let clock = try! Clock.pwm(on: raspberryPi)
+let pwm = try! PWM.on(raspberryPi)
+let dma = try! DMA.on(raspberryPi)
 
 
 let railcomGpio = 17
 let dccGpio = 18
 let debugGpio = 19
 
-
+let dmaChannel = 5
 
 
 // Allocate control block and instructions
 let (dataBusAddress, dataPointer) = try! raspberryPi.allocateUncachedMemory(pages: 1)
-let data = dataPointer.bindMemory(to: Int.self, capacity: raspberryPi.pageSize / MemoryLayout<Int>.stride)
 
-let pwmFlags = dmaTiNoWideBursts | dmaTiPwm | dmaTiSrcInc | dmaTiDestDreq | dmaTiWaitResp
-let gpioFlags = dmaTiNoWideBursts | dmaTiWaitResp | dmaTiPwm | dmaTiDestDreq
-let rangeFlags = dmaTiNoWideBursts | dmaTiWaitResp | dmaTiPwm | dmaTiDestDreq
+let dataOffset = raspberryPi.pageSize / 2
 
-var cbOffset = 0
-var dataOffset = 512
-var adjustOffset = 768
+let controlBlocks = dataPointer.bindMemory(to: DMAControlBlock.self, capacity: dataOffset / MemoryLayout<DMAControlBlock>.stride)
+let data = dataPointer.advanced(by: dataOffset).bindMemory(to: Int.self, capacity: (raspberryPi.pageSize - dataOffset) / MemoryLayout<Int>.stride)
+
+var cbIndex = 0
+var dataIndex = 0
 
 func addData(values: [Int]) {
     for (index, value) in values.enumerated() {
-        data[dataOffset + index] = value
+        data[dataIndex + index] = value
     }
     
-    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: pwmFlags, source: dataBusAddress + MemoryLayout<Int>.stride * dataOffset, dest: pwmFifoBusAddress, length: MemoryLayout<Int>.stride * values.count, stride: 0)
+    if cbIndex > 0 {
+        controlBlocks[cbIndex - 1].nextControlBlockAddress = dataBusAddress + MemoryLayout<DMAControlBlock>.stride * cbIndex
+    }
     
-    dataOffset += values.count
+    controlBlocks[cbIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .sourceAddressIncrement, .destinationDREQ, .waitForWriteResponse ]
+    controlBlocks[cbIndex].sourceAddress = dataBusAddress + dataOffset + MemoryLayout<Int>.stride * dataIndex
+    controlBlocks[cbIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.fifoInputOffset
+    controlBlocks[cbIndex].transferLength = MemoryLayout<Int>.stride * values.count
+    controlBlocks[cbIndex].tdModeStride = 0
+    controlBlocks[cbIndex].nextControlBlockAddress = 0
+    
+    dataIndex += values.count
+    cbIndex += 1
 }
 
 func addRangeChange(range: Int) {
-    data[adjustOffset] = range
+    data[dataIndex] = range
     
-    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: rangeFlags, source: dataBusAddress + MemoryLayout<Int>.stride * adjustOffset, dest: pwmRange1BusAddress, length: MemoryLayout<Int>.size, stride: 0)
+    if cbIndex > 0 {
+        controlBlocks[cbIndex - 1].nextControlBlockAddress = dataBusAddress + MemoryLayout<DMAControlBlock>.stride * cbIndex
+    }
     
-    adjustOffset += 1
+    controlBlocks[cbIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ]
+    controlBlocks[cbIndex].sourceAddress = dataBusAddress + dataOffset + MemoryLayout<Int>.stride * dataIndex
+    controlBlocks[cbIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.channel1RangeOffset
+    controlBlocks[cbIndex].transferLength = MemoryLayout<Int>.stride
+    controlBlocks[cbIndex].tdModeStride = 0
+    controlBlocks[cbIndex].nextControlBlockAddress = 0
+    
+    dataIndex += 1
+    cbIndex += 1
 }
 
 func addGpio(pin: Int, value: Bool) {
-    data[adjustOffset] = 1 << pin
-    addControlBlock(for: dataBusAddress, to: data, at: &cbOffset, flags: gpioFlags, source: dataBusAddress + MemoryLayout<Int>.stride * adjustOffset, dest: value ? gpioPinOutputSetBusAddress : gpioPinOutputClearBusAddress, length: MemoryLayout<Int>.size, stride: 0)
-    adjustOffset += 1
+    data[dataIndex] = 1 << pin
+
+    if cbIndex > 0 {
+        controlBlocks[cbIndex - 1].nextControlBlockAddress = dataBusAddress + MemoryLayout<DMAControlBlock>.stride * cbIndex
+    }
+
+    controlBlocks[cbIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ]
+    controlBlocks[cbIndex].sourceAddress = dataBusAddress + dataOffset + MemoryLayout<Int>.stride * dataIndex
+    controlBlocks[cbIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + GPIO.offset + (value ? GPIO.outputSetOffset : GPIO.outputClearOffset)
+    controlBlocks[cbIndex].transferLength = MemoryLayout<Int>.stride
+    controlBlocks[cbIndex].tdModeStride = 0
+    controlBlocks[cbIndex].nextControlBlockAddress = 0
+
+    dataIndex += 1
+    cbIndex += 1
 }
 
 
@@ -106,65 +141,70 @@ addRangeChange(range: 32)
 addGpio(pin: railcomGpio, value: true)
 addGpio(pin: debugGpio, value: false)
 
-// Loop it
-data[(cbOffset - 8) + dmaCbNextControlBlockAddressIndex] = dataBusAddress + MemoryLayout<Int>.stride * 8
+// Loop it to the second control block.
+controlBlocks[cbIndex - 1].nextControlBlockAddress = dataBusAddress + MemoryLayout<DMAControlBlock>.stride
 
 
 
 // Set the railcom gpio for output and raise high.
-setGpioFunction(gpio: railcomGpio, function: gpioOut)
-setGpioValue(gpio: railcomGpio, value: true)
+gpio.pointee.functionSelect[railcomGpio] = .output
+gpio.pointee.outputSet[railcomGpio] = true
 
 // Set the debug gpio for output and clear
-setGpioFunction(gpio: debugGpio, function: gpioOut)
-setGpioValue(gpio: debugGpio, value: false)
+gpio.pointee.functionSelect[debugGpio] = .output
+gpio.pointee.outputSet[debugGpio] = false
 
 // Set the dcc gpio for PWM output
-setGpioFunction(gpio: dccGpio, function: gpioAlternate5)
+gpio.pointee.functionSelect[dccGpio] = .alternateFunction5
 
-pwmDisable()
-pwmReset()
+pwm.pointee.disable()
+pwm.pointee.reset()
 
-dmaDisable()
-dmaEnableChannel()
+dma.enable.pointee |= 1 << dmaChannel
+usleep(100)
+dma.channel[dmaChannel].pointee.controlStatus.insert(.abort)
+usleep(100)
+dma.channel[dmaChannel].pointee.reset()
 
 // Set the source to OSC (19.2 MHz) and divisor to 278, giving us a clock with 14.48µs bits.
-clockDisable()
-clockConfigure(clock: clockSrcOsc, divi: 278, divf: 0)
+clock.pointee.disable()
+clock.pointee.control = [ .source(.oscillator), .mash(.integer) ]
+clock.pointee.divisor = [ .integer(278) ]
+clock.pointee.enable()
 
 // Use 32-bits at a time.
-pwmRange1.pointee = 32
+pwm.pointee.channel1Range = 32
 
 // Enable DMA on the PWM.
-pwmDmaC.pointee = pwmDmacEnable | (1 << pwmDmacPanicShift) | (1 << pwmDmacDreqShift)
+pwm.pointee.dmaConfiguration = [ .enabled, .dreqThreshold(1), .panicThreshold(1) ]
 
 // Enable PWM1 in serializer mode, using the FIFO as a source.
-pwmControl.pointee = pwmCtlUseFifo1 | pwmCtlSerializerMode1 | pwmCtlPwmEnable1
+pwm.pointee.control = [ .channel1UseFifo, .channel1SerializerMode, .channel1Enable ]
 
 // Start DMA.
-dmaControlBlockAddress.pointee = dataBusAddress
+dma.channel[dmaChannel].pointee.controlBlockAddress = dataBusAddress
 usleep(100)
-dmaControlStatus.pointee = dmaCsWaitForOutstandingWrites | (8 << dmaCsPanicPriorityShift) | (8 << dmaCsPriorityShift) | dmaCsActive
+dma.channel[dmaChannel].pointee.controlStatus = [ .waitForOutstandingWrites, .priorityLevel(8), .panicPriorityLevel(8), .active ]
 
 
 // Dump debug information until it stops
 func debug(_ message: String) {
     print(message)
-    print("PWM Status 0b" + String(pwmStatus.pointee, radix: 2))
-    print("DMA Status 0b" + String(dmaControlStatus.pointee, radix: 2))
-    print("DMA Debug  0b" + String(dmaDebug.pointee, radix: 2))
+    print("PWM Status 0b" + String(pwm.pointee.status.rawValue, radix: 2))
+    print("DMA Status 0b" + String(dma.channel[dmaChannel].pointee.controlStatus.rawValue, radix: 2))
+    print("DMA Debug  0b" + String(dma.channel[dmaChannel].pointee.debug.rawValue, radix: 2))
     print()
 }
 
 debug("DMA is on")
-while dmaControlStatus.pointee & dmaCsEnd == 0 { }
+while !dma.channel[dmaChannel].pointee.controlStatus.contains(.transferComplete) { }
 debug("DMA complete")
 
 
 sleep(30)
 
-pwmDisable()
-dmaDisable()
-clockDisable()
+pwm.pointee.disable()
+dma.channel[dmaChannel].pointee.controlStatus.insert(.abort)
+clock.pointee.disable()
 
 //cleanup(handle: dataHandle)

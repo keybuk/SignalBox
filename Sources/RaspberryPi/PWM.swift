@@ -86,14 +86,17 @@ public struct PWMDMAConfiguration : OptionSet {
 
 }
 
+// FIXME: this is really an internal register map, and not a good public API.
 public struct PWM {
     
     public var control: PWMControl
     public var status: PWMStatus
     public var dmaConfiguration: PWMDMAConfiguration
+    var reserved0: Int
     public var channel1Range: Int
     public var channel1Data: Int
     public var fifoInput: Int
+    var reserved1: Int
     public var channel2Range: Int
     public var channel2Data: Int
 
@@ -109,9 +112,21 @@ public struct PWM {
     public static let channel2RangeOffset    = 0x20
     public static let channel2DataOffset     = 0x28
     
+    // FIXME: this name is bad, and Swift-style requires the 'On' be inside the '('.
+    public static func on(_ raspberryPi: RaspberryPi) throws -> UnsafeMutablePointer<PWM> {
+        // FIXME: this memory map gets leaked.
+        let pointer = try raspberryPi.mapPeripheral(at: PWM.offset, size: PWM.size)
+        return pointer.bindMemory(to: PWM.self, capacity: 1)
+    }
+    
+    public mutating func disable() {
+        control.remove([ .channel1Enable, .channel2Enable ])
+        dmaConfiguration.remove(.enabled)
+    }
+    
     public mutating func reset() {
-        control.insert(.clearFifo)
-        status.formIntersection([ .busError, .fifoReadError, .fifoWriteError, .channel1GapOccurred, .channel2GapOccurred, .channel3GapOccurred, .channel4GapOccurred ])
+        control = []
+        status.insert([ .busError, .fifoReadError, .fifoWriteError, .channel1GapOccurred, .channel2GapOccurred, .channel3GapOccurred, .channel4GapOccurred ])
     }
 
 }

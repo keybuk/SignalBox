@@ -57,12 +57,12 @@ public struct ClockControl : OptionSet {
         return ClockMASH(rawValue: (rawValue >> 9) & ((1 << 2) - 1))
     }
     
-    public static func clockSource(_ source: ClockSource) -> ClockControl {
-        assert(source.rawValue < (1 << 4), ".clockSource limited to 4 bits")
+    public static func source(_ source: ClockSource) -> ClockControl {
+        assert(source.rawValue < (1 << 4), ".source limited to 4 bits")
         return ClockControl(rawValue: source.rawValue << 0)
     }
     
-    public var clockSource: ClockSource? {
+    public var source: ClockSource? {
         return ClockSource(rawValue: (rawValue >> 0) & ((1 << 4) - 1))
     }
 
@@ -96,14 +96,34 @@ public struct ClockDivisor : OptionSet {
     
 }
 
+// FIXME: this is really an internal register map, and not a good public API.
 public struct Clock {
     
     public var control: ClockControl
     public var divisor: ClockDivisor
     
+    public static let offset = 0x101000
+    public static let size   = 0x000100
+    
+    public static let clockSize = 0x000008
+
+    public static let generalPurpose0Offset = 0x70
+    public static let generalPurpose1Offset = 0x78
+    public static let generalPurpose2Offset = 0x80
+    
+    public static let pcmOffset             = 0x98
+    public static let pwmOffset             = 0xa0
+
     public static let controlOffset = 0x00
     public static let divisorOffset = 0x04
     
+    // FIXME: this name is bad. Do we really want one of these methods per-clock? We have to map the entire register space anyway, otherwise mmap() fails.
+    public static func pwm(on raspberryPi: RaspberryPi) throws -> UnsafeMutablePointer<Clock> {
+        // FIXME: this memory map gets leaked.
+        let pointer = try raspberryPi.mapPeripheral(at: Clock.offset, size: Clock.size)
+        return pointer.advanced(by: Clock.pwmOffset).bindMemory(to: Clock.self, capacity: 1)
+    }
+
     public mutating func disable() {
         control.remove(.enabled)
         
@@ -118,19 +138,5 @@ public struct Clock {
         control.insert(.enabled)
         while !control.contains(.busy) { }
     }
-    
-}
-
-public enum Clocks {
-    
-    public static let offset = 0x101000
-    public static let size   = 0x000100
-
-    public static let generalPurpose0Offset = 0x70
-    public static let generalPurpose1Offset = 0x78
-    public static let generalPurpose2Offset = 0x80
-
-    public static let pcmOffset             = 0x98
-    public static let pwmOffset             = 0xa0
     
 }

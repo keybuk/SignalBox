@@ -120,7 +120,7 @@ public struct DMATransferInformation : OptionSet {
         return (rawValue >> 21) & ((1 << 5) - 1)
     }
     
-    public static func peripheralMappping(_ peripheral: DMAPeripheral) -> DMATransferInformation {
+    public static func peripheralMapping(_ peripheral: DMAPeripheral) -> DMATransferInformation {
         assert(peripheral.rawValue < (1 << 5), ".peripheralMapping limited to 5 bits")
         return DMATransferInformation(rawValue: peripheral.rawValue << 16)
     }
@@ -210,7 +210,7 @@ public struct DMAControlBlock {
     public static let tdModeStrideOffset        = 0x10
     public static let nextControlBlockOffset    = 0x14
     
-    static let stopAddress = 0x00000000
+    public static let stopAddress = 0x00000000
     
     public init(transferInformation: DMATransferInformation, sourceAddress: Int, destinationAddress: Int, transferLength: Int, tdModeStride: Int, nextControlBlockAddress: Int) {
         self.transferInformation = transferInformation
@@ -253,12 +253,13 @@ public struct DMAChannel {
     public mutating func reset() {
         controlStatus.insert(.reset)
         usleep(100)
-        debug.formIntersection([ .readError, .fifoError, .readLastNotSetError ])
+        debug.insert([ .readError, .fifoError, .readLastNotSetError ])
     }
 
 }
 
-public enum DMA {
+// FIXME: this isn't a register map, but it's also not a good abstraction to DMA Channels.
+public struct DMA {
     
     public static let offset                = 0x007000
     public static let size                  = 0x001000
@@ -269,4 +270,32 @@ public enum DMA {
     public static let interruptStatusOffset = 0xfe0
     public static let enableOffset          = 0xff0
 
+    public let channel: [UnsafeMutablePointer<DMAChannel>]
+    public let interruptStatus: UnsafeMutablePointer<Int>
+    public let enable: UnsafeMutablePointer<Int>
+    
+    // FIXME: this name is bad, and Swift-style requires the 'On' be inside the '('.
+    public static func on(_ raspberryPi: RaspberryPi) throws -> DMA {
+        return try DMA(on: raspberryPi)
+    }
+    
+    private init(on raspberryPi: RaspberryPi) throws {
+        // FIXME: this memory map gets leaked.
+        var pointer = try raspberryPi.mapPeripheral(at: DMA.offset, size: DMA.size)
+        
+        interruptStatus = pointer.advanced(by: DMA.interruptStatusOffset).bindMemory(to: Int.self, capacity: 1)
+        enable = pointer.advanced(by: DMA.enableOffset).bindMemory(to: Int.self, capacity: 1)
+
+        var channels: [UnsafeMutablePointer<DMAChannel>] = []
+        for _ in 0..<15 {
+            channels.append(pointer.bindMemory(to: DMAChannel.self, capacity: 1))
+            pointer = pointer.advanced(by: DMA.channelSize)
+        }
+        
+        pointer = try! raspberryPi.mapPeripheral(at: DMA.dma15Offset, size: DMA.dma15Size)
+        channels.append(pointer.bindMemory(to: DMAChannel.self, capacity: 1))
+
+        channel = channels
+    }
+    
 }
