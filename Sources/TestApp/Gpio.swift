@@ -12,17 +12,14 @@ import Glibc
 import Darwin
 #endif
 
+import RaspberryPi
 
-let gpioRegistersOffset = 0x200000
-let gpioFunctionSelectOffset = 0x00
-let gpioPinOutputSetOffset = 0x1c
-let gpioPinOutputClearOffset = 0x28
 
-let gpioRegisters = try! raspberryPi.mapPeripheral(at: gpioRegistersOffset, size: raspberryPi.pageSize)
+let gpioRegisters = try! raspberryPi.mapPeripheral(at: GPIO.offset, size: GPIO.size)
 
-let gpioFunctionSelect = gpioRegisters.advanced(by: gpioFunctionSelectOffset).bindMemory(to: Int.self, capacity: 2)
-let gpioPinOutputSet = gpioRegisters.advanced(by: gpioPinOutputSetOffset).bindMemory(to: Int.self, capacity: 2)
-let gpioPinOutputClear = gpioRegisters.advanced(by: gpioPinOutputClearOffset).bindMemory(to: Int.self, capacity: 2)
+let gpioFunctionSelect = gpioRegisters.advanced(by: GPIO.functionSelectOffset).bindMemory(to: Int.self, capacity: 2)
+let gpioPinOutputSet = gpioRegisters.advanced(by: GPIO.pinOutputSetOffset).bindMemory(to: Int.self, capacity: 2)
+let gpioPinOutputClear = gpioRegisters.advanced(by: GPIO.pinOutputClearOffset).bindMemory(to: Int.self, capacity: 2)
 
 
 let gpioIn = 0b000
@@ -51,5 +48,5 @@ func setGpioValue(gpio: Int, value: Bool) {
 }
 
 
-let gpioPinOutputSetBusAddress = raspberryPi.peripheralBusBaseAddress + gpioRegistersOffset + gpioPinOutputSetOffset
-let gpioPinOutputClearBusAddress = raspberryPi.peripheralBusBaseAddress + gpioRegistersOffset + gpioPinOutputClearOffset
+let gpioPinOutputSetBusAddress = raspberryPi.peripheralBusBaseAddress + GPIO.offset + GPIO.pinOutputSetOffset
+let gpioPinOutputClearBusAddress = raspberryPi.peripheralBusBaseAddress + GPIO.offset + GPIO.pinOutputClearOffset

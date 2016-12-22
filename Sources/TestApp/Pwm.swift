@@ -12,31 +12,24 @@ import Glibc
 import Darwin
 #endif
 
-let pwmRegistersOffset = 0x20c000
-let pwmControlOffset = 0x00
-let pwmStatusOffset = 0x04
-let pwmDmaCOffset = 0x08
-let pwmRange1Offset = 0x010
-let pwmData1Offset = 0x14
-let pwmFifoOffset = 0x18
-let pwmRange2Offset = 0x020
-let pwmData2Offset = 0x24
-
-let pwmRegisters = try! raspberryPi.mapPeripheral(at: pwmRegistersOffset, size: raspberryPi.pageSize)
-
-let pwmControl = pwmRegisters.advanced(by: pwmControlOffset).bindMemory(to: Int.self, capacity: 1)
-let pwmStatus = pwmRegisters.advanced(by: pwmStatusOffset).bindMemory(to: Int.self, capacity: 1)
-let pwmDmaC = pwmRegisters.advanced(by: pwmDmaCOffset).bindMemory(to: Int.self, capacity: 1)
-let pwmRange1 = pwmRegisters.advanced(by: pwmRange1Offset).bindMemory(to: Int.self, capacity: 1)
-let pwmData1 = pwmRegisters.advanced(by: pwmData1Offset).bindMemory(to: Int.self, capacity: 1)
-let pwmFifo = pwmRegisters.advanced(by: pwmFifoOffset).bindMemory(to: Int.self, capacity: 1)
-let pwmRange2 = pwmRegisters.advanced(by: pwmRange2Offset).bindMemory(to: Int.self, capacity: 1)
-let pwmData2 = pwmRegisters.advanced(by: pwmData2Offset).bindMemory(to: Int.self, capacity: 1)
+import RaspberryPi
 
 
-let pwmRange1BusAddress = raspberryPi.peripheralBusBaseAddress + pwmRegistersOffset + pwmRange1Offset
-let pwmFifoBusAddress = raspberryPi.peripheralBusBaseAddress + pwmRegistersOffset + pwmFifoOffset
-let pwmRange2BusAddress = raspberryPi.peripheralBusBaseAddress + pwmRegistersOffset + pwmRange2Offset
+let pwmRegisters = try! raspberryPi.mapPeripheral(at: PWM.offset, size: PWM.size)
+
+let pwmControl = pwmRegisters.advanced(by: PWM.controlOffset).bindMemory(to: Int.self, capacity: 1)
+let pwmStatus = pwmRegisters.advanced(by: PWM.statusOffset).bindMemory(to: Int.self, capacity: 1)
+let pwmDmaC = pwmRegisters.advanced(by: PWM.dmaConfigurationOffset).bindMemory(to: Int.self, capacity: 1)
+let pwmRange1 = pwmRegisters.advanced(by: PWM.channel1RangeOffset).bindMemory(to: Int.self, capacity: 1)
+let pwmData1 = pwmRegisters.advanced(by: PWM.channel1DataOffset).bindMemory(to: Int.self, capacity: 1)
+let pwmFifo = pwmRegisters.advanced(by: PWM.fifoInputOffset).bindMemory(to: Int.self, capacity: 1)
+let pwmRange2 = pwmRegisters.advanced(by: PWM.channel2RangeOffset).bindMemory(to: Int.self, capacity: 1)
+let pwmData2 = pwmRegisters.advanced(by: PWM.channel2DataOffset).bindMemory(to: Int.self, capacity: 1)
+
+
+let pwmRange1BusAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.channel1RangeOffset
+let pwmFifoBusAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.fifoInputOffset
+let pwmRange2BusAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.channel2RangeOffset
 
 
 let pwmCtlMarkspaceEnable2 = 1 << 15

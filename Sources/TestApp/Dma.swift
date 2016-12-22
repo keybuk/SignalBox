@@ -12,26 +12,22 @@ import Glibc
 import Darwin
 #endif
 
-let dmaRegistersOffset = 0x007000
+import RaspberryPi
+
+
 let dmaEnableOffset = 0xff0
 
-let dmaRegisters = try! raspberryPi.mapPeripheral(at: dmaRegistersOffset, size: raspberryPi.pageSize)
+let dmaRegisters = try! raspberryPi.mapPeripheral(at: DMA.offset, size: DMA.size)
 
-let dmaEnable = dmaRegisters.advanced(by: dmaEnableOffset).bindMemory(to: Int.self, capacity: 1)
+let dmaEnable = dmaRegisters.advanced(by: DMA.enableOffset).bindMemory(to: Int.self, capacity: 1)
 
-
-let dmaChannelSize = 0x000100
-
-let dmaControlStatusOffset = 0x00
-let dmaControlBlockAddressOffset = 0x04
-let dmaDebugOffset = 0x20
 
 let dmaChannel = 5
-let dmaChannelRegisters = dmaRegisters.advanced(by: dmaChannel * dmaChannelSize)
+let dmaChannelRegisters = dmaRegisters.advanced(by: dmaChannel * DMA.channelSize)
 
-let dmaControlStatus = dmaChannelRegisters.advanced(by: dmaControlStatusOffset).bindMemory(to: Int.self, capacity: 1)
-let dmaControlBlockAddress = dmaChannelRegisters.advanced(by: dmaControlBlockAddressOffset).bindMemory(to: Int.self, capacity: 1)
-let dmaDebug = dmaChannelRegisters.advanced(by: dmaDebugOffset).bindMemory(to: Int.self, capacity: 1)
+let dmaControlStatus = dmaChannelRegisters.advanced(by: DMAChannel.controlStatusOffset).bindMemory(to: Int.self, capacity: 1)
+let dmaControlBlockAddress = dmaChannelRegisters.advanced(by: DMAChannel.controlBlockAddressOffset).bindMemory(to: Int.self, capacity: 1)
+let dmaDebug = dmaChannelRegisters.advanced(by: DMAChannel.debugOffset).bindMemory(to: Int.self, capacity: 1)
 
 
 let dmaCbTransferInformationIndex = 0

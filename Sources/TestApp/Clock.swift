@@ -12,15 +12,13 @@ import Glibc
 import Darwin
 #endif
 
+import RaspberryPi
 
-let clockRegistersOffset = 0x101000
-let clockPwmControlOffset = 0xa0
-let clockPwmDivOffset = 0xa4
 
-let clockRegisters = try! raspberryPi.mapPeripheral(at: clockRegistersOffset, size: raspberryPi.pageSize)
+let clockRegisters = try! raspberryPi.mapPeripheral(at: Clocks.offset, size: raspberryPi.pageSize)
 
-let clockPwmControl = clockRegisters.advanced(by: clockPwmControlOffset).bindMemory(to: Int.self, capacity: 1)
-let clockPwmDiv = clockRegisters.advanced(by: clockPwmDivOffset).bindMemory(to: Int.self, capacity: 1)
+let clockPwmControl = clockRegisters.advanced(by: Clocks.pwmOffset + Clock.controlOffset).bindMemory(to: Int.self, capacity: 1)
+let clockPwmDiv = clockRegisters.advanced(by: Clocks.pwmOffset + Clock.divisorOffset).bindMemory(to: Int.self, capacity: 1)
 
 
 
