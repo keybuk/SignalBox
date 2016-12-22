@@ -7,9 +7,9 @@
 //
 
 #if os(Linux)
-    import Glibc
+import Glibc
 #else
-    import Darwin
+import Darwin
 #endif
 
 
@@ -18,7 +18,7 @@ let gpioFunctionSelectOffset = 0x00
 let gpioPinOutputSetOffset = 0x1c
 let gpioPinOutputClearOffset = 0x28
 
-let gpioRegisters = mapPeripheral(at: gpioRegistersOffset)
+let gpioRegisters = try! raspberryPi.mapPeripheral(at: gpioRegistersOffset, size: raspberryPi.pageSize)
 
 let gpioFunctionSelect = gpioRegisters.advanced(by: gpioFunctionSelectOffset).bindMemory(to: Int.self, capacity: 2)
 let gpioPinOutputSet = gpioRegisters.advanced(by: gpioPinOutputSetOffset).bindMemory(to: Int.self, capacity: 2)
@@ -51,5 +51,5 @@ func setGpioValue(gpio: Int, value: Bool) {
 }
 
 
-let gpioPinOutputSetBusAddress = peripheralBusBaseAddress + gpioRegistersOffset + gpioPinOutputSetOffset
-let gpioPinOutputClearBusAddress = peripheralBusBaseAddress + gpioRegistersOffset + gpioPinOutputClearOffset
+let gpioPinOutputSetBusAddress = raspberryPi.peripheralBusBaseAddress + gpioRegistersOffset + gpioPinOutputSetOffset
+let gpioPinOutputClearBusAddress = raspberryPi.peripheralBusBaseAddress + gpioRegistersOffset + gpioPinOutputClearOffset

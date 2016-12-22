@@ -7,15 +7,15 @@
 //
 
 #if os(Linux)
-    import Glibc
+import Glibc
 #else
-    import Darwin
+import Darwin
 #endif
 
 let dmaRegistersOffset = 0x007000
 let dmaEnableOffset = 0xff0
 
-let dmaRegisters = mapPeripheral(at: dmaRegistersOffset)
+let dmaRegisters = try! raspberryPi.mapPeripheral(at: dmaRegistersOffset, size: raspberryPi.pageSize)
 
 let dmaEnable = dmaRegisters.advanced(by: dmaEnableOffset).bindMemory(to: Int.self, capacity: 1)
 

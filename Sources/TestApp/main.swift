@@ -1,8 +1,13 @@
 #if os(Linux)
-    import Glibc
+import Glibc
 #else
-    import Darwin
+import Darwin
 #endif
+
+import RaspberryPi
+
+
+let raspberryPi = try! RaspberryPi()
 
 
 let railcomGpio = 17
@@ -13,7 +18,8 @@ let debugGpio = 19
 
 
 // Allocate control block and instructions
-let (dataHandle, dataBusAddress, dataPhysicalAddress, data) = makeUncachedMap(pages: 1)
+let (dataBusAddress, dataPointer) = try! raspberryPi.allocateUncachedMemory(pages: 1)
+let data = dataPointer.bindMemory(to: Int.self, capacity: raspberryPi.pageSize / MemoryLayout<Int>.stride)
 
 let pwmFlags = dmaTiNoWideBursts | dmaTiPwm | dmaTiSrcInc | dmaTiDestDreq | dmaTiWaitResp
 let gpioFlags = dmaTiNoWideBursts | dmaTiWaitResp | dmaTiPwm | dmaTiDestDreq
@@ -161,4 +167,4 @@ pwmDisable()
 dmaDisable()
 clockDisable()
 
-cleanup(handle: dataHandle)
+//cleanup(handle: dataHandle)

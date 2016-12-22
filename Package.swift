@@ -3,8 +3,8 @@ import PackageDescription
 let package = Package(
     name: "SignalBox",
     targets: [
-        Target(name: "Mailbox", dependencies: ["Cmailbox"]),
-        Target(name: "Prototype", dependencies: ["Mailbox"]),
-        Target(name: "TestApp", dependencies: ["Mailbox"])
+        Target(name: "RaspberryPi", dependencies: ["Cmailbox"]),
+        Target(name: "Prototype", dependencies: ["RaspberryPi"]),
+        Target(name: "TestApp", dependencies: ["RaspberryPi"])
     ]
 )

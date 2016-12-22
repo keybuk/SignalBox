@@ -7,9 +7,9 @@
 //
 
 #if os(Linux)
-    import Glibc
+import Glibc
 #else
-    import Darwin
+import Darwin
 #endif
 
 let pwmRegistersOffset = 0x20c000
@@ -22,7 +22,7 @@ let pwmFifoOffset = 0x18
 let pwmRange2Offset = 0x020
 let pwmData2Offset = 0x24
 
-let pwmRegisters = mapPeripheral(at: pwmRegistersOffset)
+let pwmRegisters = try! raspberryPi.mapPeripheral(at: pwmRegistersOffset, size: raspberryPi.pageSize)
 
 let pwmControl = pwmRegisters.advanced(by: pwmControlOffset).bindMemory(to: Int.self, capacity: 1)
 let pwmStatus = pwmRegisters.advanced(by: pwmStatusOffset).bindMemory(to: Int.self, capacity: 1)
@@ -34,9 +34,9 @@ let pwmRange2 = pwmRegisters.advanced(by: pwmRange2Offset).bindMemory(to: Int.se
 let pwmData2 = pwmRegisters.advanced(by: pwmData2Offset).bindMemory(to: Int.self, capacity: 1)
 
 
-let pwmRange1BusAddress = peripheralBusBaseAddress + pwmRegistersOffset + pwmRange1Offset
-let pwmFifoBusAddress = peripheralBusBaseAddress + pwmRegistersOffset + pwmFifoOffset
-let pwmRange2BusAddress = peripheralBusBaseAddress + pwmRegistersOffset + pwmRange2Offset
+let pwmRange1BusAddress = raspberryPi.peripheralBusBaseAddress + pwmRegistersOffset + pwmRange1Offset
+let pwmFifoBusAddress = raspberryPi.peripheralBusBaseAddress + pwmRegistersOffset + pwmFifoOffset
+let pwmRange2BusAddress = raspberryPi.peripheralBusBaseAddress + pwmRegistersOffset + pwmRange2Offset
 
 
 let pwmCtlMarkspaceEnable2 = 1 << 15

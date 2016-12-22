@@ -7,16 +7,17 @@
 //
 
 #if os(Linux)
-    import Glibc
+import Glibc
 #else
-    import Darwin
+import Darwin
 #endif
+
 
 let clockRegistersOffset = 0x101000
 let clockPwmControlOffset = 0xa0
 let clockPwmDivOffset = 0xa4
 
-let clockRegisters = mapPeripheral(at: clockRegistersOffset)
+let clockRegisters = try! raspberryPi.mapPeripheral(at: clockRegistersOffset, size: raspberryPi.pageSize)
 
 let clockPwmControl = clockRegisters.advanced(by: clockPwmControlOffset).bindMemory(to: Int.self, capacity: 1)
 let clockPwmDiv = clockRegisters.advanced(by: clockPwmDivOffset).bindMemory(to: Int.self, capacity: 1)
