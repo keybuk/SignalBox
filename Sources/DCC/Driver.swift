@@ -25,9 +25,9 @@ import RaspberryPi
 /// Since there are not sufficient PWM channels, GPIOs are used directly from the DMA engine for the RailCom cutout, and the debug signal. Testing revealed that the control blocks to adjust the GPIOs must be synchronized with the second DREQ after the one for the word they are to be synchronized with, to allow that word to pass through the FIFO and into the PWM hardware. Much of the logic of this class is handling that delaying compared to the bitstream, including across the loop at the end of the data.
 ///
 /// In addition, since the DREQ is synchronized to PWM word boundaries, it is necessary to regularly use the DMA engine to adjust the Range register of the PWM so a GPIO can be raised or lowered at the correct physical bit boundary, which may not otherwise fall on a word boundary. Testing revealed that the control block for this Range register change must be synchronized with the first DREQ after the one for the word it is to adjust. The need to shortern a word is already conveyed in the bitstream through the `size` payload.
-class Driver {
+public class Driver {
     
-    enum DriverError: Error {
+    public enum DriverError: Error {
         case infiniteLoop
     }
     
@@ -59,7 +59,7 @@ class Driver {
     var data: UnsafeMutablePointer<Int>
     var dataIndex = 0
 
-    init(raspberryPi: RaspberryPi) throws {
+    public init(raspberryPi: RaspberryPi) throws {
         self.raspberryPi = raspberryPi
         
         gpio = try GPIO.on(raspberryPi)
@@ -83,7 +83,7 @@ class Driver {
 
     }
     
-    func setup() {
+    public func setup() {
         // Set the railcom gpio for output and raise high.
         gpio.pointee.functionSelect[railcomGpio] = .output
         gpio.pointee.outputSet[railcomGpio] = true
@@ -284,7 +284,7 @@ class Driver {
         }
     }
     
-    func queue(bitstream: Bitstream) throws -> Int {
+    public func queue(bitstream: Bitstream) throws -> Int {
         let startIndex = controlBlockIndex
 
         var range = 0
@@ -373,7 +373,7 @@ class Driver {
         return startIndex
     }
     
-    func start(at index: Int) {
+    public func start(at index: Int) {
         dmaChannel.pointee.controlBlockAddress = controlBlockBusAddress + MemoryLayout<DMAControlBlock>.stride * index
 
         usleep(100)
@@ -382,7 +382,7 @@ class Driver {
         while !dmaChannel.pointee.controlStatus.contains(.transferComplete) { }
     }
     
-    func stop() {
+    public func stop() {
         pwm.pointee.disable()
         dmaChannel.pointee.controlStatus.insert(.abort)
         usleep(100)

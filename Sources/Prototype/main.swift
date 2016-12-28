@@ -7,6 +7,7 @@
 //
 
 import RaspberryPi
+import DCC
 
 let resetPacket = Packet(bytes: [0b00000000, 0b00000000, 0b00000000])
 let idlePacket  = Packet(bytes: [0b11111111, 0b00000000, 0b11111111])

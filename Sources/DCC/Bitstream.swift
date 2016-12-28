@@ -15,19 +15,23 @@
 /// Additional events such as the RailCom cutout period, and a debug packet period, are included in the bitstream. These markers are placed in the stream prior to the data to which they should be synchronized.
 ///
 /// This bitstream can be passed to a `Driver`.
-struct Bitstream : Collection {
+public struct Bitstream : Collection {
     
     /// Size of words.
     ///
     /// Generally the platform's word size, but can be overriden at initialization for testing purposes.
     let wordSize: Int
     
-    init(wordSize: Int =  MemoryLayout<Int>.size * 8) {
+    public init(wordSize: Int) {
         self.wordSize = wordSize
+    }
+    
+    public init() {
+        self.wordSize = MemoryLayout<Int>.size * 8
     }
 
     /// Event than can occur within the DCC bitstream.
-    enum Event {
+    public enum Event {
         /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than `wordSize`.
         case data(word: Int, size: Int)
         
@@ -45,18 +49,18 @@ struct Bitstream : Collection {
     }
 
     /// Events generated from the input.
-    private var events: [Event] = []
+    var events: [Event] = []
     
     // Conformance to Collection.
     // Forward to the private `events` array.
-    var startIndex: Array<Event>.Index { return events.startIndex }
-    var endIndex: Array<Event>.Index { return events.endIndex }
+    public var startIndex: Array<Event>.Index { return events.startIndex }
+    public var endIndex: Array<Event>.Index { return events.endIndex }
     
-    func index(after i: Array<Event>.Index) -> Array<Event>.Index {
+    public func index(after i: Array<Event>.Index) -> Array<Event>.Index {
         return events.index(after: i)
     }
     
-    subscript(index: Array<Event>.Index) -> Event {
+    public subscript(index: Array<Event>.Index) -> Event {
         return events[index]
     }
     
@@ -64,7 +68,7 @@ struct Bitstream : Collection {
     ///
     /// - Parameters:
     ///   - event: event to append.
-    mutating func append(_ event: Event) {
+    public mutating func append(_ event: Event) {
         events.append(event)
     }
     
@@ -79,7 +83,7 @@ struct Bitstream : Collection {
     ///
     /// - Note:
     ///   NMRA S-9.1 recommends a minimum duration of 100µs for a logical 0 bit. We use a slightly longer value because it allows for much more efficient usage of the PWM and DMA hardware. This is permitted as the standard allows the duration to be in the range 99—9,900µs.
-    mutating func append(logicalBit bit: Int) {
+    public mutating func append(logicalBit bit: Int) {
         switch bit {
         case 1:
             append(physicalBits: 0b11110000, count: 8)
@@ -99,7 +103,7 @@ struct Bitstream : Collection {
     /// - Parameters:
     ///   - bits: physical bits to be added, this is an LSB-aligned value.
     ///   - count: number of right-most bits from `bits` to be added.
-    mutating func append(physicalBits bits: Int, count: Int) {
+    public mutating func append(physicalBits bits: Int, count: Int) {
         var count = count
 
         // Where the last events type is already data, remove and extend it.
@@ -137,7 +141,7 @@ struct Bitstream : Collection {
     /// - Parameters:
     ///   - packet: individual bytes for the packet, including the error detection data byte.
     ///   - debug: `true` if the debug GPIO pin should be raised during this packet transmission and RailCom cutout.
-    mutating func append(operationsModePacket packet: Packet, debug: Bool = false) {
+    public mutating func append(operationsModePacket packet: Packet, debug: Bool = false) {
         appendPreamble()
         
         // If we are debugging this packet, place a marker at the end of the preamble and before the packet start bit.
@@ -164,7 +168,7 @@ struct Bitstream : Collection {
     ///
     /// - Note:
     ///   NMRA S-9.2 recommends that the preamble consist of a minimum of 14 bits. For service mode programming, NMRA S-9.2.3 specifies a long preamble of 20 bits.
-    mutating func appendPreamble(length: Int = 14) {
+    public mutating func appendPreamble(length: Int = 14) {
         for _ in 0..<length {
             append(logicalBit: 1)
         }
@@ -178,7 +182,7 @@ struct Bitstream : Collection {
     ///
     /// - Parameters:
     ///   - packet: DCC packet to be added, including the error detection data byte.
-    mutating func append(packet: Packet) {
+    public mutating func append(packet: Packet) {
         // Each packet byte, starting with the first, is preceeded by a 0 bit.
         for byte in packet.bytes {
             append(logicalBit: 0)
@@ -202,7 +206,7 @@ struct Bitstream : Collection {
     ///   NMRA S-9.1 specifies that the DCC signal must continue for at least 26µs after the packet end bit, which delays the time for the start of the RailCom cutout. NMRA S-9.3.2 further specifies a maximum delay of 32µs. Since physical bits in the stream are 14.5µs, two bits are used to give a delay of 29µs.
     ///
     ///   For the duration of the cutout, NMRA S-9.3.2 provides a valid range of 454–488µs after the packet end bit, and thus including the cutout delay. A total of 32 physical bits are used—2 in the delay above, 30 in the remainder—giving a total cutout duration of 464µs.
-    mutating func appendRailComCutout() {
+    public mutating func appendRailComCutout() {
         append(physicalBits: 0b11, count: 2)
         append(.railComCutoutStart)
         append(physicalBits: 0b110000111100001111000011110000, count: 30)
