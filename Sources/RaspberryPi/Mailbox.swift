@@ -8,8 +8,6 @@
 
 import Foundation
 
-import Cmailbox
-
 /// Errors that can be thrown by `Mailbox`.
 public enum MailboxError: Error {
     
@@ -33,6 +31,8 @@ public enum MailboxError: Error {
 /// Documentation is available at https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 public class Mailbox {
     
+    let mailboxPropertyIoctl: UInt = 0xc0046400
+
     let mailboxPath = "/dev/vcio"
     let fileHandle: FileHandle
     
@@ -88,7 +88,7 @@ public class Mailbox {
         buffer.replaceSubrange(5..<(5 + values.count), with: values)
         buffer[5 + values.count] = Tag.end.rawValue
         
-        let result = MailboxProperty(fileHandle.fileDescriptor, buffer)
+        let result = ioctl(fileHandle.fileDescriptor, mailboxPropertyIoctl, UnsafeMutableRawPointer(mutating: buffer))
         if result < 0 {
             throw MailboxError.invalidRequest
         }
