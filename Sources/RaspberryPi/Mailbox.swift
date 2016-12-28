@@ -41,13 +41,6 @@ public class Mailbox {
         fileHandle = try FileHandle(forReadingFrom: URL(fileURLWithPath: mailboxPath))
     }
     
-    deinit {
-        // Handles remain even after the process exits, so return them to the system.
-        for handle in memoryHandles {
-            try? releaseMemory(handle: handle)
-        }
-    }
-    
     /// Property request tags that are currently implemented.
     enum Tag: UInt32 {
         case allocateMemory = 0x3000c
@@ -76,6 +69,7 @@ public class Mailbox {
     /// - Throws:
     ///   `MailboxError.invalidRequest` when the mailbox call fails, or if the mailbox returns a parse error status.
     ///   `MailboxError.invalidResponse` if the response does not match the expected format.
+    ///   `MailboxError.requestFailed` for any other failure.
     func propertyRequest(forTag tag: Tag, values: [UInt32]) throws -> [UInt32] {
         let bufferSize = 6 + values.count
         var buffer: [UInt32] = Array(repeating: 0, count: bufferSize)
@@ -91,7 +85,11 @@ public class Mailbox {
         
         let result = ioctl(fileHandle.fileDescriptor, mailboxPropertyIoctl, UnsafeMutableRawPointer(mutating: buffer))
         if result < 0 {
-            throw MailboxError.invalidRequest
+            if errno == EINVAL {
+                throw MailboxError.invalidRequest
+            } else {
+                throw MailboxError.requestFailed
+            }
         }
 
         switch buffer[1] {
@@ -112,47 +110,11 @@ public class Mailbox {
     /// Handle to memory on the GPU.
     public typealias MemoryHandle = UInt32
     
-    /// Internal cache of allocated memory handles.
-    var memoryHandles: [MemoryHandle] = []
-    
-    /// Flags for `Mailbox.allocateMemory(size:alignment:flags)`
-    public struct AllocateMemoryFlags: OptionSet {
-        public let rawValue: UInt32
-        
-        public init(rawValue: UInt32) {
-            self.rawValue = rawValue
-        }
-        
-        /// Can be resized to 0 at any time. Use for cached data.
-        public static let discardable   = AllocateMemoryFlags(rawValue: 1 << 0)
-        
-        /// Normal allocating alias. Don't use from ARM.
-        public static let normal        = AllocateMemoryFlags(rawValue: 0 << 2)
-        
-        /// 0xC alias.  Uncached.
-        public static let direct        = AllocateMemoryFlags(rawValue: 1 << 2)
-        
-        /// 0x8 alias.  Non-allocating in L2 but coherent.
-        public static let coherent      = AllocateMemoryFlags(rawValue: 2 << 2)
-        
-        /// Initialize buffer to all zeros.
-        public static let zero          = AllocateMemoryFlags(rawValue: 1 << 4)
-        
-        /// Don't initialize (default is to initialize to all ones.)
-        public static let noInit        = AllocateMemoryFlags(rawValue: 1 << 5)
-        
-        /// Likely to be locked for long periods of time.
-        public static let hintPermalock = AllocateMemoryFlags(rawValue: 1 << 6)
-        
-        /// Allocating in L2.
-        public static let l1Nonallocating: AllocateMemoryFlags = [ .direct, .coherent ]
-    }
-
     /// Allocate contiguous memory on the GPU.
     ///
     /// Memory must be locked with `lockMemory(handle:)` before it can be accessed.
     ///
-    /// The returned handle is not managed by the Linux kernel; `Mailbox` will retain a reference to the handle and release it on deinitialization; use `disownMemory(handle:)` to disable this.
+    /// The returned handle is not managed by the Linux kernel and will not be automatically freed on program exit.
     ///
     /// - Parameters:
     ///   - size: number of bytes to allocate.
@@ -164,11 +126,10 @@ public class Mailbox {
     /// - Throws:
     ///   `MailboxError.invalidRequest` when the mailbox call fails, or if the mailbox returns a parse error status.
     ///   `MailboxError.invalidResponse` if the response does not match the expected format.
-    public func allocateMemory(size: Int, alignment: Int, flags: AllocateMemoryFlags) throws -> MemoryHandle {
+    public func allocateMemory(size: Int, alignment: Int, flags: MailboxAllocateMemoryFlags) throws -> MemoryHandle {
         let response = try propertyRequest(forTag: .allocateMemory, values: [ UInt32(size), UInt32(alignment), flags.rawValue ])
         guard response.count == 1 else { throw MailboxError.invalidResponse }
         
-        memoryHandles.append(response[0])
         return response[0]
     }
     
@@ -221,17 +182,40 @@ public class Mailbox {
         let response = try propertyRequest(forTag: .releaseMemory, values: [ handle ])
         guard response.count == 1 else { throw MailboxError.invalidResponse }
         guard response[0] == 0 else { throw MailboxError.requestFailed }
-        
-        disownMemory(handle: handle)
-    }
-    
-    /// Disown memory handle.
-    ///
-    /// Prevents `Mailbox` from automatically releasing the handle on deinitizalition.
-    public func disownMemory(handle: MemoryHandle) {
-        if let index = memoryHandles.index(of: handle) {
-            memoryHandles.remove(at: index)
-        }
     }
     
 }
+
+/// Flags for `Mailbox.allocateMemory(size:alignment:flags)`
+public struct MailboxAllocateMemoryFlags: OptionSet {
+    public let rawValue: UInt32
+    
+    public init(rawValue: UInt32) {
+        self.rawValue = rawValue
+    }
+    
+    /// Can be resized to 0 at any time. Use for cached data.
+    public static let discardable   = MailboxAllocateMemoryFlags(rawValue: 1 << 0)
+    
+    /// Normal allocating alias. Don't use from ARM.
+    public static let normal        = MailboxAllocateMemoryFlags(rawValue: 0 << 2)
+    
+    /// 0xC alias.  Uncached.
+    public static let direct        = MailboxAllocateMemoryFlags(rawValue: 1 << 2)
+    
+    /// 0x8 alias.  Non-allocating in L2 but coherent.
+    public static let coherent      = MailboxAllocateMemoryFlags(rawValue: 2 << 2)
+    
+    /// Initialize buffer to all zeros.
+    public static let zero          = MailboxAllocateMemoryFlags(rawValue: 1 << 4)
+    
+    /// Don't initialize (default is to initialize to all ones.)
+    public static let noInit        = MailboxAllocateMemoryFlags(rawValue: 1 << 5)
+    
+    /// Likely to be locked for long periods of time.
+    public static let hintPermalock = MailboxAllocateMemoryFlags(rawValue: 1 << 6)
+    
+    /// Allocating in L2.
+    public static let l1Nonallocating: MailboxAllocateMemoryFlags = [ .direct, .coherent ]
+}
+
