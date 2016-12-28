@@ -240,11 +240,11 @@ public class Driver {
         return controlBlockIndex - 1
     }
     
-    func dueDelayedEvents(_ delayedEvents: inout [(Int, Bitstream.Event)]) -> [Bitstream.Event] {
+    func dueDelayedEvents(_ delayedEvents: inout [(Int, BitstreamEvent)]) -> [BitstreamEvent] {
         let oldDelayedEvents = delayedEvents
         delayedEvents.removeAll()
         
-        var dueEvents: [Bitstream.Event] = []
+        var dueEvents: [BitstreamEvent] = []
 
         for (delay, event) in oldDelayedEvents {
             if delay == 1 {
@@ -289,7 +289,7 @@ public class Driver {
 
         var range = 0
         var words: [Int] = []
-        var delayedEvents: [(Int, Bitstream.Event)] = []
+        var delayedEvents: [(Int, BitstreamEvent)] = []
         var addresses: [Int: Int] = [:]
         
         var repeating = false
@@ -311,7 +311,7 @@ public class Driver {
                     
                     words.append(word)
 
-                    var dueEvents: [Bitstream.Event] = []
+                    var dueEvents: [BitstreamEvent] = []
                     dueEvents.append(contentsOf: dueDelayedEvents(&laggingEvents))
                     dueEvents.append(contentsOf: dueDelayedEvents(&delayedEvents))
                     

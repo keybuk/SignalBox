@@ -30,37 +30,19 @@ public struct Bitstream : Collection {
         self.wordSize = MemoryLayout<Int>.size * 8
     }
 
-    /// Event than can occur within the DCC bitstream.
-    public enum Event {
-        /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than `wordSize`.
-        case data(word: Int, size: Int)
-        
-        /// Indicates that the RailCom cutout period should begin aligned with the start of the next `.data`.
-        case railComCutoutStart
-        
-        /// Indicates that the RailCom cutout period should end aligned with the start of the next `.data`.
-        case railComCutoutEnd
-        
-        /// Indicates that the debug packet period should begin aligned with the start of the next `.data`.
-        case debugStart
-        
-        /// Indicates that the debug packet period should end aligned with the start of the next `.data`.
-        case debugEnd
-    }
-
     /// Events generated from the input.
-    var events: [Event] = []
+    var events: [BitstreamEvent] = []
     
     // Conformance to Collection.
     // Forward to the private `events` array.
-    public var startIndex: Array<Event>.Index { return events.startIndex }
-    public var endIndex: Array<Event>.Index { return events.endIndex }
+    public var startIndex: Array<BitstreamEvent>.Index { return events.startIndex }
+    public var endIndex: Array<BitstreamEvent>.Index { return events.endIndex }
     
-    public func index(after i: Array<Event>.Index) -> Array<Event>.Index {
+    public func index(after i: Array<BitstreamEvent>.Index) -> Array<BitstreamEvent>.Index {
         return events.index(after: i)
     }
     
-    public subscript(index: Array<Event>.Index) -> Event {
+    public subscript(index: Array<BitstreamEvent>.Index) -> BitstreamEvent {
         return events[index]
     }
     
@@ -68,7 +50,7 @@ public struct Bitstream : Collection {
     ///
     /// - Parameters:
     ///   - event: event to append.
-    public mutating func append(_ event: Event) {
+    public mutating func append(_ event: BitstreamEvent) {
         events.append(event)
     }
     
@@ -214,3 +196,40 @@ public struct Bitstream : Collection {
     }
 
 }
+
+/// Event than can occur within the DCC bitstream.
+public enum BitstreamEvent : Equatable {
+    /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than `wordSize`.
+    case data(word: Int, size: Int)
+    
+    /// Indicates that the RailCom cutout period should begin aligned with the start of the next `.data`.
+    case railComCutoutStart
+    
+    /// Indicates that the RailCom cutout period should end aligned with the start of the next `.data`.
+    case railComCutoutEnd
+    
+    /// Indicates that the debug packet period should begin aligned with the start of the next `.data`.
+    case debugStart
+    
+    /// Indicates that the debug packet period should end aligned with the start of the next `.data`.
+    case debugEnd
+    
+    public static func ==(lhs: BitstreamEvent, rhs: BitstreamEvent) -> Bool {
+        switch (lhs, rhs) {
+        case let (.data(lhsWord, lhsSize), .data(rhsWord, rhsSize)):
+            return lhsWord == rhsWord && lhsSize == rhsSize
+        case (.railComCutoutStart, .railComCutoutStart):
+            return true
+        case (.railComCutoutEnd, .railComCutoutEnd):
+            return true
+        case (.debugStart, .debugStart):
+            return true
+        case (.debugEnd, .debugEnd):
+            return true
+        default:
+            return false
+        }
+    }
+
+}
+
