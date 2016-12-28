@@ -31,7 +31,8 @@ public enum MailboxError: Error {
 /// Documentation is available at https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 public class Mailbox {
     
-    let mailboxPropertyIoctl: UInt = 0xc0046400
+    // _IOWR(100, 0, char *)
+    let mailboxPropertyIoctl: UInt = ((1 | 2) << 30) | (100 << 8) | (0 << 0) | (4 << 16)
 
     let mailboxPath = "/dev/vcio"
     let fileHandle: FileHandle
