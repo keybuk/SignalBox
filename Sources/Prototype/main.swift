@@ -6,6 +6,8 @@
 //
 //
 
+import Foundation
+
 import RaspberryPi
 import DCC
 
