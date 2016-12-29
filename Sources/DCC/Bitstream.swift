@@ -107,6 +107,11 @@ public struct Bitstream : Collection {
     ///
     /// This bit length is measured from the end of the Packet End Bit, and thus includes the bits specified in `railComDelayLength`. It is calculated during initialization based on `bitDuration`.
     public let railComCutoutLength: Int
+    
+    /// Length in physical bits of the entire RailCom output.
+    ///
+    /// This is the value of `railComCutoutLength` rounded up to the nearest double of `oneBitLength`, thus allowing for the complete transmission of logical one bits by the end of the RailCom output period.
+    public let railComLength: Int
 
     /// Size of words.
     ///
@@ -122,6 +127,8 @@ public struct Bitstream : Collection {
         
         railComDelayLength = Int((Bitstream.railComCutoutStartMinimumDuration - 1.0) / bitDuration) + 1
         railComCutoutLength = Int((Bitstream.railComCutoutEndMinimumDuration - 1.0) / bitDuration) + 1
+        
+        railComLength = (oneBitLength * 2) * ((railComCutoutLength - 1) / (oneBitLength * 2) + 1)
 
         // Sanity check the lengths.
         assert(
@@ -313,9 +320,7 @@ public struct Bitstream : Collection {
     /// - Parameters:
     ///   - debug: `true` if the debug GPIO pin should be cleared at the end of the RailCom cutout.
     public mutating func appendRailComCutout(debug: Bool = false) {
-        // Pad out the RailCom cutout to an exact multiple of logical one bit sizes (twice `oneBitLength`).
-        // Step through each part (high or low) and output the appropriate piece.
-        let railComLength = (oneBitLength * 2) * ((railComCutoutLength - 1) / (oneBitLength * 2) + 1)
+        // Step through each high and low bit part.
         for offset in stride(from: 0, to: railComLength, by: oneBitLength) {
             let physicalBit = (offset / oneBitLength) % 2 == 0 ? 1 : 0
             let nextOffset = offset + oneBitLength
