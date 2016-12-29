@@ -54,28 +54,6 @@ public struct Bitstream : Collection {
         events.append(event)
     }
     
-    /// Append logical bits.
-    ///
-    /// Logical bits represent the DCC signal. A logical bit value of 1 has a duration of +3V for 58µs, followed by 0V for the same duration; while a logical bit value of 0 has a duration of +3V for 101.5µs, followed by 0V for the same duration.
-    ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
-    ///
-    /// - Parameters:
-    ///   - bit: logical bit to append, must be the value 1 or 0.
-    ///
-    /// - Note:
-    ///   NMRA S-9.1 recommends a minimum duration of 100µs for a logical 0 bit. We use a slightly longer value because it allows for much more efficient usage of the PWM and DMA hardware. This is permitted as the standard allows the duration to be in the range 99—9,900µs.
-    public mutating func append(logicalBit bit: Int) {
-        switch bit {
-        case 1:
-            append(physicalBits: 0b11110000, count: 8)
-        case 0:
-            append(physicalBits: 0b11111110000000, count: 14)
-        default:
-            assertionFailure("Bit must be 1 or 0")
-        }
-    }
-    
     /// Append physical bits.
     ///
     /// Physical bits are the input to the PWM, with a duration of 14.5µs. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
@@ -113,6 +91,28 @@ public struct Bitstream : Collection {
             }
             
             events.append(.data(word: word, size: count))
+        }
+    }
+    
+    /// Append logical bits.
+    ///
+    /// Logical bits represent the DCC signal. A logical bit value of 1 has a duration of +3V for 58µs, followed by 0V for the same duration; while a logical bit value of 0 has a duration of +3V for 101.5µs, followed by 0V for the same duration.
+    ///
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    ///
+    /// - Parameters:
+    ///   - bit: logical bit to append, must be the value 1 or 0.
+    ///
+    /// - Note:
+    ///   NMRA S-9.1 recommends a minimum duration of 100µs for a logical 0 bit. We use a slightly longer value because it allows for much more efficient usage of the PWM and DMA hardware. This is permitted as the standard allows the duration to be in the range 99—9,900µs.
+    public mutating func append(logicalBit bit: Int) {
+        switch bit {
+        case 1:
+            append(physicalBits: 0b11110000, count: 8)
+        case 0:
+            append(physicalBits: 0b11111110000000, count: 14)
+        default:
+            assertionFailure("Bit must be 1 or 0")
         }
     }
     

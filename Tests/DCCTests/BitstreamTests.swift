@@ -19,6 +19,8 @@ class BitstreamTests: XCTestCase {
         wordSize = MemoryLayout<Int>.size * 8
     }
     
+    // MARK: Physical Bits
+
     /// Test that a zero count input is accepted and doesn't add any output.
     func testPhysicalBitsZeroCount() {
         var x = Bitstream()
@@ -162,6 +164,222 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[1], .debugStart)
         XCTAssertEqual(x[2], .data(word: 0b1111 << (wordSize - 4), size: 4))
     }
+    
+    // MARK: Logical Bits
+    
+    /// Test that a logical one bit is appended as the right number and values of physical bits.
+    func testLogicalOneBit() {
+        var x = Bitstream()
+        x.append(logicalBit: 1)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b11110000 << (wordSize - 8), size: 8))
+    }
+
+    /// Test that a logical one bit can be broken up into multiple data if it doesn't fit.
+    /*
+    func testLogicalOneBitDoesntFit() {
+        var x = Bitstream(wordSize: 6)
+        x.append(logicalBit: 1)
+        
+        XCTAssertEqual(x.count, 3)
+        XCTAssertEqual(x[0], .data(word: 0b111, size: 3))
+        XCTAssertEqual(x[0], .data(word: 0b100, size: 3))
+        XCTAssertEqual(x[0], .data(word: 0b00 << 1, size: 2))
+    }
+    */
+    
+    /// Test that a logical one bit can extend existing data.
+    func testLogicalOneBitExtends() {
+        var x = Bitstream()
+        x.append(physicalBits: 0b1100, count: 4)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b1100 << (wordSize - 4), size: 4))
+        
+        x.append(logicalBit: 1)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b110011110000 << (wordSize - 12), size: 12))
+    }
+    
+    /// Test that a logical one bit can extend existing data, and the remainder appended, where it doesn't fit.
+    func testLogicalOneBitExtendsAndAppends() {
+        let bits = ~(~0 << (wordSize - 4))
+        
+        var x = Bitstream()
+        x.append(physicalBits: bits, count: wordSize - 4)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: bits << 4, size: wordSize - 4))
+
+        x.append(logicalBit: 1)
+        
+        XCTAssertEqual(x.count, 2)
+        XCTAssertEqual(x[0], .data(word: (bits << 4) | 0b1111, size: wordSize))
+        XCTAssertEqual(x[1], .data(word: 0b0000 << (wordSize - 4), size: 4))
+    }
+
+    /// Test that a logical one bit can extend existing data, and doesn't add another when it fits, unless another is appended.
+    func testLogicalOneBitExtendsPerfectly() {
+        let bits = ~(~0 << (wordSize - 8))
+        
+        var x = Bitstream()
+        x.append(physicalBits: bits, count: wordSize - 8)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: bits << 8, size: wordSize - 8))
+        
+        x.append(logicalBit: 1)
+        
+        // Test for the perfect fit.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: (bits << 8) | 0b11110000, size: wordSize))
+        
+        // Extra append.
+        x.append(logicalBit: 1)
+        
+        XCTAssertEqual(x.count, 2)
+        XCTAssertEqual(x[0], .data(word: (bits << 8) | 0b11110000, size: wordSize))
+        XCTAssertEqual(x[1], .data(word: 0b11110000 << (wordSize - 8), size: 8))
+    }
+
+    /// Test that a logical one bit can go after non-data.
+    func testLogicalOneBitAfterNonData() {
+        var x = Bitstream()
+        x.append(.debugStart)
+        x.append(logicalBit: 1)
+        
+        XCTAssertEqual(x.count, 2)
+        XCTAssertEqual(x[0], .debugStart)
+        XCTAssertEqual(x[1], .data(word: 0b11110000 << (wordSize - 8), size: 8))
+    }
+    
+    /// Test that appending a logical one bit doesn't try and extend a data prior to a non-data, even when non-complete.
+    ///
+    /// Sizes should remain short.
+    func testLogicalOneBitSandwichNonData() {
+        var x = Bitstream()
+        x.append(physicalBits: 0b10101010, count: 8)
+        x.append(.debugStart)
+        x.append(logicalBit: 1)
+        
+        XCTAssertEqual(x.count, 3)
+        XCTAssertEqual(x[0], .data(word: 0b10101010 << (wordSize - 8), size: 8))
+        XCTAssertEqual(x[1], .debugStart)
+        XCTAssertEqual(x[2], .data(word: 0b11110000 << (wordSize - 8), size: 8))
+    }
+
+    /// Test that a logical zero bit is appended as the right number and values of physical bits.
+    func testLogicalZeroBit() {
+        var x = Bitstream()
+        x.append(logicalBit: 0)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b11111110000000 << (wordSize - 14), size: 14))
+    }
+    
+    /// Test that a logical zero bit can be broken up into multiple data if it doesn't fit.
+    /*
+     func testLogicalZeroBitDoesntFit() {
+         var x = Bitstream(wordSize: 6)
+         x.append(logicalBit: 1)
+         
+         XCTAssertEqual(x.count, 5)
+         XCTAssertEqual(x[0], .data(word: 0b111, size: 3))
+         XCTAssertEqual(x[0], .data(word: 0b111, size: 3))
+         XCTAssertEqual(x[0], .data(word: 0b100, size: 2))
+         XCTAssertEqual(x[0], .data(word: 0b000, size: 2))
+         XCTAssertEqual(x[0], .data(word: 0b00 << 1, size: 2))
+     }
+     */
+    
+    /// Test that a logical zero bit can extend existing data.
+    func testLogicalZeroBitExtends() {
+        var x = Bitstream()
+        x.append(physicalBits: 0b1100, count: 4)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b1100 << (wordSize - 4), size: 4))
+        
+        x.append(logicalBit: 0)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b110011111110000000 << (wordSize - 18), size: 18))
+    }
+    
+    /// Test that a logical zero bit can extend existing data, and the remainder appended, where it doesn't fit.
+    func testLogicalZeroBitExtendsAndAppends() {
+        let bits = ~(~0 << (wordSize - 4))
+        
+        var x = Bitstream()
+        x.append(physicalBits: bits, count: wordSize - 4)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: bits << 4, size: wordSize - 4))
+        
+        x.append(logicalBit: 0)
+        
+        XCTAssertEqual(x.count, 2)
+        XCTAssertEqual(x[0], .data(word: (bits << 4) | 0b1111, size: wordSize))
+        XCTAssertEqual(x[1], .data(word: 0b1110000000 << (wordSize - 10), size: 10))
+    }
+    
+    /// Test that a logical zero bit can extend existing data, and doesn't add another when it fits, unless another is appended.
+    func testLogicalZeroBitExtendsPerfectly() {
+        let bits = ~(~0 << (wordSize - 14))
+        
+        var x = Bitstream()
+        x.append(physicalBits: bits, count: wordSize - 14)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: bits << 14, size: wordSize - 14))
+        
+        x.append(logicalBit: 0)
+        
+        // Test for the perfect fit.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: (bits << 14) | 0b11111110000000, size: wordSize))
+        
+        // Extra append.
+        x.append(logicalBit: 0)
+        
+        XCTAssertEqual(x.count, 2)
+        XCTAssertEqual(x[0], .data(word: (bits << 14) | 0b11111110000000, size: wordSize))
+        XCTAssertEqual(x[1], .data(word: 0b11111110000000 << (wordSize - 14), size: 14))
+    }
+
+    /// Test that a logical zero bit can go after non-data.
+    func testLogicalZeroBitAfterNonData() {
+        var x = Bitstream()
+        x.append(.debugStart)
+        x.append(logicalBit: 0)
+        
+        XCTAssertEqual(x.count, 2)
+        XCTAssertEqual(x[0], .debugStart)
+        XCTAssertEqual(x[1], .data(word: 0b111111110000000 << (wordSize - 14), size: 14))
+    }
+    
+    /// Test that appending a logical zero bit doesn't try and extend a data prior to a non-data, even when non-complete.
+    ///
+    /// Sizes should remain short.
+    func testLogicalZeroBitSandwichNonData() {
+        var x = Bitstream()
+        x.append(physicalBits: 0b10101010, count: 8)
+        x.append(.debugStart)
+        x.append(logicalBit: 0)
+        
+        XCTAssertEqual(x.count, 3)
+        XCTAssertEqual(x[0], .data(word: 0b10101010 << (wordSize - 8), size: 8))
+        XCTAssertEqual(x[1], .debugStart)
+        XCTAssertEqual(x[2], .data(word: 0b111111110000000 << (wordSize - 14), size: 14))
+    }
 
 }
 
@@ -179,6 +397,18 @@ extension BitstreamTests {
             ("testPhysicalBitsExtendsPerfectly", testPhysicalBitsExtendsPerfectly),
             ("testPhysicalBitsAfterNonData", testPhysicalBitsAfterNonData),
             ("testPhysicalBitsSandwichNonData", testPhysicalBitsSandwichNonData),
+            ("testLogicalOneBit", testLogicalOneBit),
+            ("testLogicalOneBitExtends", testLogicalOneBitExtends),
+            ("testLogicalOneBitExtendsAndAppends", testLogicalOneBitExtendsAndAppends),
+            ("testLogicalOneBitExtendsPerfectly", testLogicalOneBitExtendsPerfectly),
+            ("testLogicalOneBitAfterNonData", testLogicalOneBitAfterNonData),
+            ("testLogicalOneBitSandwichNonData", testLogicalOneBitSandwichNonData),
+            ("testLogicalZeroBit", testLogicalZeroBit),
+            ("testLogicalZeroBitExtends", testLogicalZeroBitExtends),
+            ("testLogicalZeroBitExtendsAndAppends", testLogicalZeroBitExtendsAndAppends),
+            ("testLogicalZeroBitExtendsPerfectly", testLogicalZeroBitExtendsPerfectly),
+            ("testLogicalZeroBitAfterNonData", testLogicalZeroBitAfterNonData),
+            ("testLogicalZeroBitSandwichNonData", testLogicalZeroBitSandwichNonData),
             ]
     }()
 
