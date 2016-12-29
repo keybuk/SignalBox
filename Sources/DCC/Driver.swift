@@ -100,6 +100,7 @@ public class Driver {
         
         pwm.pointee.disable()
         pwm.pointee.reset()
+        pwm.pointee.control.insert(.clearFifo)
         
         dma.enable.pointee |= 1 << dmaChannelNumber
         usleep(100)
