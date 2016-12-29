@@ -19,6 +19,41 @@ class BitstreamTests: XCTestCase {
         wordSize = MemoryLayout<Int>.size * 8
     }
     
+    /// Test that we get the collection members for free.
+    func testCollection() {
+        var x = Bitstream()
+        
+        XCTAssertEqual(x.count, 0)
+        XCTAssertTrue(x.isEmpty)
+        
+        x.append(.debugStart)
+
+        XCTAssertFalse(x.isEmpty)
+    }
+    
+    
+    // MARK: Events
+    
+    /// Test that we can append an event.
+    func testEvent() {
+        var x = Bitstream()
+        x.append(.debugStart)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .debugStart)
+    }
+    
+    /// Test that we can append multiple events.
+    func testEventMultiple() {
+        var x = Bitstream()
+        x.append(.debugStart)
+        x.append(.debugEnd)
+        
+        XCTAssertEqual(x.count, 2)
+        XCTAssertEqual(x[0], .debugStart)
+        XCTAssertEqual(x[1], .debugEnd)
+    }
+
     
     // MARK: Physical Bits
 
@@ -664,6 +699,11 @@ extension BitstreamTests {
     
     static var allTests = {
         return [
+            ("testCollection", testCollection),
+            
+            ("testEvent", testEvent),
+            ("testEventMultiple", testEventMultiple),
+        
             ("testPhysicalBitsZeroCount", testPhysicalBitsZeroCount),
             ("testPhysicalBitsAllOnes", testPhysicalBitsAllOnes),
             ("testPhysicalBitsAllZeros", testPhysicalBitsAllZeros),
