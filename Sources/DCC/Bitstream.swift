@@ -174,33 +174,6 @@ public struct Bitstream : Collection {
         }
     }
     
-    /// Append a DCC packet for use in Operations Mode.
-    ///
-    /// An operations mode packet consists of a 14-bit preamble, followed by the packet and a RailCom cutout.
-    ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
-    ///
-    /// - Parameters:
-    ///   - packet: individual bytes for the packet, including the error detection data byte.
-    ///   - debug: `true` if the debug GPIO pin should be raised during this packet transmission and RailCom cutout.
-    public mutating func append(operationsModePacket packet: Packet, debug: Bool = false) {
-        appendPreamble()
-        
-        // If we are debugging this packet, place a marker at the end of the preamble and before the packet start bit.
-        if debug {
-            append(.debugStart)
-        }
-        
-        append(packet: packet)
-        
-        appendRailComCutout()
-
-        // If we were debugging this packet, clear the marker for that too; thus the debug duration includes the full packet, and the RailCom cutout.
-        if debug {
-            append(.debugEnd)
-        }
-    }
-    
     /// Append a DCC preamble.
     ///
     /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
@@ -214,28 +187,6 @@ public struct Bitstream : Collection {
         for _ in 0..<length {
             append(logicalBit: 1)
         }
-    }
-    
-    /// Append a DCC packet.
-    ///
-    /// The contents of the packet are appended along with the packet start bit, data byte start bits, and packet end bit.
-    ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
-    ///
-    /// - Parameters:
-    ///   - packet: DCC packet to be added, including the error detection data byte.
-    public mutating func append(packet: Packet) {
-        // Each packet byte, starting with the first, is preceeded by a 0 bit.
-        for byte in packet.bytes {
-            append(logicalBit: 0)
-            
-            for bit in 0..<8 {
-                append(logicalBit: (byte >> (7 - bit)) & 0b1)
-            }
-        }
-
-        // Packet End Bit: 1 x 1-bit.
-        append(logicalBit: 1)
     }
     
     /// Append a RailCom cutout.
@@ -260,6 +211,55 @@ public struct Bitstream : Collection {
         append(repeatingPhysicalBit: 1, count: 4)
         append(repeatingPhysicalBit: 0, count: 4)
         append(.railComCutoutEnd)
+    }
+
+    /// Append a DCC packet.
+    ///
+    /// The contents of the packet are appended along with the packet start bit, data byte start bits, and packet end bit.
+    ///
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    ///
+    /// - Parameters:
+    ///   - packet: DCC packet to be added, including the error detection data byte.
+    public mutating func append(packet: Packet) {
+        // Each packet byte, starting with the first, is preceeded by a 0 bit.
+        for byte in packet.bytes {
+            append(logicalBit: 0)
+            
+            for bit in 0..<8 {
+                append(logicalBit: (byte >> (7 - bit)) & 0b1)
+            }
+        }
+        
+        // Packet End Bit: 1 x 1-bit.
+        append(logicalBit: 1)
+    }
+    
+    /// Append a DCC packet for use in Operations Mode.
+    ///
+    /// An operations mode packet consists of a 14-bit preamble, followed by the packet and a RailCom cutout.
+    ///
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    ///
+    /// - Parameters:
+    ///   - packet: individual bytes for the packet, including the error detection data byte.
+    ///   - debug: `true` if the debug GPIO pin should be raised during this packet transmission and RailCom cutout.
+    public mutating func append(operationsModePacket packet: Packet, debug: Bool = false) {
+        appendPreamble()
+        
+        // If we are debugging this packet, place a marker at the end of the preamble and before the packet start bit.
+        if debug {
+            append(.debugStart)
+        }
+        
+        append(packet: packet)
+        
+        appendRailComCutout()
+        
+        // If we were debugging this packet, clear the marker for that too; thus the debug duration includes the full packet, and the RailCom cutout.
+        if debug {
+            append(.debugEnd)
+        }
     }
 
 }
