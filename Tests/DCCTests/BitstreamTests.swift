@@ -692,6 +692,183 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[1], .debugStart)
         XCTAssertEqual(x[2], .data(word: 0b111111110000000 << (wordSize - 14), size: 14))
     }
+    
+    
+    // MARK: Preamble
+    
+    /// Test that we can append a preamble of default length.
+    ///
+    /// This should append the data for fourteen logical one bits.
+    func testPreamble() {
+        var x = Bitstream(wordSize: 32)
+        x.appendPreamble()
+        
+        XCTAssertEqual(x.count, 4)
+        XCTAssertEqual(x[0], .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[1], .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[2], .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[3], .data(word: 0b1111000011110000 << 16, size: 16))
+    }
+    
+    /// Test that we can append a long preamble with a specified length.
+    func testPreambleWithLength() {
+        var x = Bitstream(wordSize: 32)
+        x.appendPreamble(length: 20)
+        
+        XCTAssertEqual(x.count, 5)
+        XCTAssertEqual(x[0], .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[1], .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[2], .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[3], .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[4], .data(word: 0b11110000111100001111000011110000, size: 32))
+    }
+    
+    /// Test that appending a preamble extends any existing data.
+    func testPreambleExtends() {
+        var x = Bitstream(wordSize: 32)
+        x.append(physicalBits: 0b101010, count: 6)
+        x.appendPreamble()
+        
+        XCTAssertEqual(x.count, 4)
+        XCTAssertEqual(x[0], .data(word: 0b10101011110000111100001111000011, size: 32))
+        XCTAssertEqual(x[1], .data(word: 0b11000011110000111100001111000011, size: 32))
+        XCTAssertEqual(x[2], .data(word: 0b11000011110000111100001111000011, size: 32))
+        XCTAssertEqual(x[3], .data(word: 0b1100001111000011110000 << 10, size: 22))
+    }
+    
+    
+    // MARK: RailCom Cutout
+    
+    /// Test that we can append a RailCom cutout.
+    ///
+    /// This is a relatively complicated structure consisting of a 26µs delay, before the start event, and a total length of 454µs before the end event. The events cut into an ordinary transmission of logical one bits which should be complete in form.
+    func testRailComCutout() {
+        var x = Bitstream(wordSize: 32)
+        x.appendRailComCutout()
+        
+        XCTAssertEqual(x.count, 4)
+        XCTAssertEqual(x[0], .data(word: 0b11 << 30, size: 2))
+        XCTAssertEqual(x[1], .railComCutoutStart)
+        XCTAssertEqual(x[2], .data(word: 0b110000111100001111000011110000 << 2, size: 30))
+        XCTAssertEqual(x[3], .railComCutoutEnd)
+    }
+    
+    /// Test that appending a RailCom cutout extends any existing data.
+    func testRailComCutoutExtends() {
+        var x = Bitstream(wordSize: 32)
+        x.append(physicalBits: 0b101010, count: 6)
+        x.appendRailComCutout()
+        
+        XCTAssertEqual(x.count, 4)
+        XCTAssertEqual(x[0], .data(word: 0b10101011 << 24, size: 8))
+        XCTAssertEqual(x[1], .railComCutoutStart)
+        XCTAssertEqual(x[2], .data(word: 0b110000111100001111000011110000 << 2, size: 30))
+        XCTAssertEqual(x[3], .railComCutoutEnd)
+    }
+
+    
+    // MARK: Packet
+    
+    /// Test that we can append a DCC packet.
+    ///
+    /// Since the packet is already serialized in byte form, what we're checking here is that the logical bits of those bytes are turned into physical bits, that they are separated by zero bits, prefixed by a zero packet start bit, and terminated by a one packet end bit.
+    func testPacket() {
+        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+
+        var x = Bitstream(wordSize: 32)
+        x.append(packet: packet)
+
+        XCTAssertEqual(x.count, 10)
+        XCTAssertEqual(x[0], .data(word: 0b11111110000000111111100000001111, size: 32))
+        XCTAssertEqual(x[1], .data(word: 0b11100000001111111000000011111110, size: 32))
+        XCTAssertEqual(x[2], .data(word: 0b00000011111110000000111111100000, size: 32))
+        XCTAssertEqual(x[3], .data(word: 0b00111100001111000011111110000000, size: 32))
+        XCTAssertEqual(x[4], .data(word: 0b11111110000000111100001111000011, size: 32))
+        XCTAssertEqual(x[5], .data(word: 0b11000011110000111111100000001111, size: 32))
+        XCTAssertEqual(x[6], .data(word: 0b11100000001111111000000011111110, size: 32))
+        XCTAssertEqual(x[7], .data(word: 0b00000011111110000000111100001111, size: 32))
+        XCTAssertEqual(x[8], .data(word: 0b00001111000011110000111111100000, size: 32))
+        XCTAssertEqual(x[9], .data(word: 0b00111100001111000011110000 << 6, size: 26))
+    }
+
+    /// Test that appending a packet extends any existing data.
+    func testPacketExtends() {
+        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        
+        var x = Bitstream(wordSize: 32)
+        x.append(physicalBits: 0b101010, count: 6)
+        x.append(packet: packet)
+        
+        XCTAssertEqual(x.count, 10)
+        XCTAssertEqual(x[0], .data(word: 0b10101011111110000000111111100000, size: 32))
+        XCTAssertEqual(x[1], .data(word: 0b00111111100000001111111000000011, size: 32))
+        XCTAssertEqual(x[2], .data(word: 0b11111000000011111110000000111111, size: 32))
+        XCTAssertEqual(x[3], .data(word: 0b10000000111100001111000011111110, size: 32))
+        XCTAssertEqual(x[4], .data(word: 0b00000011111110000000111100001111, size: 32))
+        XCTAssertEqual(x[5], .data(word: 0b00001111000011110000111111100000, size: 32))
+        XCTAssertEqual(x[6], .data(word: 0b00111111100000001111111000000011, size: 32))
+        XCTAssertEqual(x[7], .data(word: 0b11111000000011111110000000111100, size: 32))
+        XCTAssertEqual(x[8], .data(word: 0b00111100001111000011110000111111, size: 32))
+        XCTAssertEqual(x[9], .data(word: 0b10000000111100001111000011110000, size: 32))
+    }
+    
+    
+    // MARK: Operations Mode Packet
+    
+    func testOperationsModePacket() {
+        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        
+        var x = Bitstream(wordSize: 32)
+        x.append(operationsModePacket: packet)
+        
+        XCTAssertEqual(x.count, 17)
+        XCTAssertEqual(x[0],  .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[1],  .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[2],  .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[3],  .data(word: 0b11110000111100001111111000000011, size: 32))
+        XCTAssertEqual(x[4],  .data(word: 0b11111000000011111110000000111111, size: 32))
+        XCTAssertEqual(x[5],  .data(word: 0b10000000111111100000001111111000, size: 32))
+        XCTAssertEqual(x[6],  .data(word: 0b00001111111000000011110000111100, size: 32))
+        XCTAssertEqual(x[7],  .data(word: 0b00111111100000001111111000000011, size: 32))
+        XCTAssertEqual(x[8],  .data(word: 0b11000011110000111100001111000011, size: 32))
+        XCTAssertEqual(x[9],  .data(word: 0b11111000000011111110000000111111, size: 32))
+        XCTAssertEqual(x[10], .data(word: 0b10000000111111100000001111111000, size: 32))
+        XCTAssertEqual(x[11], .data(word: 0b00001111000011110000111100001111, size: 32))
+        XCTAssertEqual(x[12], .data(word: 0b00001111111000000011110000111100, size: 32))
+        XCTAssertEqual(x[13], .data(word: 0b001111000011 << 20, size: 12))
+        XCTAssertEqual(x[14], .railComCutoutStart)
+        XCTAssertEqual(x[15], .data(word: 0b110000111100001111000011110000 << 2, size: 30))
+        XCTAssertEqual(x[16], .railComCutoutEnd)
+
+    }
+
+    func testOperationsModePacketWithDebug() {
+        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        
+        var x = Bitstream(wordSize: 32)
+        x.append(operationsModePacket: packet, debug: true)
+        
+        XCTAssertEqual(x.count, 19)
+        XCTAssertEqual(x[0],  .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[1],  .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[2],  .data(word: 0b11110000111100001111000011110000, size: 32))
+        XCTAssertEqual(x[3],  .data(word: 0b1111000011110000 << 16, size: 16))
+        XCTAssertEqual(x[4],  .debugStart)
+        XCTAssertEqual(x[5],  .data(word: 0b11111110000000111111100000001111, size: 32))
+        XCTAssertEqual(x[6],  .data(word: 0b11100000001111111000000011111110, size: 32))
+        XCTAssertEqual(x[7],  .data(word: 0b00000011111110000000111111100000, size: 32))
+        XCTAssertEqual(x[8],  .data(word: 0b00111100001111000011111110000000, size: 32))
+        XCTAssertEqual(x[9],  .data(word: 0b11111110000000111100001111000011, size: 32))
+        XCTAssertEqual(x[10], .data(word: 0b11000011110000111111100000001111, size: 32))
+        XCTAssertEqual(x[11], .data(word: 0b11100000001111111000000011111110, size: 32))
+        XCTAssertEqual(x[12], .data(word: 0b00000011111110000000111100001111, size: 32))
+        XCTAssertEqual(x[13], .data(word: 0b00001111000011110000111111100000, size: 32))
+        XCTAssertEqual(x[14], .data(word: 0b0011110000111100001111000011 << 4, size: 28))
+        XCTAssertEqual(x[15], .railComCutoutStart)
+        XCTAssertEqual(x[16], .data(word: 0b110000111100001111000011110000 << 2, size: 30))
+        XCTAssertEqual(x[17], .railComCutoutEnd)
+        XCTAssertEqual(x[18], .debugEnd)
+    }
 
 }
 
@@ -750,6 +927,16 @@ extension BitstreamTests {
             ("testLogicalZeroBitExtendsPerfectly", testLogicalZeroBitExtendsPerfectly),
             ("testLogicalZeroBitAfterNonData", testLogicalZeroBitAfterNonData),
             ("testLogicalZeroBitSandwichNonData", testLogicalZeroBitSandwichNonData),
+            
+            ("testPreamble", testPreamble),
+            ("testPreambleWithLength", testPreambleWithLength),
+            ("testPreambleExtends", testPreambleExtends),
+            
+            ("testRailComCutout", testRailComCutout),
+            ("testRailComCutoutExtends", testRailComCutoutExtends),
+            
+            ("testPacket", testPacket),
+            ("testPacketExtends", testPacketExtends),
             ]
     }()
 
