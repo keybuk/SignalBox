@@ -126,11 +126,6 @@ public struct Clock {
 
     public mutating func disable() {
         control.remove(.enabled)
-        
-        // I find that, in practice, just stopping the clock as above doesn't actually work; so kill it instead.
-        usleep(10)
-        control.insert(.killClock)
-        
         while control.contains(.busy) { }
     }
 
