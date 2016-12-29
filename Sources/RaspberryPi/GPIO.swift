@@ -63,20 +63,23 @@ public struct GPIOFunctionSelect : Collection {
             let bits = newValue.rawValue << ((index % 10) * 3)
             switch index / 10 {
             case 0:
-                field0 &= ~mask
-                field0 |= bits
+                let field = field0 & ~mask
+                field0 = field | bits
             case 1:
-                field1 &= ~mask
-                field1 |= bits
+                let field = field1 & ~mask
+                field1 = field | bits
             case 2:
-                field2 &= ~mask
-                field2 |= bits
+                let field = field2 & ~mask
+                field2 = field | bits
             case 3:
-                field3 &= ~mask
-                field3 |= bits
+                let field = field3 & ~mask
+                field3 = field | bits
             case 4:
-                field4 &= ~mask
-                field4 |= bits
+                let field = field4 & ~mask
+                field4 = field | bits
+            case 5:
+                let field = field5 & ~mask
+                field5 = field | bits
             default:
                 fatalError("GPIO index out of bounds")
             }
