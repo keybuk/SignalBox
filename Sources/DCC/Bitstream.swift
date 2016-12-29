@@ -8,26 +8,131 @@
 
 /// Bitstream serializes logical DCC packets into a physical bitstream.
 ///
-/// The physical bitstream assumes that bits have an individual duration of 14.5µs. A physical bit value of 1 means the output will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration. Given these constraints, the resulting stream conforms to NMRA S-9.1.
+/// Each physical bit within the bitstream has a duration of `bitDuration`, passed during initialization. A physical bit value of 1 means the output will be +3.3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
 ///
-/// Individual words within the bitstream are msb-aligned according to `wordSize`, but may contain fewer bits as denoted by their `size` payload. The output should not be padded.
+/// The number of physical one or zero bits is selected to conform to the constraints specified by NMRA S-9.1.
 ///
-/// Additional events such as the RailCom cutout period, and a debug packet period, are included in the bitstream. These markers are placed in the stream prior to the data to which they should be synchronized.
+/// Individual words within the bitstream are msb-aligned, but may contain fewer bits as denoted by their `size` payload. The output should not be padded.
+///
+/// Additional events such as the RailCom cutout period, and a debug packet period, are included in the bitstream. These markers are placed in the stream prior to the data to which they should be synchronized. The durations of the RailCom cutout confirm to NMRA S-9.3.2.
 ///
 /// This bitstream can be passed to a `Driver`.
 public struct Bitstream : Collection {
     
+    /// Recommended duration in microseconds of the high and low parts of a one bit.
+    ///
+    /// - Note:
+    ///   NMRA S-9.1 defines this as the nominal duration for a one bit.
+    public let oneBitDuration: Float = 58
+    
+    /// Minimum permitted duration in microseconds of the high and low parts of a one bit.
+    ///
+    /// - Note:
+    ///   NMRA S-9.1 defines this as the minimum permitted duration for the command station to send, while allowing decoders to be less strict.
+    public let oneBitMinimumDuration: Float = 55
+    
+    /// Maximum permitted duration in microseconds of the high and low parts of a one bit.
+    ///
+    /// - Note:
+    ///   NMRA S-9.1 defines this as the maximum permitted duration for the command station to send, while allowing decoders to be less strict.
+    public let oneBitMaximumDuration: Float = 61
+    
+    /// Recommended duration in microseconds of the high and low parts of a zero bit.
+    ///
+    /// - Note:
+    ///   NMRA S-9.1 defines this as the nominal "greater than or equal to" duration for a zero bit.
+    public let zeroBitDuration: Float = 100
+    
+    /// Minimum permitted duration in microseconds of the high and low parts of a zero bit.
+    ///
+    /// - Note:
+    ///   NMRA S-9.1 defines this as the minimum permitted duration for the command station to send, while allowing decoders to be less strict.
+    public let zeroBitMinimumDuration: Float = 95
+    
+    /// Maximum permitted duration in microseconds of the high and low parts of a zero bit.
+    ///
+    /// - Note:
+    ///   NMRA S-9.1 specifies: Digital Command Station components shall transmit "0" bits with each part of the bit having a duration of between 95 and 9900 microseconds with the total bit duration of the "0" bit not exceeding 12000 microseconds.
+    ///
+    ///   Since our transmission parts are always equal in length, this is half of the latter value.
+    public let zeroBitMaximumDuration: Float = 6000
+    
+    /// Minimum permitted duration in microseconds before the start of the RailCom cutout.
+    ///
+    /// No nomimal duration is defined by the standard, so this is the target we use when calculating bit lengths.
+    ///
+    /// - Note:
+    ///   NMRA S-9.1 specifies that the DCC signal must continue for at least 26µs after the packet end bit, which delays the time for the start of the RailCom cutout.
+    public let railComCutoutStartMinimumDuration: Float = 26
+
+    /// Maximum permitted duration in microseconds before the start of the RailCom cutout.
+    ///
+    /// - Note:
+    ///   Specified in NMRA S-9.3.2.
+    public let railComCutoutStartMaximumDuration: Float = 32
+
+    /// Minimum permitted duration in microseconds of the RailCom cutout.
+    ///
+    /// No nomimal duration is defined by the standard, so this is the target we use when calculating bit lengths.
+    ///
+    /// - Note:
+    ///   Specified in NMRA S-9.3.2 and is measured from the end of the Packet End Bit, and thus includes the delay before the start of the RailCom cutout.
+    public let railComCutoutEndMinimumDuration: Float = 454
+    
+    /// Maximum permitted duration in microseconds of the RailCom cutout.
+    ///
+    /// - Note:
+    ///   Specified in NMRA S-9.3.2 and is measured from the end of the Packet End Bit, and thus includes the delay before the start of the RailCom cutout.
+    public let railComCutoutEndMaximumDuration: Float = 488
+
+    /// Duration in microseconds of a single physical bit.
+    public let bitDuration: Float
+    
+    /// Length in physical bits of the high and low parts of a one bit.
+    ///
+    /// This is calculated during initialization based on `bitDuration`.
+    public let oneBitLength: Int
+    
+    /// Length in physical bits of the high and low parts of a zero bit.
+    ///
+    /// This is calculated during initialization based on `bitDuration`.
+    public let zeroBitLength: Int
+
+    /// Length in physical bits of the delay before the start of the RailCom cutout.
+    ///
+    /// This is calculated during initialization based on `bitDuration`.
+    public let railComDelayLength: Int
+
+    /// Length in physical bits of the RailCom cutout.
+    ///
+    /// This bit length is measured from the end of the Packet End Bit, and thus includes the bits specified in `railComDelayLength`. It is calculated during initialization based on `bitDuration`.
+    public let railComCutoutLength: Int
+
     /// Size of words.
     ///
     /// Generally the platform's word size, but can be overriden at initialization for testing purposes.
     let wordSize: Int
     
-    init(wordSize: Int) {
+    init(bitDuration: Float, wordSize: Int) {
+        self.bitDuration = bitDuration
         self.wordSize = wordSize
+        
+        oneBitLength = Int((oneBitDuration - 1.0) / bitDuration) + 1
+        zeroBitLength = Int((zeroBitDuration - 1.0) / bitDuration) + 1
+        
+        railComDelayLength = Int((railComCutoutStartMinimumDuration - 1.0) / bitDuration) + 1
+        railComCutoutLength = Int((railComCutoutEndMinimumDuration - 1.0) / bitDuration) + 1
+
+        // Sanity check the lengths.
+        assert(((Float(oneBitLength) * bitDuration) >= oneBitMinimumDuration) && ((Float(oneBitLength) * bitDuration) <= oneBitMaximumDuration), "Duration of one bit would be \(Float(oneBitLength) * bitDuration)µs which is outside the valid range \(oneBitMinimumDuration)–\(oneBitMaximumDuration)µs")
+        assert(((Float(zeroBitLength) * bitDuration) >= zeroBitMinimumDuration) && ((Float(zeroBitLength) * bitDuration) <= zeroBitMaximumDuration), "Duration of zero bit would be \(Float(zeroBitLength) * bitDuration)µs which is outside the valid range \(zeroBitMinimumDuration)–\(zeroBitMaximumDuration)µs")
+        
+        assert(((Float(railComDelayLength) * bitDuration) >= railComCutoutStartMinimumDuration) && ((Float(railComDelayLength) * bitDuration) <= railComCutoutStartMaximumDuration), "Duration of pre-RailCom cutout delay would be \(Float(railComDelayLength) * bitDuration)µs which is outside the valid range \(railComCutoutStartMinimumDuration)–\(railComCutoutStartMaximumDuration)µs")
+        assert(((Float(railComCutoutLength) * bitDuration) >= railComCutoutEndMinimumDuration) && ((Float(railComCutoutLength) * bitDuration) <= railComCutoutEndMaximumDuration), "Duration of RailCom cutout would be \(Float(railComCutoutLength) * bitDuration)µs which is outside the valid range \(railComCutoutEndMinimumDuration)–\(railComCutoutEndMaximumDuration)µs")
     }
     
-    public init() {
-        self.init(wordSize: MemoryLayout<Int>.size * 8)
+    public init(bitDuration: Float) {
+        self.init(bitDuration: bitDuration, wordSize: MemoryLayout<Int>.size * 8)
     }
 
     /// Events generated from the input.
@@ -56,7 +161,7 @@ public struct Bitstream : Collection {
     
     /// Append physical bits.
     ///
-    /// Physical bits are the input to the PWM, with a duration of 14.5µs. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
+    /// Physical bits are the input to the PWM, with a duration of `bitDuration`. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
     ///
     /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
@@ -96,7 +201,7 @@ public struct Bitstream : Collection {
     
     /// Append a repeating physical bits.
     ///
-    /// Physical bits are the input to the PWM, with a duration of 14.5µs. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
+    /// Physical bits are the input to the PWM, with a duration of `bitDuration`. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
     ///
     /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
@@ -152,23 +257,20 @@ public struct Bitstream : Collection {
     
     /// Append logical bits.
     ///
-    /// Logical bits represent the DCC signal. A logical bit value of 1 has a duration of +3V for 58µs, followed by 0V for the same duration; while a logical bit value of 0 has a duration of +3V for 101.5µs, followed by 0V for the same duration.
+    /// Logical bits represent the DCC signal. A logical bit value of 1 has a duration of +3V for at least `oneBitDuration`, followed by 0V for the same duration; while a logical bit value of 0 has a duration of +3V for `zeroBitDuration`, followed by 0V for the same duration.
     ///
     /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - bit: logical bit to append, must be the value 1 or 0.
-    ///
-    /// - Note:
-    ///   NMRA S-9.1 recommends a minimum duration of 100µs for a logical 0 bit. We use a slightly longer value because it allows for much more efficient usage of the PWM and DMA hardware. This is permitted as the standard allows the duration to be in the range 99—9,900µs.
     public mutating func append(logicalBit bit: Int) {
         switch bit {
         case 1:
-            append(repeatingPhysicalBit: 1, count: 4)
-            append(repeatingPhysicalBit: 0, count: 4)
+            append(repeatingPhysicalBit: 1, count: oneBitLength)
+            append(repeatingPhysicalBit: 0, count: oneBitLength)
         case 0:
-            append(repeatingPhysicalBit: 1, count: 7)
-            append(repeatingPhysicalBit: 0, count: 7)
+            append(repeatingPhysicalBit: 1, count: zeroBitLength)
+            append(repeatingPhysicalBit: 0, count: zeroBitLength)
         default:
             assertionFailure("Bit must be 1 or 0")
         }
@@ -195,24 +297,35 @@ public struct Bitstream : Collection {
     ///
     /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
-    /// - Note:
-    ///   NMRA S-9.1 specifies that the DCC signal must continue for at least 26µs after the packet end bit, which delays the time for the start of the RailCom cutout. NMRA S-9.3.2 further specifies a maximum delay of 32µs. Since physical bits in the stream are 14.5µs, two bits are used to give a delay of 29µs.
-    ///
-    ///   For the duration of the cutout, NMRA S-9.3.2 provides a valid range of 454–488µs after the packet end bit, and thus including the cutout delay. A total of 32 physical bits are used—2 in the delay above, 30 in the remainder—giving a total cutout duration of 464µs.
-    public mutating func appendRailComCutout() {
-        append(repeatingPhysicalBit: 1, count: 2)
-        append(.railComCutoutStart)
-        append(repeatingPhysicalBit: 1, count: 2)
-        append(repeatingPhysicalBit: 0, count: 4)        
-        append(repeatingPhysicalBit: 1, count: 4)
-        append(repeatingPhysicalBit: 0, count: 4)
-        append(repeatingPhysicalBit: 1, count: 4)
-        append(repeatingPhysicalBit: 0, count: 4)
-        append(repeatingPhysicalBit: 1, count: 4)
-        append(repeatingPhysicalBit: 0, count: 4)
-        append(.railComCutoutEnd)
+    /// - Parameters:
+    ///   - debug: `true` if the debug GPIO pin should be cleared at the end of the RailCom cutout.
+    public mutating func appendRailComCutout(debug: Bool = false) {
+        // Pad out the RailCom cutout to an exact multiple of logical one bit sizes (twice `oneBitLength`).
+        // Step through each part (high or low) and output the appropriate piece.
+        let railComLength = (oneBitLength * 2) * ((railComCutoutLength - 1) / (oneBitLength * 2) + 1)
+        for offset in stride(from: 0, to: railComLength, by: oneBitLength) {
+            let physicalBit = (offset / oneBitLength) % 2 == 0 ? 1 : 0
+            let nextOffset = offset + oneBitLength
+            if (offset..<nextOffset).contains(railComDelayLength) {
+                // RailCom delay ends within this part, splice it and place the start marker.
+                append(repeatingPhysicalBit: physicalBit, count: railComDelayLength - offset)
+                append(.railComCutoutStart)
+                append(repeatingPhysicalBit: physicalBit, count: oneBitLength - (railComDelayLength - offset))
+            } else if (offset...nextOffset).contains(railComCutoutLength) {
+                // RailCom cutout ends within or immediately after this part, splice it and place the end marker.
+                append(repeatingPhysicalBit: physicalBit, count: railComCutoutLength - offset)
+                append(.railComCutoutEnd)
+                if debug {
+                    append(.debugEnd)
+                }
+                append(repeatingPhysicalBit: physicalBit, count: oneBitLength - (railComCutoutLength - offset))
+            } else {
+                // Output the high or low part of a logical one bit.
+                append(repeatingPhysicalBit: physicalBit, count: oneBitLength)
+            }
+        }
     }
-
+    
     /// Append a DCC packet.
     ///
     /// The contents of the packet are appended along with the packet start bit, data byte start bits, and packet end bit.
@@ -254,12 +367,7 @@ public struct Bitstream : Collection {
         
         append(packet: packet)
         
-        appendRailComCutout()
-        
-        // If we were debugging this packet, clear the marker for that too; thus the debug duration includes the full packet, and the RailCom cutout.
-        if debug {
-            append(.debugEnd)
-        }
+        appendRailComCutout(debug: debug)
     }
 
 }

@@ -40,6 +40,9 @@ public class Driver {
     // Set the source to OSC (19.2 MHz) and divisor to 278, giving us a clock with 14.48µs bits.
     let clockSource: ClockControl = [ .source(.oscillator), .mash(.integer) ]
     let clockDivisor: ClockDivisor = [ .integer(278) ]
+    
+    // FIXME not sure which way round I want to do this, start with the bit duration and calculate the clock?
+    public let bitDuration: Float = 1000000 / (19200000.0 / Float(278))
 
     let eventDelay = 2
     

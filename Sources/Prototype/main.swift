@@ -44,9 +44,15 @@ var packet: Packet? = resetPacket
 
 loop: repeat {
     if let packet = packet {
-        var bitstream = Bitstream()
+        var bitstream = Bitstream(bitDuration: driver.bitDuration)
         bitstream.append(operationsModePacket: packet, debug: true)
         
+        print("One bit has length \(bitstream.oneBitLength)b, and duration \(Float(bitstream.oneBitLength) * bitstream.bitDuration)µs")
+        print("Zero bit has length \(bitstream.zeroBitLength)b, and duration \(Float(bitstream.zeroBitLength) * bitstream.bitDuration)µs")
+        print("RailCom delay has length \(bitstream.railComDelayLength)b, and duration \(Float(bitstream.railComDelayLength) * bitstream.bitDuration)µs")
+        print("RailCom cutout has length \(bitstream.railComCutoutLength)b, and duration \(Float(bitstream.railComCutoutLength) * bitstream.bitDuration)µs")
+        print()
+
         let index = try! driver.queue(bitstream: bitstream)
         driver.start(at: index)
     }

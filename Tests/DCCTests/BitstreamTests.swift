@@ -21,7 +21,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that we get the collection members for free.
     func testCollection() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         
         XCTAssertEqual(x.count, 0)
         XCTAssertTrue(x.isEmpty)
@@ -36,7 +36,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that we can append an event.
     func testEvent() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(.debugStart)
         
         XCTAssertEqual(x.count, 1)
@@ -45,7 +45,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that we can append multiple events.
     func testEventMultiple() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(.debugStart)
         x.append(.debugEnd)
         
@@ -59,7 +59,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that a zero count input is accepted and doesn't add any output.
     func testPhysicalBitsZeroCount() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0, count: 0)
         
         XCTAssertEqual(x.count, 0)
@@ -72,7 +72,7 @@ class BitstreamTests: XCTestCase {
         for i in 1...wordSize {
             let bits = i < wordSize ? ~(~0 << i) : ~0
 
-            var x = Bitstream()
+            var x = Bitstream(bitDuration: 14.5)
             x.append(physicalBits: bits, count: i)
         
             XCTAssertEqual(x.count, 1)
@@ -83,7 +83,7 @@ class BitstreamTests: XCTestCase {
     /// Test that, for each possible count, an input of zero bits ends up as zero bits in the output.
     func testPhysicalBitsAllZeros() {
         for i in 1...wordSize {
-            var x = Bitstream()
+            var x = Bitstream(bitDuration: 14.5)
             x.append(physicalBits: 0, count: i)
             
             XCTAssertEqual(x.count, 1)
@@ -96,7 +96,7 @@ class BitstreamTests: XCTestCase {
         for i in 1...wordSize {
             let bits = ~(~0 << (i - 1))
             
-            var x = Bitstream()
+            var x = Bitstream(bitDuration: 14.5)
             x.append(physicalBits: bits, count: i)
             
             XCTAssertEqual(x.count, 1)
@@ -109,7 +109,7 @@ class BitstreamTests: XCTestCase {
         for i in 1...wordSize {
             let bits = ~(~0 << (i - 1)) << 1
             
-            var x = Bitstream()
+            var x = Bitstream(bitDuration: 14.5)
             x.append(physicalBits: bits, count: i)
             
             XCTAssertEqual(x.count, 1)
@@ -119,7 +119,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that a second append of physical bits extends the first rather than adding a second data.
     func testPhysicalBitsExtends() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b1100, count: 4)
 
         // Sanity check.
@@ -136,7 +136,7 @@ class BitstreamTests: XCTestCase {
     func testPhysicalBitsExtendsAndAppends() {
         let bits = ~(~0 << (wordSize - 4))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 4)
         
         // Sanity check.
@@ -154,7 +154,7 @@ class BitstreamTests: XCTestCase {
     func testPhysicalBitsExtendsPerfectly() {
         let bits = ~(~0 << (wordSize - 8))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 8)
         
         // Sanity check.
@@ -177,7 +177,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that physical bits can go after non-data.
     func testPhysicalBitsAfterNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(.debugStart)
         x.append(physicalBits: 0b1111, count: 4)
 
@@ -190,7 +190,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// Sizes should remain short.
     func testPhysicalBitsSandwichNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b10101010, count: 8)
         x.append(.debugStart)
         x.append(physicalBits: 0b1111, count: 4)
@@ -206,7 +206,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that a zero count input is accepted and doesn't add any output.
     func testRepeatingPhysicalOneBitZeroCount() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(repeatingPhysicalBit: 1, count: 0)
         
         XCTAssertEqual(x.count, 0)
@@ -214,7 +214,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that physical bits with a positive count append data.
     func testRepeatingPhysicalOneBit() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(repeatingPhysicalBit: 1, count: 8)
         
         XCTAssertEqual(x.count, 1)
@@ -225,7 +225,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// Since the wordSize initializer is only available for tests, this is a test to make sure functionality we rely on in other tests, works.
     func testRepeatingPhysicalOneBitShortWordSize() {
-        var x = Bitstream(wordSize: 6)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 6)
         x.append(repeatingPhysicalBit: 1, count: 8)
         
         XCTAssertEqual(x.count, 2)
@@ -235,7 +235,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that physical bits with a count greater than the natural word size result in multiple data.
     func testRepeatingPhysicalOneBitLongerThanWord() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(repeatingPhysicalBit: 1, count: wordSize + 8)
         
         XCTAssertEqual(x.count, 2)
@@ -245,7 +245,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that a second append of physical bits extends the first rather than adding a second data.
     func testRepeatingPhysicalOneBitExtends() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b1100, count: 4)
         
         // Sanity check.
@@ -262,7 +262,7 @@ class BitstreamTests: XCTestCase {
     func testRepeatingPhysicalOneBitExtendsAndAppends() {
         let bits = ~(~0 << (wordSize - 4))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 4)
         
         // Sanity check.
@@ -280,7 +280,7 @@ class BitstreamTests: XCTestCase {
     func testRepeatingPhysicalOneBitExtendsPerfectly() {
         let bits = ~(~0 << (wordSize - 8))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 8)
         
         // Sanity check.
@@ -303,7 +303,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that physical bits can go after non-data.
     func testRepeatingPhysicalOneBitAfterNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(.debugStart)
         x.append(repeatingPhysicalBit: 1, count: 4)
         
@@ -316,7 +316,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// Sizes should remain short.
     func testRepeatingPhysicalOneBitSandwichNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b10101010, count: 8)
         x.append(.debugStart)
         x.append(repeatingPhysicalBit: 1, count: 4)
@@ -329,7 +329,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that a zero count input is accepted and doesn't add any output.
     func testRepeatingPhysicalZeroBitZeroCount() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(repeatingPhysicalBit: 0, count: 0)
         
         XCTAssertEqual(x.count, 0)
@@ -337,7 +337,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that physical bits with a positive count append data.
     func testRepeatingPhysicalZeroBit() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(repeatingPhysicalBit: 0, count: 8)
         
         XCTAssertEqual(x.count, 1)
@@ -348,7 +348,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// Since the wordSize initializer is only available for tests, this is a test to make sure functionality we rely on in other tests, works.
     func testRepeatingPhysicalZeroBitShortWordSize() {
-        var x = Bitstream(wordSize: 6)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 6)
         x.append(repeatingPhysicalBit: 0, count: 8)
         
         XCTAssertEqual(x.count, 2)
@@ -358,7 +358,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that physical bits with a count greater than the natural word size result in multiple data.
     func testRepeatingPhysicalZeroBitLongerThanWord() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(repeatingPhysicalBit: 0, count: wordSize + 8)
         
         XCTAssertEqual(x.count, 2)
@@ -368,7 +368,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that a second append of physical bits extends the first rather than adding a second data.
     func testRepeatingPhysicalZeroBitExtends() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b1100, count: 4)
         
         // Sanity check.
@@ -385,7 +385,7 @@ class BitstreamTests: XCTestCase {
     func testRepeatingPhysicalZeroBitExtendsAndAppends() {
         let bits = ~(~0 << (wordSize - 4))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 4)
         
         // Sanity check.
@@ -403,7 +403,7 @@ class BitstreamTests: XCTestCase {
     func testRepeatingPhysicalZeroBitExtendsPerfectly() {
         let bits = ~(~0 << (wordSize - 8))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 8)
         
         // Sanity check.
@@ -426,7 +426,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that physical bits can go after non-data.
     func testRepeatingPhysicalZeroBitAfterNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(.debugStart)
         x.append(repeatingPhysicalBit: 0, count: 4)
         
@@ -439,7 +439,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// Sizes should remain short.
     func testRepeatingPhysicalZeroBitSandwichNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b10101010, count: 8)
         x.append(.debugStart)
         x.append(repeatingPhysicalBit: 0, count: 4)
@@ -452,7 +452,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that a physical zero bits can be appended to physical one bits.
     func testRepeatingPhysicalZeroBitAfterOne() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(repeatingPhysicalBit: 1, count: 4)
         
         // Sanity check.
@@ -467,7 +467,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that a physical one bits can be appended to physical zero bits.
     func testRepeatingPhysicalOneBitAfterZero() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(repeatingPhysicalBit: 0, count: 4)
         
         // Sanity check.
@@ -485,7 +485,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that a logical one bit is appended as the right number and values of physical bits.
     func testLogicalOneBit() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(logicalBit: 1)
         
         XCTAssertEqual(x.count, 1)
@@ -494,7 +494,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that a logical one bit can be broken up into multiple data if it doesn't fit.
     func testLogicalOneBitDoesntFit() {
-        var x = Bitstream(wordSize: 3)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 3)
         x.append(logicalBit: 1)
         
         XCTAssertEqual(x.count, 3)
@@ -505,7 +505,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that a logical one bit can extend existing data.
     func testLogicalOneBitExtends() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b1100, count: 4)
         
         // Sanity check.
@@ -522,7 +522,7 @@ class BitstreamTests: XCTestCase {
     func testLogicalOneBitExtendsAndAppends() {
         let bits = ~(~0 << (wordSize - 4))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 4)
         
         // Sanity check.
@@ -540,7 +540,7 @@ class BitstreamTests: XCTestCase {
     func testLogicalOneBitExtendsPerfectly() {
         let bits = ~(~0 << (wordSize - 8))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 8)
         
         // Sanity check.
@@ -563,7 +563,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that a logical one bit can go after non-data.
     func testLogicalOneBitAfterNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(.debugStart)
         x.append(logicalBit: 1)
         
@@ -576,7 +576,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// Sizes should remain short.
     func testLogicalOneBitSandwichNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b10101010, count: 8)
         x.append(.debugStart)
         x.append(logicalBit: 1)
@@ -587,9 +587,18 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[2], .data(word: 0b11110000 << (wordSize - 8), size: 8))
     }
 
+    /// Test that a logical one bit is appended as the right number and values of physical bits even with an unusual length.
+    func testLogicalOneBitAlternateLength() {
+        var x = Bitstream(bitDuration: 10)
+        x.append(logicalBit: 1)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b111111000000 << (wordSize - 12), size: 12))
+    }
+
     /// Test that a logical zero bit is appended as the right number and values of physical bits.
     func testLogicalZeroBit() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(logicalBit: 0)
         
         XCTAssertEqual(x.count, 1)
@@ -598,7 +607,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that a logical zero bit can be broken up into multiple data if it doesn't fit.
     func testLogicalZeroBitDoesntFit() {
-        var x = Bitstream(wordSize: 3)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 3)
         x.append(logicalBit: 0)
         
         XCTAssertEqual(x.count, 5)
@@ -611,7 +620,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that a logical zero bit can extend existing data.
     func testLogicalZeroBitExtends() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b1100, count: 4)
         
         // Sanity check.
@@ -628,7 +637,7 @@ class BitstreamTests: XCTestCase {
     func testLogicalZeroBitExtendsAndAppends() {
         let bits = ~(~0 << (wordSize - 4))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 4)
         
         // Sanity check.
@@ -646,7 +655,7 @@ class BitstreamTests: XCTestCase {
     func testLogicalZeroBitExtendsPerfectly() {
         let bits = ~(~0 << (wordSize - 14))
         
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: bits, count: wordSize - 14)
         
         // Sanity check.
@@ -669,7 +678,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that a logical zero bit can go after non-data.
     func testLogicalZeroBitAfterNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(.debugStart)
         x.append(logicalBit: 0)
         
@@ -682,7 +691,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// Sizes should remain short.
     func testLogicalZeroBitSandwichNonData() {
-        var x = Bitstream()
+        var x = Bitstream(bitDuration: 14.5)
         x.append(physicalBits: 0b10101010, count: 8)
         x.append(.debugStart)
         x.append(logicalBit: 0)
@@ -692,7 +701,16 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[1], .debugStart)
         XCTAssertEqual(x[2], .data(word: 0b111111110000000 << (wordSize - 14), size: 14))
     }
-    
+
+    /// Test that a logical zero bit is appended as the right number and values of physical bits even with an unusual length.
+    func testLogicalZeroBitAlternateLength() {
+        var x = Bitstream(bitDuration: 10)
+        x.append(logicalBit: 0)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b11111111110000000000 << (wordSize - 20), size: 20))
+    }
+
     
     // MARK: Preamble
     
@@ -700,7 +718,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// This should append the data for fourteen logical one bits.
     func testPreamble() {
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.appendPreamble()
         
         XCTAssertEqual(x.count, 4)
@@ -712,7 +730,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that we can append a long preamble with a specified length.
     func testPreambleWithLength() {
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.appendPreamble(length: 20)
         
         XCTAssertEqual(x.count, 5)
@@ -725,7 +743,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that appending a preamble extends any existing data.
     func testPreambleExtends() {
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(physicalBits: 0b101010, count: 6)
         x.appendPreamble()
         
@@ -736,6 +754,20 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[3], .data(word: Int(bitPattern: 0b1100001111000011110000) << 10, size: 22))
     }
     
+    /// Test that a preamble can be generated using an unusual bit length.
+    func testPreambleAlternateLength() {
+        var x = Bitstream(bitDuration: 10, wordSize: 32)
+        x.appendPreamble()
+        
+        XCTAssertEqual(x.count, 6)
+        XCTAssertEqual(x[0], .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[1], .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[2], .data(word: Int(bitPattern: 0b11000000111111000000111111000000), size: 32))
+        XCTAssertEqual(x[3], .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[4], .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[5], .data(word: Int(bitPattern: 0b11000000) << 24, size: 8))
+    }
+
     
     // MARK: RailCom Cutout
     
@@ -743,7 +775,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// This is a relatively complicated structure consisting of a 26µs delay, before the start event, and a total length of 454µs before the end event. The events cut into an ordinary transmission of logical one bits which should be complete in form.
     func testRailComCutout() {
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.appendRailComCutout()
         
         XCTAssertEqual(x.count, 4)
@@ -755,7 +787,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that appending a RailCom cutout extends any existing data.
     func testRailComCutoutExtends() {
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(physicalBits: 0b101010, count: 6)
         x.appendRailComCutout()
         
@@ -764,6 +796,48 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[1], .railComCutoutStart)
         XCTAssertEqual(x[2], .data(word: 0b110000111100001111000011110000 << 2, size: 30))
         XCTAssertEqual(x[3], .railComCutoutEnd)
+    }
+    
+    /// Test that we can include the debug marker with the end of the RailCom cutout.
+    func testRailComCutoutWithDebug() {
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
+        x.appendRailComCutout(debug: true)
+        
+        XCTAssertEqual(x.count, 5)
+        XCTAssertEqual(x[0], .data(word: 0b11 << 30, size: 2))
+        XCTAssertEqual(x[1], .railComCutoutStart)
+        XCTAssertEqual(x[2], .data(word: 0b110000111100001111000011110000 << 2, size: 30))
+        XCTAssertEqual(x[3], .railComCutoutEnd)
+        XCTAssertEqual(x[4], .debugEnd)
+    }
+    
+    /// Test that a RailCom cutout can be included when using an unusual length that alters the marker locations and requires a trailing part.
+    func testRailComCutoutAlternateLength() {
+        var x = Bitstream(bitDuration: 10.0, wordSize: 32)
+        x.appendRailComCutout()
+        
+        XCTAssertEqual(x.count, 6)
+        XCTAssertEqual(x[0], .data(word: Int(bitPattern: 0b111) << 29, size: 3))
+        XCTAssertEqual(x[1], .railComCutoutStart)
+        XCTAssertEqual(x[2], .data(word: Int(bitPattern: 0b11100000011111100000011111100000), size: 32))
+        XCTAssertEqual(x[3], .data(word: Int(bitPattern: 0b01111110000) << 21, size: 11))
+        XCTAssertEqual(x[4], .railComCutoutEnd)
+        XCTAssertEqual(x[5], .data(word: Int(bitPattern: 0b00) << 30, size: 2))
+    }
+    
+    /// Test that a RailCom cutout, when using an unusual length, places the debug marker along with the cutout end.
+    func testRailComCutoutAlternateLengthWithDebug() {
+        var x = Bitstream(bitDuration: 10.0, wordSize: 32)
+        x.appendRailComCutout(debug: true)
+        
+        XCTAssertEqual(x.count, 7)
+        XCTAssertEqual(x[0], .data(word: Int(bitPattern: 0b111) << 29, size: 3))
+        XCTAssertEqual(x[1], .railComCutoutStart)
+        XCTAssertEqual(x[2], .data(word: Int(bitPattern: 0b11100000011111100000011111100000), size: 32))
+        XCTAssertEqual(x[3], .data(word: Int(bitPattern: 0b01111110000) << 21, size: 11))
+        XCTAssertEqual(x[4], .railComCutoutEnd)
+        XCTAssertEqual(x[5], .debugEnd)
+        XCTAssertEqual(x[6], .data(word: Int(bitPattern: 0b00) << 30, size: 2))
     }
 
     
@@ -775,7 +849,7 @@ class BitstreamTests: XCTestCase {
     func testPacket() {
         let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
 
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(packet: packet)
 
         XCTAssertEqual(x.count, 10)
@@ -795,7 +869,7 @@ class BitstreamTests: XCTestCase {
     func testPacketExtends() {
         let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
         
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(physicalBits: 0b101010, count: 6)
         x.append(packet: packet)
         
@@ -812,6 +886,32 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[9], .data(word: Int(bitPattern: 0b10000000111100001111000011110000), size: 32))
     }
     
+    /// Test that appending a packet when using an unusual length appends the correct data.
+    func testPacketAlternateLength() {
+        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        
+        var x = Bitstream(bitDuration: 10, wordSize: 32)
+        x.append(packet: packet)
+        
+        XCTAssertEqual(x.count, 15)
+        XCTAssertEqual(x[0],  .data(word: Int(bitPattern: 0b11111111110000000000111111111100), size: 32))
+        XCTAssertEqual(x[1],  .data(word: Int(bitPattern: 0b00000000111111111100000000001111), size: 32))
+        XCTAssertEqual(x[2],  .data(word: Int(bitPattern: 0b11111100000000001111111111000000), size: 32))
+        XCTAssertEqual(x[3],  .data(word: Int(bitPattern: 0b00001111111111000000000011111111), size: 32))
+        XCTAssertEqual(x[4],  .data(word: Int(bitPattern: 0b11000000000011111100000011111100), size: 32))
+        XCTAssertEqual(x[5],  .data(word: Int(bitPattern: 0b00001111111111000000000011111111), size: 32))
+        XCTAssertEqual(x[6],  .data(word: Int(bitPattern: 0b11000000000011111100000011111100), size: 32))
+        XCTAssertEqual(x[7],  .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[8],  .data(word: Int(bitPattern: 0b11111100000000001111111111000000), size: 32))
+        XCTAssertEqual(x[9],  .data(word: Int(bitPattern: 0b00001111111111000000000011111111), size: 32))
+        XCTAssertEqual(x[10], .data(word: Int(bitPattern: 0b11000000000011111111110000000000), size: 32))
+        XCTAssertEqual(x[11], .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[12], .data(word: Int(bitPattern: 0b00001111110000001111111111000000), size: 32))
+        XCTAssertEqual(x[13], .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[14], .data(word: Int(bitPattern: 0b11000000) << 24, size: 8))
+    }
+
+    
     
     // MARK: Operations Mode Packet
     
@@ -821,7 +921,7 @@ class BitstreamTests: XCTestCase {
     func testOperationsModePacket() {
         let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
         
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(operationsModePacket: packet)
         
         XCTAssertEqual(x.count, 17)
@@ -842,7 +942,6 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[14], .railComCutoutStart)
         XCTAssertEqual(x[15], .data(word: Int(bitPattern: 0b110000111100001111000011110000) << 2, size: 30))
         XCTAssertEqual(x[16], .railComCutoutEnd)
-
     }
 
     /// Test that we can append a DCC packet for operations mode, and mark it for debugging.
@@ -851,7 +950,7 @@ class BitstreamTests: XCTestCase {
     func testOperationsModePacketWithDebug() {
         let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
         
-        var x = Bitstream(wordSize: 32)
+        var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(operationsModePacket: packet, debug: true)
         
         XCTAssertEqual(x.count, 19)
@@ -874,6 +973,79 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[16], .data(word: Int(bitPattern: 0b110000111100001111000011110000) << 2, size: 30))
         XCTAssertEqual(x[17], .railComCutoutEnd)
         XCTAssertEqual(x[18], .debugEnd)
+    }
+    
+    /// Test that we can append a DCC packet for operations mode when using an unusual bit length.
+    func testOperationsModePacketAlternateLength() {
+        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        
+        var x = Bitstream(bitDuration: 10, wordSize: 32)
+        x.append(operationsModePacket: packet)
+        
+        XCTAssertEqual(x.count, 25)
+        XCTAssertEqual(x[0],  .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[1],  .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[2],  .data(word: Int(bitPattern: 0b11000000111111000000111111000000), size: 32))
+        XCTAssertEqual(x[3],  .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[4],  .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[5],  .data(word: Int(bitPattern: 0b11000000111111111100000000001111), size: 32))
+        XCTAssertEqual(x[6],  .data(word: Int(bitPattern: 0b11111100000000001111111111000000), size: 32))
+        XCTAssertEqual(x[7],  .data(word: Int(bitPattern: 0b00001111111111000000000011111111), size: 32))
+        XCTAssertEqual(x[8],  .data(word: Int(bitPattern: 0b11000000000011111111110000000000), size: 32))
+        XCTAssertEqual(x[9],  .data(word: Int(bitPattern: 0b11111111110000000000111111000000), size: 32))
+        XCTAssertEqual(x[10], .data(word: Int(bitPattern: 0b11111100000011111111110000000000), size: 32))
+        XCTAssertEqual(x[11], .data(word: Int(bitPattern: 0b11111111110000000000111111000000), size: 32))
+        XCTAssertEqual(x[12], .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[13], .data(word: Int(bitPattern: 0b00001111111111000000000011111111), size: 32))
+        XCTAssertEqual(x[14], .data(word: Int(bitPattern: 0b11000000000011111111110000000000), size: 32))
+        XCTAssertEqual(x[15], .data(word: Int(bitPattern: 0b11111111110000000000111111111100), size: 32))
+        XCTAssertEqual(x[16], .data(word: Int(bitPattern: 0b00000000111111000000111111000000), size: 32))
+        XCTAssertEqual(x[17], .data(word: Int(bitPattern: 0b11111100000011111100000011111111), size: 32))
+        XCTAssertEqual(x[18], .data(word: Int(bitPattern: 0b11000000000011111100000011111100), size: 32))
+        XCTAssertEqual(x[19], .data(word: Int(bitPattern: 0b0000111111000000111) << 13, size: 19))
+        XCTAssertEqual(x[20], .railComCutoutStart)
+        XCTAssertEqual(x[21], .data(word: Int(bitPattern: 0b11100000011111100000011111100000), size: 32))
+        XCTAssertEqual(x[22], .data(word: Int(bitPattern: 0b01111110000) << 21, size: 11))
+        XCTAssertEqual(x[23], .railComCutoutEnd)
+        XCTAssertEqual(x[24], .data(word: Int(bitPattern: 0b00) << 30, size: 2))
+    }
+
+    /// Test that we can append a DCC packet for operations mode, and debugging, when using an unusual bit length.
+    func testOperationsModePacketAlternateLengthWithDebug() {
+        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        
+        var x = Bitstream(bitDuration: 10, wordSize: 32)
+        x.append(operationsModePacket: packet, debug: true)
+        
+        XCTAssertEqual(x.count, 28)
+        XCTAssertEqual(x[0],  .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[1],  .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[2],  .data(word: Int(bitPattern: 0b11000000111111000000111111000000), size: 32))
+        XCTAssertEqual(x[3],  .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[4],  .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[5],  .data(word: Int(bitPattern: 0b11000000) << 24, size: 8))
+        XCTAssertEqual(x[6],  .debugStart)
+        XCTAssertEqual(x[7],  .data(word: Int(bitPattern: 0b11111111110000000000111111111100), size: 32))
+        XCTAssertEqual(x[8],  .data(word: Int(bitPattern: 0b00000000111111111100000000001111), size: 32))
+        XCTAssertEqual(x[9],  .data(word: Int(bitPattern: 0b11111100000000001111111111000000), size: 32))
+        XCTAssertEqual(x[10], .data(word: Int(bitPattern: 0b00001111111111000000000011111111), size: 32))
+        XCTAssertEqual(x[11], .data(word: Int(bitPattern: 0b11000000000011111100000011111100), size: 32))
+        XCTAssertEqual(x[12], .data(word: Int(bitPattern: 0b00001111111111000000000011111111), size: 32))
+        XCTAssertEqual(x[13], .data(word: Int(bitPattern: 0b11000000000011111100000011111100), size: 32))
+        XCTAssertEqual(x[14], .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[15], .data(word: Int(bitPattern: 0b11111100000000001111111111000000), size: 32))
+        XCTAssertEqual(x[16], .data(word: Int(bitPattern: 0b00001111111111000000000011111111), size: 32))
+        XCTAssertEqual(x[17], .data(word: Int(bitPattern: 0b11000000000011111111110000000000), size: 32))
+        XCTAssertEqual(x[18], .data(word: Int(bitPattern: 0b11111100000011111100000011111100), size: 32))
+        XCTAssertEqual(x[19], .data(word: Int(bitPattern: 0b00001111110000001111111111000000), size: 32))
+        XCTAssertEqual(x[20], .data(word: Int(bitPattern: 0b00001111110000001111110000001111), size: 32))
+        XCTAssertEqual(x[21], .data(word: Int(bitPattern: 0b11000000111) << 21, size: 11))
+        XCTAssertEqual(x[22], .railComCutoutStart)
+        XCTAssertEqual(x[23], .data(word: Int(bitPattern: 0b11100000011111100000011111100000), size: 32))
+        XCTAssertEqual(x[24], .data(word: Int(bitPattern: 0b01111110000) << 21, size: 11))
+        XCTAssertEqual(x[25], .railComCutoutEnd)
+        XCTAssertEqual(x[26], .debugEnd)
+        XCTAssertEqual(x[27], .data(word: Int(bitPattern: 0b00) << 30, size: 2))
     }
 
 }
@@ -926,6 +1098,7 @@ extension BitstreamTests {
             ("testLogicalOneBitExtendsPerfectly", testLogicalOneBitExtendsPerfectly),
             ("testLogicalOneBitAfterNonData", testLogicalOneBitAfterNonData),
             ("testLogicalOneBitSandwichNonData", testLogicalOneBitSandwichNonData),
+            ("testLogicalOneBitAlternateLength", testLogicalOneBitAlternateLength),
             ("testLogicalZeroBit", testLogicalZeroBit),
             ("testLogicalZeroBitDoesntFit", testLogicalZeroBitDoesntFit),
             ("testLogicalZeroBitExtends", testLogicalZeroBitExtends),
@@ -933,19 +1106,27 @@ extension BitstreamTests {
             ("testLogicalZeroBitExtendsPerfectly", testLogicalZeroBitExtendsPerfectly),
             ("testLogicalZeroBitAfterNonData", testLogicalZeroBitAfterNonData),
             ("testLogicalZeroBitSandwichNonData", testLogicalZeroBitSandwichNonData),
+            ("testLogicalZeroBitAlternateLength", testLogicalZeroBitAlternateLength),
             
             ("testPreamble", testPreamble),
             ("testPreambleWithLength", testPreambleWithLength),
             ("testPreambleExtends", testPreambleExtends),
+            ("testPreambleAlternateLength", testPreambleAlternateLength),
             
             ("testRailComCutout", testRailComCutout),
             ("testRailComCutoutExtends", testRailComCutoutExtends),
+            ("testRailComCutoutWithDebug", testRailComCutoutWithDebug),
+            ("testRailComCutoutAlternateLength", testRailComCutoutAlternateLength),
+            ("testRailComCutoutAlternateLengthWithDebug", testRailComCutoutAlternateLengthWithDebug),
             
             ("testPacket", testPacket),
             ("testPacketExtends", testPacketExtends),
+            ("testPacketAlternateLength", testPacketAlternateLength),
             
             ("testOperationsModePacket", testOperationsModePacket),
             ("testOperationsModePacketWithDebug", testOperationsModePacketWithDebug),
+            ("testOperationsModePacketAlternateLength", testOperationsModePacketAlternateLength),
+            ("testOperationsModePacketAlternateLengthWithDebug", testOperationsModePacketAlternateLengthWithDebug),
             ]
     }()
 
