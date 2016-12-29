@@ -815,6 +815,9 @@ class BitstreamTests: XCTestCase {
     
     // MARK: Operations Mode Packet
     
+    /// Test that we can append a DCC packet for operations mode.
+    ///
+    /// This extends the append(packet:) method by prefixing with a preamble, and postfixing with a RailCom cutout.
     func testOperationsModePacket() {
         let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
         
@@ -842,6 +845,9 @@ class BitstreamTests: XCTestCase {
 
     }
 
+    /// Test that we can append a DCC packet for operations mode, and mark it for debugging.
+    ///
+    /// This introduces `.debugStart`/`.debugEnd' events around the packet/RailCom cutout.
     func testOperationsModePacketWithDebug() {
         let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
         
@@ -937,6 +943,9 @@ extension BitstreamTests {
             
             ("testPacket", testPacket),
             ("testPacketExtends", testPacketExtends),
+            
+            ("testOperationsModePacket", testOperationsModePacket),
+            ("testOperationsModePacketWithDebug", testOperationsModePacketWithDebug),
             ]
     }()
 
