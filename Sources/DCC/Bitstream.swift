@@ -174,7 +174,8 @@ public struct Bitstream : Collection {
         
         // Where the last events type is already data, remove and extend it.
         if case let .data(word: word, size: size)? = events.last,
-            size < wordSize
+            size < wordSize,
+            count > 0
         {
             // This is a little more complex because the values in `bits` are lsb-aligned while the values in `words` are msb-aligned, and we have to beware of one-fill when shifting to the right.
             let mask = (1 << (wordSize - size)) - 1
@@ -213,7 +214,8 @@ public struct Bitstream : Collection {
         
         // Where the last events type is already data, remove and extend it.
         if case let .data(word: word, size: size)? = events.last,
-            size < wordSize
+            size < wordSize,
+            count > 0
         {
             events.removeLast()
 

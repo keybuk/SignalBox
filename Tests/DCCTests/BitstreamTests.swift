@@ -175,6 +175,21 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[1], .data(word: 0b1111 << (wordSize - 4), size: 4))
     }
     
+    /// Test that a second append of physical bits with a zero count doesn't change the first.
+    func testPhysicalBitsExtendsZeroCount() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(physicalBits: 0b1100, count: 4)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b1100 << (wordSize - 4), size: 4))
+        
+        x.append(physicalBits: 0, count: 0)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b1100 << (wordSize - 4), size: 4))
+    }
+    
     /// Test that physical bits can go after non-data.
     func testPhysicalBitsAfterNonData() {
         var x = Bitstream(bitDuration: 14.5)
@@ -301,6 +316,21 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[1], .data(word: 0b1111 << (wordSize - 4), size: 4))
     }
     
+    /// Test that a second append of physical bits with a zero count does not modify the first.
+    func testRepeatingPhysicalOneBitExtendsZeroCount() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(physicalBits: 0b1100, count: 4)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b1100 << (wordSize - 4), size: 4))
+        
+        x.append(repeatingPhysicalBit: 1, count: 0)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b1100 << (wordSize - 4), size: 4))
+    }
+
     /// Test that physical bits can go after non-data.
     func testRepeatingPhysicalOneBitAfterNonData() {
         var x = Bitstream(bitDuration: 14.5)
@@ -424,6 +454,21 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[1], .data(word: 0, size: 4))
     }
     
+    /// Test that a second append of physical bits with a zero count does not modify the first.
+    func testRepeatingPhysicalZeroBitExtendsZeroCount() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(physicalBits: 0b1100, count: 4)
+        
+        // Sanity check.
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b1100 << (wordSize - 4), size: 4))
+        
+        x.append(repeatingPhysicalBit: 0, count: 0)
+        
+        XCTAssertEqual(x.count, 1)
+        XCTAssertEqual(x[0], .data(word: 0b1100 << (wordSize - 4), size: 4))
+    }
+
     /// Test that physical bits can go after non-data.
     func testRepeatingPhysicalZeroBitAfterNonData() {
         var x = Bitstream(bitDuration: 14.5)
@@ -1067,6 +1112,7 @@ extension BitstreamTests {
             ("testPhysicalBitsExtends", testPhysicalBitsExtends),
             ("testPhysicalBitsExtendsAndAppends", testPhysicalBitsExtendsAndAppends),
             ("testPhysicalBitsExtendsPerfectly", testPhysicalBitsExtendsPerfectly),
+            ("testPhysicalBitsExtendsZeroCount", testPhysicalBitsExtendsZeroCount),
             ("testPhysicalBitsAfterNonData", testPhysicalBitsAfterNonData),
             ("testPhysicalBitsSandwichNonData", testPhysicalBitsSandwichNonData),
             
@@ -1077,6 +1123,7 @@ extension BitstreamTests {
             ("testRepeatingPhysicalOneBitExtends", testRepeatingPhysicalOneBitExtends),
             ("testRepeatingPhysicalOneBitExtendsAndAppends", testRepeatingPhysicalOneBitExtendsAndAppends),
             ("testRepeatingPhysicalOneBitExtendsPerfectly", testRepeatingPhysicalOneBitExtendsPerfectly),
+            ("testRepeatingPhysicalOneBitExtendsZeroCount", testRepeatingPhysicalOneBitExtendsZeroCount),
             ("testRepeatingPhysicalOneBitAfterNonData", testRepeatingPhysicalOneBitAfterNonData),
             ("testRepeatingPhysicalOneBitSandwichNonData", testRepeatingPhysicalOneBitSandwichNonData),
             ("testRepeatingPhysicalZeroBitZeroCount", testRepeatingPhysicalZeroBitZeroCount),
@@ -1086,6 +1133,7 @@ extension BitstreamTests {
             ("testRepeatingPhysicalZeroBitExtends", testRepeatingPhysicalZeroBitExtends),
             ("testRepeatingPhysicalZeroBitExtendsAndAppends", testRepeatingPhysicalZeroBitExtendsAndAppends),
             ("testRepeatingPhysicalZeroBitExtendsPerfectly", testRepeatingPhysicalZeroBitExtendsPerfectly),
+            ("testRepeatingPhysicalZeroBitExtendsZeroCount", testRepeatingPhysicalZeroBitExtendsZeroCount),
             ("testRepeatingPhysicalZeroBitAfterNonData", testRepeatingPhysicalZeroBitAfterNonData),
             ("testRepeatingPhysicalZeroBitSandwichNonData", testRepeatingPhysicalZeroBitSandwichNonData),
             ("testRepeatingPhysicalZeroBitAfterOne", testRepeatingPhysicalZeroBitAfterOne),
