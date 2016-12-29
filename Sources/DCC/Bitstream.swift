@@ -23,31 +23,31 @@ public struct Bitstream : Collection {
     ///
     /// - Note:
     ///   NMRA S-9.1 defines this as the nominal duration for a one bit.
-    public let oneBitDuration: Float = 58
+    public static let oneBitDuration: Float = 58
     
     /// Minimum permitted duration in microseconds of the high and low parts of a one bit.
     ///
     /// - Note:
     ///   NMRA S-9.1 defines this as the minimum permitted duration for the command station to send, while allowing decoders to be less strict.
-    public let oneBitMinimumDuration: Float = 55
+    public static let oneBitMinimumDuration: Float = 55
     
     /// Maximum permitted duration in microseconds of the high and low parts of a one bit.
     ///
     /// - Note:
     ///   NMRA S-9.1 defines this as the maximum permitted duration for the command station to send, while allowing decoders to be less strict.
-    public let oneBitMaximumDuration: Float = 61
+    public static let oneBitMaximumDuration: Float = 61
     
     /// Recommended duration in microseconds of the high and low parts of a zero bit.
     ///
     /// - Note:
     ///   NMRA S-9.1 defines this as the nominal "greater than or equal to" duration for a zero bit.
-    public let zeroBitDuration: Float = 100
+    public static let zeroBitDuration: Float = 100
     
     /// Minimum permitted duration in microseconds of the high and low parts of a zero bit.
     ///
     /// - Note:
     ///   NMRA S-9.1 defines this as the minimum permitted duration for the command station to send, while allowing decoders to be less strict.
-    public let zeroBitMinimumDuration: Float = 95
+    public static let zeroBitMinimumDuration: Float = 95
     
     /// Maximum permitted duration in microseconds of the high and low parts of a zero bit.
     ///
@@ -55,7 +55,7 @@ public struct Bitstream : Collection {
     ///   NMRA S-9.1 specifies: Digital Command Station components shall transmit "0" bits with each part of the bit having a duration of between 95 and 9900 microseconds with the total bit duration of the "0" bit not exceeding 12000 microseconds.
     ///
     ///   Since our transmission parts are always equal in length, this is half of the latter value.
-    public let zeroBitMaximumDuration: Float = 6000
+    public static let zeroBitMaximumDuration: Float = 6000
     
     /// Minimum permitted duration in microseconds before the start of the RailCom cutout.
     ///
@@ -63,13 +63,13 @@ public struct Bitstream : Collection {
     ///
     /// - Note:
     ///   NMRA S-9.1 specifies that the DCC signal must continue for at least 26µs after the packet end bit, which delays the time for the start of the RailCom cutout.
-    public let railComCutoutStartMinimumDuration: Float = 26
+    public static let railComCutoutStartMinimumDuration: Float = 26
 
     /// Maximum permitted duration in microseconds before the start of the RailCom cutout.
     ///
     /// - Note:
     ///   Specified in NMRA S-9.3.2.
-    public let railComCutoutStartMaximumDuration: Float = 32
+    public static let railComCutoutStartMaximumDuration: Float = 32
 
     /// Minimum permitted duration in microseconds of the RailCom cutout.
     ///
@@ -77,13 +77,13 @@ public struct Bitstream : Collection {
     ///
     /// - Note:
     ///   Specified in NMRA S-9.3.2 and is measured from the end of the Packet End Bit, and thus includes the delay before the start of the RailCom cutout.
-    public let railComCutoutEndMinimumDuration: Float = 454
+    public static let railComCutoutEndMinimumDuration: Float = 454
     
     /// Maximum permitted duration in microseconds of the RailCom cutout.
     ///
     /// - Note:
     ///   Specified in NMRA S-9.3.2 and is measured from the end of the Packet End Bit, and thus includes the delay before the start of the RailCom cutout.
-    public let railComCutoutEndMaximumDuration: Float = 488
+    public static let railComCutoutEndMaximumDuration: Float = 488
 
     /// Duration in microseconds of a single physical bit.
     public let bitDuration: Float
@@ -117,18 +117,29 @@ public struct Bitstream : Collection {
         self.bitDuration = bitDuration
         self.wordSize = wordSize
         
-        oneBitLength = Int((oneBitDuration - 1.0) / bitDuration) + 1
-        zeroBitLength = Int((zeroBitDuration - 1.0) / bitDuration) + 1
+        oneBitLength = Int((Bitstream.oneBitDuration - 1.0) / bitDuration) + 1
+        zeroBitLength = Int((Bitstream.zeroBitDuration - 1.0) / bitDuration) + 1
         
-        railComDelayLength = Int((railComCutoutStartMinimumDuration - 1.0) / bitDuration) + 1
-        railComCutoutLength = Int((railComCutoutEndMinimumDuration - 1.0) / bitDuration) + 1
+        railComDelayLength = Int((Bitstream.railComCutoutStartMinimumDuration - 1.0) / bitDuration) + 1
+        railComCutoutLength = Int((Bitstream.railComCutoutEndMinimumDuration - 1.0) / bitDuration) + 1
 
         // Sanity check the lengths.
-        assert(((Float(oneBitLength) * bitDuration) >= oneBitMinimumDuration) && ((Float(oneBitLength) * bitDuration) <= oneBitMaximumDuration), "Duration of one bit would be \(Float(oneBitLength) * bitDuration)µs which is outside the valid range \(oneBitMinimumDuration)–\(oneBitMaximumDuration)µs")
-        assert(((Float(zeroBitLength) * bitDuration) >= zeroBitMinimumDuration) && ((Float(zeroBitLength) * bitDuration) <= zeroBitMaximumDuration), "Duration of zero bit would be \(Float(zeroBitLength) * bitDuration)µs which is outside the valid range \(zeroBitMinimumDuration)–\(zeroBitMaximumDuration)µs")
-        
-        assert(((Float(railComDelayLength) * bitDuration) >= railComCutoutStartMinimumDuration) && ((Float(railComDelayLength) * bitDuration) <= railComCutoutStartMaximumDuration), "Duration of pre-RailCom cutout delay would be \(Float(railComDelayLength) * bitDuration)µs which is outside the valid range \(railComCutoutStartMinimumDuration)–\(railComCutoutStartMaximumDuration)µs")
-        assert(((Float(railComCutoutLength) * bitDuration) >= railComCutoutEndMinimumDuration) && ((Float(railComCutoutLength) * bitDuration) <= railComCutoutEndMaximumDuration), "Duration of RailCom cutout would be \(Float(railComCutoutLength) * bitDuration)µs which is outside the valid range \(railComCutoutEndMinimumDuration)–\(railComCutoutEndMaximumDuration)µs")
+        assert(
+            ((Float(oneBitLength) * bitDuration) >= Bitstream.oneBitMinimumDuration) &&
+            ((Float(oneBitLength) * bitDuration) <= Bitstream.oneBitMaximumDuration),
+            "Duration of one bit would be \(Float(oneBitLength) * bitDuration)µs which is outside the valid range \(Bitstream.oneBitMinimumDuration)–\(Bitstream.oneBitMaximumDuration)µs")
+        assert(
+            ((Float(zeroBitLength) * bitDuration) >= Bitstream.zeroBitMinimumDuration) &&
+            ((Float(zeroBitLength) * bitDuration) <= Bitstream.zeroBitMaximumDuration),
+            "Duration of zero bit would be \(Float(zeroBitLength) * bitDuration)µs which is outside the valid range \(Bitstream.zeroBitMinimumDuration)–\(Bitstream.zeroBitMaximumDuration)µs")
+        assert(
+            ((Float(railComDelayLength) * bitDuration) >= Bitstream.railComCutoutStartMinimumDuration) &&
+            ((Float(railComDelayLength) * bitDuration) <= Bitstream.railComCutoutStartMaximumDuration),
+            "Duration of pre-RailCom cutout delay would be \(Float(railComDelayLength) * bitDuration)µs which is outside the valid range \(Bitstream.railComCutoutStartMinimumDuration)–\(Bitstream.railComCutoutStartMaximumDuration)µs")
+        assert(
+            ((Float(railComCutoutLength) * bitDuration) >= Bitstream.railComCutoutEndMinimumDuration) &&
+            ((Float(railComCutoutLength) * bitDuration) <= Bitstream.railComCutoutEndMaximumDuration),
+            "Duration of RailCom cutout would be \(Float(railComCutoutLength) * bitDuration)µs which is outside the valid range \(Bitstream.railComCutoutEndMinimumDuration)–\(Bitstream.railComCutoutEndMaximumDuration)µs")
     }
     
     public init(bitDuration: Float) {
