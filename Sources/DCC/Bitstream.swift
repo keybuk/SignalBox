@@ -94,6 +94,62 @@ public struct Bitstream : Collection {
         }
     }
     
+    /// Append a repeating physical bits.
+    ///
+    /// Physical bits are the input to the PWM, with a duration of 14.5µs. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
+    ///
+    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    ///
+    /// - Parameters:
+    ///   - bit: physical bit to be added.
+    ///   - count: number of repeated `bit` to be added.
+    public mutating func append(repeatingPhysicalBit bit: Int, count: Int) {
+        var count = count
+        
+        // Where the last events type is already data, remove and extend it.
+        if case let .data(word: word, size: size)? = events.last,
+            size < wordSize
+        {
+            events.removeLast()
+
+            let numberOfBits = Swift.min(count, wordSize - size)
+            switch bit {
+            case 1:
+                let bits = ~(~0 << numberOfBits) << (wordSize - size - numberOfBits)
+                events.append(.data(word: word | bits, size: size + numberOfBits))
+            case 0:
+                events.append(.data(word: word, size: size + numberOfBits))
+                break
+            default:
+                assertionFailure("Bit must be 1 or 0")
+            }
+
+            count -= numberOfBits
+        }
+        
+        // While any bits remain, add new words with them.
+        while count > 0 {
+            let numberOfBits = Swift.min(count, wordSize)
+            switch bit {
+            case 1:
+                // Append `count` bits; use a short-cut if we're just filling an entire word to avoid the `x << wordSize` error.
+                if numberOfBits < (MemoryLayout<Int>.size * 8) {
+                    let bits = ~(~0 << numberOfBits) << (wordSize - numberOfBits)
+                    events.append(.data(word: bits, size: numberOfBits))
+                } else {
+                    events.append(.data(word: ~0, size: numberOfBits))
+                }
+            case 0:
+                events.append(.data(word: 0, size: numberOfBits))
+                break
+            default:
+                assertionFailure("Bit must be 1 or 0")
+            }
+            
+            count -= numberOfBits
+        }
+    }
+    
     /// Append logical bits.
     ///
     /// Logical bits represent the DCC signal. A logical bit value of 1 has a duration of +3V for 58µs, followed by 0V for the same duration; while a logical bit value of 0 has a duration of +3V for 101.5µs, followed by 0V for the same duration.
@@ -108,9 +164,11 @@ public struct Bitstream : Collection {
     public mutating func append(logicalBit bit: Int) {
         switch bit {
         case 1:
-            append(physicalBits: 0b11110000, count: 8)
+            append(repeatingPhysicalBit: 1, count: 4)
+            append(repeatingPhysicalBit: 0, count: 4)
         case 0:
-            append(physicalBits: 0b11111110000000, count: 14)
+            append(repeatingPhysicalBit: 1, count: 7)
+            append(repeatingPhysicalBit: 0, count: 7)
         default:
             assertionFailure("Bit must be 1 or 0")
         }
@@ -172,7 +230,7 @@ public struct Bitstream : Collection {
             append(logicalBit: 0)
             
             for bit in 0..<8 {
-                append(logicalBit: (byte >> (7 - bit)) & 0x1)
+                append(logicalBit: (byte >> (7 - bit)) & 0b1)
             }
         }
 
@@ -191,9 +249,16 @@ public struct Bitstream : Collection {
     ///
     ///   For the duration of the cutout, NMRA S-9.3.2 provides a valid range of 454–488µs after the packet end bit, and thus including the cutout delay. A total of 32 physical bits are used—2 in the delay above, 30 in the remainder—giving a total cutout duration of 464µs.
     public mutating func appendRailComCutout() {
-        append(physicalBits: 0b11, count: 2)
+        append(repeatingPhysicalBit: 1, count: 2)
         append(.railComCutoutStart)
-        append(physicalBits: 0b110000111100001111000011110000, count: 30)
+        append(repeatingPhysicalBit: 1, count: 2)
+        append(repeatingPhysicalBit: 0, count: 4)        
+        append(repeatingPhysicalBit: 1, count: 4)
+        append(repeatingPhysicalBit: 0, count: 4)
+        append(repeatingPhysicalBit: 1, count: 4)
+        append(repeatingPhysicalBit: 0, count: 4)
+        append(repeatingPhysicalBit: 1, count: 4)
+        append(repeatingPhysicalBit: 0, count: 4)
         append(.railComCutoutEnd)
     }
 
