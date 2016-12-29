@@ -44,7 +44,7 @@ var packet: Packet? = resetPacket
 
 loop: repeat {
     if let packet = packet {
-        var bitstream = Bitstream(wordSize: 32)
+        var bitstream = Bitstream()
         bitstream.append(operationsModePacket: packet, debug: true)
         
         let index = try! driver.queue(bitstream: bitstream)

@@ -22,16 +22,16 @@ public struct Bitstream : Collection {
     /// Generally the platform's word size, but can be overriden at initialization for testing purposes.
     let wordSize: Int
     
-    public init(wordSize: Int) {
+    init(wordSize: Int) {
         self.wordSize = wordSize
     }
     
     public init() {
-        self.wordSize = MemoryLayout<Int>.size * 8
+        self.init(wordSize: MemoryLayout<Int>.size * 8)
     }
 
     /// Events generated from the input.
-    var events: [BitstreamEvent] = []
+    private var events: [BitstreamEvent] = []
     
     // Conformance to Collection.
     // Forward to the private `events` array.
@@ -86,8 +86,9 @@ public struct Bitstream : Collection {
     ///   - bits: physical bits to be added, this is an LSB-aligned value.
     ///   - count: number of right-most bits from `bits` to be added.
     public mutating func append(physicalBits bits: Int, count: Int) {
+        assert(count <= wordSize, "cannot append more physical bits than the word size")
         var count = count
-
+        
         // Where the last events type is already data, remove and extend it.
         if case let .data(word: word, size: size)? = events.last,
             size < wordSize
@@ -104,10 +105,11 @@ public struct Bitstream : Collection {
         
         // If any bits remain, add a new word with them.
         if count > 0 {
-            // For testing, wordSize can be defined as shorter than the size of Int on this platform; so be sure to mask out the left-most excess part.
             var word = bits << (wordSize - count)
+            
+            // For testing, wordSize can be defined as shorter than the size of Int on this platform; so be sure to mask out the left-most excess part.
             if wordSize < MemoryLayout<Int>.size * 8 {
-                word &= (1 << wordSize) - 1
+                word &= ~(~0 << wordSize)
             }
             
             events.append(.data(word: word, size: count))
