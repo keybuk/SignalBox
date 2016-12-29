@@ -20,6 +20,9 @@ public enum MailboxError: Error {
     /// The request failed.
     case requestFailed
 
+    /// The mailbox property call failed.
+    case systemError(errno: Int32)
+    
 }
 
 /// Raspberry Pi Mailbox Property interface.
@@ -69,7 +72,7 @@ public class Mailbox {
     /// - Throws:
     ///   `MailboxError.invalidRequest` when the mailbox call fails, or if the mailbox returns a parse error status.
     ///   `MailboxError.invalidResponse` if the response does not match the expected format.
-    ///   `MailboxError.requestFailed` for any other failure.
+    ///   `MailboxError.systemError` for any other failure.
     func propertyRequest(forTag tag: Tag, values: [UInt32]) throws -> [UInt32] {
         let bufferSize = 6 + values.count
         var buffer: [UInt32] = Array(repeating: 0, count: bufferSize)
@@ -88,7 +91,7 @@ public class Mailbox {
             if errno == EINVAL {
                 throw MailboxError.invalidRequest
             } else {
-                throw MailboxError.requestFailed
+                throw MailboxError.systemError(errno: errno)
             }
         }
 
