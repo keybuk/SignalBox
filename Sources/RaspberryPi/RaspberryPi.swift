@@ -31,6 +31,8 @@ public enum RaspberryPiError: Error {
 /// This class wraps the details of the Raspberry Pi hardware, and operations on it, including memory mapping.
 public class RaspberryPi {
 
+    public static let uncachedAliasAddress = Int(bitPattern: 0xc0000000)
+
     /// Size in bytes of memory pages.
     public let pageSize = 4096
 
@@ -113,32 +115,57 @@ public class RaspberryPi {
         return pointer
     }
     
-    public func allocateUncachedMemory(pages: Int) throws -> (busAddress: Int, pointer: UnsafeMutableRawPointer) {
-        let handle = try mailbox.allocateMemory(size: pageSize * pages, alignment: pageSize, flags: .direct)
+}
+
+public class UncachedMemory {
+    
+    let size: Int
+    let mailbox: Mailbox
+    let handle: Mailbox.MemoryHandle
+    
+    public let busAddress: Int
+    
+    public let pointer: UnsafeMutableRawPointer
+    
+    public static func allocate(minimumSize: Int, using raspberryPi: RaspberryPi) throws -> UncachedMemory {
+        let size = raspberryPi.pageSize * (((minimumSize - 1) / raspberryPi.pageSize) + 1)
+
+        let handle = try raspberryPi.mailbox.allocateMemory(size: size, alignment: raspberryPi.pageSize, flags: .direct)
+        
         do {
-            let busAddress = try mailbox.lockMemory(handle: handle)
+            let busAddress = try raspberryPi.mailbox.lockMemory(handle: handle)
             
-            guard let pointer = mmap(
+            guard
+                let pointer = mmap(
                     nil,
-                    pageSize * pages,
+                    size,
                     PROT_READ | PROT_WRITE,
                     MAP_SHARED,
-                    memFileHandle.fileDescriptor,
-                    off_t(physicalAddressOfUncachedMemory(forBusAddress: busAddress))),
+                    raspberryPi.memFileHandle.fileDescriptor,
+                    off_t(busAddress & ~RaspberryPi.uncachedAliasAddress)),
                 pointer != MAP_FAILED
                 else { throw RaspberryPiError.memoryMapFailed(errno: errno) }
             
-            return (busAddress, pointer)
+            return UncachedMemory(size: size, mailbox: raspberryPi.mailbox, handle: handle, busAddress: busAddress, pointer: pointer)
         } catch {
-            try! mailbox.releaseMemory(handle: handle)
+            try! raspberryPi.mailbox.releaseMemory(handle: handle)
             throw error
         }
     }
     
-    let uncachedAliasAddress = Int(bitPattern: 0xc0000000)
+    init(size: Int, mailbox: Mailbox, handle: Mailbox.MemoryHandle, busAddress: Int, pointer: UnsafeMutableRawPointer) {
+        self.size = size
+        self.mailbox = mailbox
+        self.handle = handle
+        self.busAddress = busAddress
+        self.pointer = pointer
+    }
 
-    public func physicalAddressOfUncachedMemory(forBusAddress address: Int) -> Int {
-        return address & ~uncachedAliasAddress
+    deinit {
+        // There isn't much we can do if we fail to release memory. Fortunately it's one of those operations that also shouldn't ever happen.
+        munmap(pointer, size)
+        try! mailbox.releaseMemory(handle: handle)
     }
     
 }
+

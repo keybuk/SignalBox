@@ -124,3 +124,4 @@ loop: while true {
 }
 
 driver.stop()
+driver.shutdown()

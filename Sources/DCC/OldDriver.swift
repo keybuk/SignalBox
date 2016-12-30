@@ -54,11 +54,11 @@ public class OldDriver {
     
     let dmaChannel: UnsafeMutablePointer<DMAChannel>
     
-    let controlBlockBusAddress: Int
+    var controlBlockMemory: UncachedMemory!
     var controlBlock: UnsafeMutablePointer<DMAControlBlock>
     var controlBlockIndex = 0
     
-    let dataBusAddress: Int
+    var dataMemory: UncachedMemory!
     var data: UnsafeMutablePointer<Int>
     var dataIndex = 0
 
@@ -73,16 +73,14 @@ public class OldDriver {
         dmaChannel = dma.channel[dmaChannelNumber]
         
         // Allocate control block and data regions
-        let (controlBlockBusAddress, controlBlockPointer) = try raspberryPi.allocateUncachedMemory(pages: 1024)
-        self.controlBlockBusAddress = controlBlockBusAddress
-        controlBlock = controlBlockPointer.bindMemory(to: DMAControlBlock.self, capacity: raspberryPi.pageSize / MemoryLayout<DMAControlBlock>.stride * 1024)
+        controlBlockMemory = try UncachedMemory.allocate(minimumSize: MemoryLayout<DMAControlBlock>.stride * 65536, using: raspberryPi)
+        controlBlock = controlBlockMemory.pointer.bindMemory(to: DMAControlBlock.self, capacity: 65536)
 
-        let (dataBusAddress, dataPointer) = try raspberryPi.allocateUncachedMemory(pages: 1024)
-        self.dataBusAddress = dataBusAddress
-        data = dataPointer.bindMemory(to: Int.self, capacity: raspberryPi.pageSize / MemoryLayout<Int>.stride * 1024)
+        dataMemory = try UncachedMemory.allocate(minimumSize: MemoryLayout<Int>.stride * 65536, using: raspberryPi)
+        data = dataMemory.pointer.bindMemory(to: Int.self, capacity: 65536)
         
-        print("ControlBlocks at 0x" + String(raspberryPi.physicalAddressOfUncachedMemory(forBusAddress: controlBlockBusAddress), radix: 16))
-        print("         Data at 0x" + String(raspberryPi.physicalAddressOfUncachedMemory(forBusAddress: dataBusAddress), radix: 16))
+        print("ControlBlocks at 0x" + String(UInt(bitPattern: controlBlockMemory.busAddress & ~RaspberryPi.uncachedAliasAddress), radix: 16))
+        print("         Data at 0x" + String(UInt(bitPattern: dataMemory.busAddress  & ~RaspberryPi.uncachedAliasAddress), radix: 16))
 
     }
     
@@ -129,6 +127,11 @@ public class OldDriver {
         
         DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(10), execute: watchdog)
         watchdog()
+    }
+    
+    public func shutdown() {
+        controlBlockMemory = nil
+        dataMemory = nil
     }
     
     func watchdog() {
@@ -188,11 +191,11 @@ public class OldDriver {
         }
         
         if controlBlockIndex > 0 {
-            controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockBusAddress + MemoryLayout<DMAControlBlock>.stride * controlBlockIndex
+            controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockMemory.busAddress + MemoryLayout<DMAControlBlock>.stride * controlBlockIndex
         }
         
         controlBlock[controlBlockIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .sourceAddressIncrement, .destinationDREQ, .waitForWriteResponse ]
-        controlBlock[controlBlockIndex].sourceAddress = dataBusAddress + MemoryLayout<Int>.stride * dataIndex
+        controlBlock[controlBlockIndex].sourceAddress = dataMemory.busAddress + MemoryLayout<Int>.stride * dataIndex
         controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.fifoInputOffset
         controlBlock[controlBlockIndex].transferLength = MemoryLayout<Int>.stride * words.count
         controlBlock[controlBlockIndex].tdModeStride = 0
@@ -208,11 +211,11 @@ public class OldDriver {
         data[dataIndex] = range
         
         if controlBlockIndex > 0 {
-            controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockBusAddress + MemoryLayout<DMAControlBlock>.stride * controlBlockIndex
+            controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockMemory.busAddress + MemoryLayout<DMAControlBlock>.stride * controlBlockIndex
         }
         
         controlBlock[controlBlockIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ]
-        controlBlock[controlBlockIndex].sourceAddress = dataBusAddress + MemoryLayout<Int>.stride * dataIndex
+        controlBlock[controlBlockIndex].sourceAddress = dataMemory.busAddress + MemoryLayout<Int>.stride * dataIndex
         controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.channel1RangeOffset
         controlBlock[controlBlockIndex].transferLength = MemoryLayout<Int>.stride
         controlBlock[controlBlockIndex].tdModeStride = 0
@@ -228,11 +231,11 @@ public class OldDriver {
         data[dataIndex] = 1 << pin
         
         if controlBlockIndex > 0 {
-            controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockBusAddress + MemoryLayout<DMAControlBlock>.stride * controlBlockIndex
+            controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockMemory.busAddress + MemoryLayout<DMAControlBlock>.stride * controlBlockIndex
         }
         
         controlBlock[controlBlockIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ]
-        controlBlock[controlBlockIndex].sourceAddress = dataBusAddress + MemoryLayout<Int>.stride * dataIndex
+        controlBlock[controlBlockIndex].sourceAddress = dataMemory.busAddress + MemoryLayout<Int>.stride * dataIndex
         controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + GPIO.offset + (value ? GPIO.outputSetOffset : GPIO.outputClearOffset)
         controlBlock[controlBlockIndex].transferLength = MemoryLayout<Int>.stride
         controlBlock[controlBlockIndex].tdModeStride = 0
@@ -295,7 +298,6 @@ public class OldDriver {
         var words: [Int] = []
         var delayedEvents: [(Int, BitstreamEvent)] = []
         var addresses: [Int: Int] = [:]
-        var loopIndex = 0
         
         var repeating = false
         loop: repeat {
@@ -310,7 +312,7 @@ public class OldDriver {
                         let address = addresses[dataIndex]
                     {
                         print("            --> \(dataIndex): \(address)")
-                        controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockBusAddress + MemoryLayout<DMAControlBlock>.stride * address
+                        controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockMemory.busAddress + MemoryLayout<DMAControlBlock>.stride * address
                         break loop
                     }
                     
@@ -375,14 +377,14 @@ public class OldDriver {
             print(leftPad(String(address), toLength: 8, withPad: " ") + " -> \(startIndex)", terminator: "")
             printWords(words, wordSize: range, lastWordSize: range)
             print("            --> Start")
-            controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockBusAddress + MemoryLayout<DMAControlBlock>.stride * startIndex
+            controlBlock[controlBlockIndex - 1].nextControlBlockAddress = controlBlockMemory.busAddress + MemoryLayout<DMAControlBlock>.stride * startIndex
         }
         
         return startIndex
     }
     
     public func start(at index: Int) {
-        dmaChannel.pointee.controlBlockAddress = controlBlockBusAddress + MemoryLayout<DMAControlBlock>.stride * index
+        dmaChannel.pointee.controlBlockAddress = controlBlockMemory.busAddress + MemoryLayout<DMAControlBlock>.stride * index
 
         usleep(100)
         dmaChannel.pointee.controlStatus = [ .waitForOutstandingWrites, .priorityLevel(8), .panicPriorityLevel(8), .active ]
