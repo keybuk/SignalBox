@@ -892,7 +892,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// Since the packet is already serialized in byte form, what we're checking here is that the logical bits of those bytes are turned into physical bits, that they are separated by zero bits, prefixed by a zero packet start bit, and terminated by a one packet end bit.
     func testPacket() {
-        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        let packet: Packet = .speed28Step(address: 3, direction: .forward, speed: 14) //(bytes: [0b00000011, 0b01111000, 0b01111011])
 
         var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(packet: packet)
@@ -912,7 +912,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that appending a packet extends any existing data.
     func testPacketExtends() {
-        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        let packet: Packet = .speed28Step(address: 3, direction: .forward, speed: 14) //(bytes: [0b00000011, 0b01111000, 0b01111011])
         
         var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(physicalBits: 0b101010, count: 6)
@@ -933,7 +933,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that appending a packet when using an unusual length appends the correct data.
     func testPacketAlternateLength() {
-        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        let packet: Packet = .speed28Step(address: 3, direction: .forward, speed: 14) //(bytes: [0b00000011, 0b01111000, 0b01111011])
         
         var x = Bitstream(bitDuration: 10, wordSize: 32)
         x.append(packet: packet)
@@ -964,7 +964,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// This extends the append(packet:) method by prefixing with a preamble, and postfixing with a RailCom cutout.
     func testOperationsModePacket() {
-        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        let packet: Packet = .speed28Step(address: 3, direction: .forward, speed: 14) //(bytes: [0b00000011, 0b01111000, 0b01111011])
         
         var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(operationsModePacket: packet)
@@ -993,7 +993,7 @@ class BitstreamTests: XCTestCase {
     ///
     /// This introduces `.debugStart`/`.debugEnd' events around the packet/RailCom cutout.
     func testOperationsModePacketWithDebug() {
-        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        let packet: Packet = .speed28Step(address: 3, direction: .forward, speed: 14) //(bytes: [0b00000011, 0b01111000, 0b01111011])
         
         var x = Bitstream(bitDuration: 14.5, wordSize: 32)
         x.append(operationsModePacket: packet, debug: true)
@@ -1022,7 +1022,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that we can append a DCC packet for operations mode when using an unusual bit length.
     func testOperationsModePacketAlternateLength() {
-        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        let packet: Packet = .speed28Step(address: 3, direction: .forward, speed: 14) //(bytes: [0b00000011, 0b01111000, 0b01111011])
         
         var x = Bitstream(bitDuration: 10, wordSize: 32)
         x.append(operationsModePacket: packet)
@@ -1057,7 +1057,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that we can append a DCC packet for operations mode, and debugging, when using an unusual bit length.
     func testOperationsModePacketAlternateLengthWithDebug() {
-        let packet = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
+        let packet: Packet = .speed28Step(address: 3, direction: .forward, speed: 14) //(bytes: [0b00000011, 0b01111000, 0b01111011])
         
         var x = Bitstream(bitDuration: 10, wordSize: 32)
         x.append(operationsModePacket: packet, debug: true)

@@ -11,28 +11,48 @@ import Foundation
 import RaspberryPi
 import DCC
 
-let resetPacket = Packet(bytes: [0b00000000, 0b00000000, 0b00000000])
-let idlePacket  = Packet(bytes: [0b11111111, 0b00000000, 0b11111111])
-let startPacket = Packet(bytes: [0b00000011, 0b01111000, 0b01111011])
-let stopPacket  = Packet(bytes: [0b00000011, 0b01100000, 0b01100011])
+let locoAddress: Address = 3
+
+let resetPacket: Packet = .softReset(address: .broadcast)
+let idlePacket: Packet = .idle
+let startPacket: Packet = .speed28Step(address: locoAddress, direction: .forward, speed: 14)
+let stopPacket: Packet = .stop28Step(address: locoAddress, direction: .ignore)
 
 func functionPacket(_ function: Int, value: Bool) -> Packet {
-    let loco = 0b00000011
-    var command: Int = 0
     switch function {
     case 0:
-        command = 0b10010000
-    case 1...4:
-        command = 0b10000000 | (value ? 1 << (function - 1) : 0)
-    case 5...8:
-        command = 0b10110000 | (value ? 1 << (function - 5) : 0)
-    case 9...12:
-        command = 0b10100000 | (value ? 1 << (function - 9) : 0)
+        return .function0To4(address: locoAddress, headlight: true, f1: false, f2: false, f3: false, f4: false)
+
+    case 1:
+        return .function0To4(address: locoAddress, headlight: false, f1: true, f2: false, f3: false, f4: false)
+    case 2:
+        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: true, f3: false, f4: false)
+    case 3:
+        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: false, f3: true, f4: false)
+    case 4:
+        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: false, f3: false, f4: true)
+
+    case 5:
+        return .function5To8(address: locoAddress, f5: true, f6: false, f7: false, f8: false)
+    case 6:
+        return .function5To8(address: locoAddress, f5: false, f6: true, f7: false, f8: false)
+    case 7:
+        return .function5To8(address: locoAddress, f5: false, f6: false, f7: true, f8: false)
+    case 8:
+        return .function5To8(address: locoAddress, f5: false, f6: false, f7: false, f8: true)
+
+    case 9:
+        return .function9To12(address: locoAddress, f9: true, f10: false, f11: false, f12: false)
+    case 10:
+        return .function9To12(address: locoAddress, f9: false, f10: true, f11: false, f12: false)
+    case 11:
+        return .function9To12(address: locoAddress, f9: false, f10: false, f11: true, f12: false)
+    case 12:
+        return .function9To12(address: locoAddress, f9: false, f10: false, f11: false, f12: true)
+        
     default:
-        return idlePacket
+        return .idle
     }
-    
-    return Packet(bytes: [loco, command, loco ^ command])
 }
 
 let raspberryPi = try! RaspberryPi()
