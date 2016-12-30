@@ -419,7 +419,12 @@ public enum BitstreamEvent : Equatable {
             return true
         case (.debugEnd, .debugEnd):
             return true
-        default:
+
+        case (.data(_, _), _),
+             (.railComCutoutStart, _),
+             (.railComCutoutEnd, _),
+             (.debugStart, _),
+             (.debugEnd, _):
             return false
         }
     }
