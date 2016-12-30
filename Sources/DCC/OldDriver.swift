@@ -25,7 +25,7 @@ import RaspberryPi
 /// Since there are not sufficient PWM channels, GPIOs are used directly from the DMA engine for the RailCom cutout, and the debug signal. Testing revealed that the control blocks to adjust the GPIOs must be synchronized with the second DREQ after the one for the word they are to be synchronized with, to allow that word to pass through the FIFO and into the PWM hardware. Much of the logic of this class is handling that delaying compared to the bitstream, including across the loop at the end of the data.
 ///
 /// In addition, since the DREQ is synchronized to PWM word boundaries, it is necessary to regularly use the DMA engine to adjust the Range register of the PWM so a GPIO can be raised or lowered at the correct physical bit boundary, which may not otherwise fall on a word boundary. Testing revealed that the control block for this Range register change must be synchronized with the first DREQ after the one for the word it is to adjust. The need to shortern a word is already conveyed in the bitstream through the `size` payload.
-public class Driver {
+public class OldDriver {
     
     public enum DriverError: Error {
         case infiniteLoop
@@ -73,13 +73,13 @@ public class Driver {
         dmaChannel = dma.channel[dmaChannelNumber]
         
         // Allocate control block and data regions
-        let (controlBlockBusAddress, controlBlockPointer) = try raspberryPi.allocateUncachedMemory(pages: 10)
+        let (controlBlockBusAddress, controlBlockPointer) = try raspberryPi.allocateUncachedMemory(pages: 1024)
         self.controlBlockBusAddress = controlBlockBusAddress
-        controlBlock = controlBlockPointer.bindMemory(to: DMAControlBlock.self, capacity: raspberryPi.pageSize / MemoryLayout<DMAControlBlock>.stride * 10)
+        controlBlock = controlBlockPointer.bindMemory(to: DMAControlBlock.self, capacity: raspberryPi.pageSize / MemoryLayout<DMAControlBlock>.stride * 1024)
 
-        let (dataBusAddress, dataPointer) = try raspberryPi.allocateUncachedMemory(pages: 10)
+        let (dataBusAddress, dataPointer) = try raspberryPi.allocateUncachedMemory(pages: 1024)
         self.dataBusAddress = dataBusAddress
-        data = dataPointer.bindMemory(to: Int.self, capacity: raspberryPi.pageSize / MemoryLayout<Int>.stride * 10)
+        data = dataPointer.bindMemory(to: Int.self, capacity: raspberryPi.pageSize / MemoryLayout<Int>.stride * 1024)
         
         print("ControlBlocks at 0x" + String(raspberryPi.physicalAddressOfUncachedMemory(forBusAddress: controlBlockBusAddress), radix: 16))
         print("         Data at 0x" + String(raspberryPi.physicalAddressOfUncachedMemory(forBusAddress: dataBusAddress), radix: 16))
@@ -87,13 +87,13 @@ public class Driver {
     }
     
     public func setup() {
-        // Set the railcom gpio for output and raise high.
+        // Set the railcom gpio for output and clear.
         gpio.pointee.functionSelect[railcomGpio] = .output
-        gpio.pointee.outputSet[railcomGpio] = true
+        gpio.pointee.outputClear[railcomGpio] = true
         
         // Set the debug gpio for output and clear
         gpio.pointee.functionSelect[debugGpio] = .output
-        gpio.pointee.outputSet[debugGpio] = false
+        gpio.pointee.outputClear[debugGpio] = true
         
         // Set the dcc gpio for PWM output
         gpio.pointee.functionSelect[dccGpio] = .alternateFunction5
@@ -295,6 +295,7 @@ public class Driver {
         var words: [Int] = []
         var delayedEvents: [(Int, BitstreamEvent)] = []
         var addresses: [Int: Int] = [:]
+        var loopIndex = 0
         
         var repeating = false
         loop: repeat {
@@ -305,7 +306,7 @@ public class Driver {
             for event in bitstream {
                 switch event {
                 case let .data(word: word, size: size):
-                    if repeating && laggingEvents.isEmpty && words.isEmpty,
+                    if repeating && laggingEvents.isEmpty && words.isEmpty/* && dataIndex >= loopIndex*/,
                         let address = addresses[dataIndex]
                     {
                         print("            --> \(dataIndex): \(address)")
@@ -354,6 +355,9 @@ public class Driver {
                     }
                     
                     dataIndex += 1
+                //case .loopStart:
+                //    // Loop starts on the next dataIndex
+                //    loopIndex = dataIndex + 1
                 default:
                     delayedEvents.append((eventDelay, event))
                 }

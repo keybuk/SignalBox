@@ -57,30 +57,39 @@ func functionPacket(_ function: Int, value: Bool) -> Packet {
 
 let raspberryPi = try! RaspberryPi()
 
-let driver = try! Driver(raspberryPi: raspberryPi)
+let driver = try! OldDriver(raspberryPi: raspberryPi)
 driver.setup()
 
-var packet: Packet? = resetPacket
+var startupBitstream = Bitstream(bitDuration: driver.bitDuration)
+startupBitstream.append(.railComCutoutEnd)
+for _ in 0..<20 {
+    startupBitstream.appendPreamble()
+    startupBitstream.append(packet: .softReset(address: .broadcast))
+}
+for _ in 0..<10 {
+    startupBitstream.appendPreamble()
+    startupBitstream.append(packet: .idle)
+}
+// Would loop this one.
+startupBitstream.appendPreamble()
+startupBitstream.append(packet: .idle)
 
-loop: repeat {
-    if let packet = packet {
-        var bitstream = Bitstream(bitDuration: driver.bitDuration)
-        bitstream.append(operationsModePacket: packet, debug: true)
-        
-        print("One bit has length \(bitstream.oneBitLength)b, and duration \(Float(bitstream.oneBitLength) * bitstream.bitDuration)µs")
-        print("Zero bit has length \(bitstream.zeroBitLength)b, and duration \(Float(bitstream.zeroBitLength) * bitstream.bitDuration)µs")
-        print("RailCom delay has length \(bitstream.railComDelayLength)b, and duration \(Float(bitstream.railComDelayLength) * bitstream.bitDuration)µs")
-        print("RailCom cutout has length \(bitstream.railComCutoutLength)b, and duration \(Float(bitstream.railComCutoutLength) * bitstream.bitDuration)µs")
-        print()
+print("One bit has length \(startupBitstream.oneBitLength)b, and duration \(Float(startupBitstream.oneBitLength) * startupBitstream.bitDuration)µs")
+print("Zero bit has length \(startupBitstream.zeroBitLength)b, and duration \(Float(startupBitstream.zeroBitLength) * startupBitstream.bitDuration)µs")
+print("RailCom delay has length \(startupBitstream.railComDelayLength)b, and duration \(Float(startupBitstream.railComDelayLength) * startupBitstream.bitDuration)µs")
+print("RailCom cutout has length \(startupBitstream.railComCutoutLength)b, and duration \(Float(startupBitstream.railComCutoutLength) * startupBitstream.bitDuration)µs")
+print()
 
-        let index = try! driver.queue(bitstream: bitstream)
-        driver.start(at: index)
-    }
-    packet = nil
+let index = try! driver.queue(bitstream: startupBitstream)
+driver.start(at: index)
 
+
+loop: while true {
     print("> ", terminator: "")
     guard let line = readLine(strippingNewline: true) else { print(); break }
-    
+
+    var packet: Packet?
+    var debug  = true
     switch line {
     case "exit", "quit":
         break loop
@@ -90,8 +99,10 @@ loop: repeat {
         packet = stopPacket
     case "idle":
         packet = idlePacket
+        debug = false
     case "reset":
         packet = resetPacket
+        debug = false
     case _ where line.hasPrefix("fon "):
         let function = Int(line.substring(from: line.index(line.startIndex, offsetBy: 4)))
         packet = functionPacket(function!, value: true)
@@ -102,6 +113,14 @@ loop: repeat {
         print("?")
     }
     
-} while true
+    if let packet = packet {
+        var bitstream = Bitstream(bitDuration: driver.bitDuration)
+        bitstream.append(operationsModePacket: packet, debug: debug)
+        
+        let index = try! driver.queue(bitstream: bitstream)
+        driver.start(at: index)
+    }
+    packet = nil
+}
 
 driver.stop()
