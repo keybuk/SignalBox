@@ -31,7 +31,7 @@ public enum RaspberryPiError: Error {
 /// This class wraps the details of the Raspberry Pi hardware, and operations on it, including memory mapping.
 public class RaspberryPi {
 
-    public static let uncachedAliasAddress = Int(bitPattern: 0xc0000000)
+    public let uncachedAliasAddress = Int(bitPattern: 0xc0000000)
 
     /// Size in bytes of memory pages.
     public let pageSize = 4096
@@ -39,10 +39,10 @@ public class RaspberryPi {
     /// Bus address where I/O Peripherals begin.
     ///
     /// The bus address is the address utilized for hardware, including the DMA engine.
-    public let peripheralBusBaseAddress = 0x7e000000
+    public let peripheralBusAddress = 0x7e000000
 
     /// Physical address where I/O Peripherals begin on the earlier Pi models.
-    let bcm2835PhysicalBaseAddress = 0x20000000
+    let bcm2835PhysicalAddress = 0x20000000
     
     /// Size of the I/O Peripherals address range on the earlier Pi models.
     let bcm2835AddressSize = 0x01000000
@@ -50,7 +50,7 @@ public class RaspberryPi {
     /// Physical address where I/O Peripherals begin.
     ///
     /// The physical address is the address at which memory may be mapped from `/dev/mem`.
-    public let peripheralPhysicalBaseAddress: Int
+    public let peripheralPhysicalAddress: Int
     
     /// Size of the I/O Peripherals address range.
     public let peripheralAddressSize: Int
@@ -59,25 +59,23 @@ public class RaspberryPi {
     let memPath = "/dev/mem"
     
     /// File handle for `/dev/mem`.
-    let memFileHandle: FileHandle
+    var memFileHandle: FileHandle!
     
     /// Mailbox instance for GPU memory allocation.
-    let mailbox: Mailbox
+    var mailbox: Mailbox!
+    
+    init(physicalAddress: Int, addressSize: Int) {
+        peripheralPhysicalAddress = physicalAddress
+        peripheralAddressSize = addressSize
+    }
     
     public init() throws {
-        // O_SYNC on Linux provides us with an uncached mmap.
-        let memFd = open(memPath, O_RDWR | O_SYNC)
-        guard memFd >= 0 else { throw RaspberryPiError.failed }
-        memFileHandle = FileHandle(fileDescriptor: memFd, closeOnDealloc: true)
-        
-        try mailbox = Mailbox()
-        
         let rangeMap = try RaspberryPi.loadRanges()
-        if let (physicalBaseAddress, addressSize) = rangeMap[peripheralBusBaseAddress] {
-            peripheralPhysicalBaseAddress = physicalBaseAddress
+        if let (physicalAddress, addressSize) = rangeMap[peripheralBusAddress] {
+            peripheralPhysicalAddress = physicalAddress
             peripheralAddressSize = addressSize
         } else {
-            peripheralPhysicalBaseAddress = bcm2835PhysicalBaseAddress
+            peripheralPhysicalAddress = bcm2835PhysicalAddress
             peripheralAddressSize = bcm2835AddressSize
         }
     }
@@ -102,18 +100,45 @@ public class RaspberryPi {
         }
     }
     
-    public func mapPeripheral(at offset: Int, size: Int) throws -> UnsafeMutableRawPointer {
+    func mapMemory(at address: Int, size: Int) throws -> UnsafeMutableRawPointer {
+        if memFileHandle == nil {
+            // O_SYNC on Linux provides us with an uncached mmap.
+            let memFd = open(memPath, O_RDWR | O_SYNC)
+            guard memFd >= 0 else { throw RaspberryPiError.failed }
+            memFileHandle = FileHandle(fileDescriptor: memFd, closeOnDealloc: true)
+        }
+        
         guard let pointer = mmap(
-                nil,
-                size,
-                PROT_READ | PROT_WRITE,
-                MAP_SHARED,
-                memFileHandle.fileDescriptor,
-                off_t(peripheralPhysicalBaseAddress + offset)),
+            nil,
+            size,
+            PROT_READ | PROT_WRITE,
+            MAP_SHARED,
+            memFileHandle.fileDescriptor,
+            off_t(address)),
             pointer != MAP_FAILED
             else { throw RaspberryPiError.memoryMapFailed(errno: errno) }
         return pointer
     }
+    
+    public func allocateUncachedMemory(minimumSize: Int) throws -> UncachedMemory {
+        let size = pageSize * (((minimumSize - 1) / pageSize) + 1)
+        
+        if mailbox == nil {
+            try mailbox = Mailbox()
+        }
+        let handle = try mailbox.allocateMemory(size: size, alignment: pageSize, flags: .direct)
+        
+        do {
+            let busAddress = try mailbox.lockMemory(handle: handle)
+            let pointer = try mapMemory(at: busAddress & ~uncachedAliasAddress, size: size)
+            
+            return UncachedMemory(size: size, mailbox: mailbox, handle: handle, busAddress: busAddress, pointer: pointer)
+        } catch {
+            try! mailbox.releaseMemory(handle: handle)
+            throw error
+        }
+    }
+
     
 }
 
@@ -126,32 +151,6 @@ public class UncachedMemory {
     public let busAddress: Int
     
     public let pointer: UnsafeMutableRawPointer
-    
-    public static func allocate(minimumSize: Int, using raspberryPi: RaspberryPi) throws -> UncachedMemory {
-        let size = raspberryPi.pageSize * (((minimumSize - 1) / raspberryPi.pageSize) + 1)
-
-        let handle = try raspberryPi.mailbox.allocateMemory(size: size, alignment: raspberryPi.pageSize, flags: .direct)
-        
-        do {
-            let busAddress = try raspberryPi.mailbox.lockMemory(handle: handle)
-            
-            guard
-                let pointer = mmap(
-                    nil,
-                    size,
-                    PROT_READ | PROT_WRITE,
-                    MAP_SHARED,
-                    raspberryPi.memFileHandle.fileDescriptor,
-                    off_t(busAddress & ~RaspberryPi.uncachedAliasAddress)),
-                pointer != MAP_FAILED
-                else { throw RaspberryPiError.memoryMapFailed(errno: errno) }
-            
-            return UncachedMemory(size: size, mailbox: raspberryPi.mailbox, handle: handle, busAddress: busAddress, pointer: pointer)
-        } catch {
-            try! raspberryPi.mailbox.releaseMemory(handle: handle)
-            throw error
-        }
-    }
     
     init(size: Int, mailbox: Mailbox, handle: Mailbox.MemoryHandle, busAddress: Int, pointer: UnsafeMutableRawPointer) {
         self.size = size

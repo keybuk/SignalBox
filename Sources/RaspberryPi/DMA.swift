@@ -281,7 +281,7 @@ public struct DMA {
     
     private init(on raspberryPi: RaspberryPi) throws {
         // FIXME: this memory map gets leaked.
-        var pointer = try raspberryPi.mapPeripheral(at: DMA.offset, size: DMA.size)
+        var pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralPhysicalAddress + DMA.offset, size: DMA.size)
         
         interruptStatus = pointer.advanced(by: DMA.interruptStatusOffset).bindMemory(to: Int.self, capacity: 1)
         enable = pointer.advanced(by: DMA.enableOffset).bindMemory(to: Int.self, capacity: 1)
@@ -292,7 +292,7 @@ public struct DMA {
             pointer = pointer.advanced(by: DMA.channelSize)
         }
         
-        pointer = try! raspberryPi.mapPeripheral(at: DMA.dma15Offset, size: DMA.dma15Size)
+        pointer = try! raspberryPi.mapMemory(at: raspberryPi.peripheralPhysicalAddress + DMA.dma15Offset, size: DMA.dma15Size)
         channels.append(pointer.bindMemory(to: DMAChannel.self, capacity: 1))
 
         channel = channels

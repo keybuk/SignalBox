@@ -73,14 +73,14 @@ public class OldDriver {
         dmaChannel = dma.channel[dmaChannelNumber]
         
         // Allocate control block and data regions
-        controlBlockMemory = try UncachedMemory.allocate(minimumSize: MemoryLayout<DMAControlBlock>.stride * 65536, using: raspberryPi)
+        controlBlockMemory = try raspberryPi.allocateUncachedMemory(minimumSize: MemoryLayout<DMAControlBlock>.stride * 65536)
         controlBlock = controlBlockMemory.pointer.bindMemory(to: DMAControlBlock.self, capacity: 65536)
 
-        dataMemory = try UncachedMemory.allocate(minimumSize: MemoryLayout<Int>.stride * 65536, using: raspberryPi)
+        dataMemory = try raspberryPi.allocateUncachedMemory(minimumSize: MemoryLayout<Int>.stride * 65536)
         data = dataMemory.pointer.bindMemory(to: Int.self, capacity: 65536)
         
-        print("ControlBlocks at 0x" + String(UInt(bitPattern: controlBlockMemory.busAddress & ~RaspberryPi.uncachedAliasAddress), radix: 16))
-        print("         Data at 0x" + String(UInt(bitPattern: dataMemory.busAddress  & ~RaspberryPi.uncachedAliasAddress), radix: 16))
+        print("ControlBlocks at 0x" + String(UInt(bitPattern: controlBlockMemory.busAddress & ~raspberryPi.uncachedAliasAddress), radix: 16))
+        print("         Data at 0x" + String(UInt(bitPattern: dataMemory.busAddress  & ~raspberryPi.uncachedAliasAddress), radix: 16))
 
     }
     
@@ -196,7 +196,7 @@ public class OldDriver {
         
         controlBlock[controlBlockIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .sourceAddressIncrement, .destinationDREQ, .waitForWriteResponse ]
         controlBlock[controlBlockIndex].sourceAddress = dataMemory.busAddress + MemoryLayout<Int>.stride * dataIndex
-        controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.fifoInputOffset
+        controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset
         controlBlock[controlBlockIndex].transferLength = MemoryLayout<Int>.stride * words.count
         controlBlock[controlBlockIndex].tdModeStride = 0
         controlBlock[controlBlockIndex].nextControlBlockAddress = 0
@@ -216,7 +216,7 @@ public class OldDriver {
         
         controlBlock[controlBlockIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ]
         controlBlock[controlBlockIndex].sourceAddress = dataMemory.busAddress + MemoryLayout<Int>.stride * dataIndex
-        controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + PWM.offset + PWM.channel1RangeOffset
+        controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset
         controlBlock[controlBlockIndex].transferLength = MemoryLayout<Int>.stride
         controlBlock[controlBlockIndex].tdModeStride = 0
         controlBlock[controlBlockIndex].nextControlBlockAddress = 0
@@ -236,7 +236,7 @@ public class OldDriver {
         
         controlBlock[controlBlockIndex].transferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ]
         controlBlock[controlBlockIndex].sourceAddress = dataMemory.busAddress + MemoryLayout<Int>.stride * dataIndex
-        controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusBaseAddress + GPIO.offset + (value ? GPIO.outputSetOffset : GPIO.outputClearOffset)
+        controlBlock[controlBlockIndex].destinationAddress = raspberryPi.peripheralBusAddress + GPIO.offset + (value ? GPIO.outputSetOffset : GPIO.outputClearOffset)
         controlBlock[controlBlockIndex].transferLength = MemoryLayout<Int>.stride
         controlBlock[controlBlockIndex].tdModeStride = 0
         controlBlock[controlBlockIndex].nextControlBlockAddress = 0
