@@ -1,6 +1,6 @@
 import PackageDescription
 
-let package = Package(
+var package = Package(
     name: "SignalBox",
     targets: [
         Target(name: "RaspberryPi"),
@@ -8,3 +8,7 @@ let package = Package(
         Target(name: "Prototype", dependencies: ["RaspberryPi", "DCC"]),
     ]
 )
+
+#if os(Linux)
+package.dependencies.append(.Package(url: "https://github.com/mdaxter/CBSD", majorVersion: 1))
+#endif

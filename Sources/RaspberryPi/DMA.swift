@@ -192,7 +192,7 @@ public struct DMADebug : OptionSet {
 }
 
 
-public struct DMAControlBlock {
+public struct DMAControlBlock : Equatable {
     
     public var transferInformation: DMATransferInformation
     public var sourceAddress: Int
@@ -230,6 +230,10 @@ public struct DMAControlBlock {
     
     public static func tdModeStride(source: Int, destination: Int) -> Int {
         return (source << 0) | (destination << 16)
+    }
+    
+    public static func ==(lhs: DMAControlBlock, rhs: DMAControlBlock) -> Bool {
+        return lhs.transferInformation == rhs.transferInformation && lhs.sourceAddress == rhs.sourceAddress && lhs.destinationAddress == rhs.destinationAddress && lhs.transferLength == rhs.transferLength && lhs.tdModeStride == rhs.tdModeStride && lhs.nextControlBlockAddress == rhs.nextControlBlockAddress
     }
     
 }

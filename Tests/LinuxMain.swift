@@ -13,4 +13,5 @@ import XCTest
 
 XCTMain([
     testCase(BitstreamTests.allTests),
+    testCase(DriverTests.allTests),
 ])

@@ -16,6 +16,7 @@ class BitstreamTests: XCTestCase {
     var wordSize: Int = 0
     
     override func setUp() {
+        super.setUp()
         wordSize = MemoryLayout<Int>.size * 8
     }
     
