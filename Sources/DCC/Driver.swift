@@ -19,46 +19,67 @@ struct Driver {
         self.raspberryPi = raspberryPi
     }
     
+    static let selfTransferInformation: DMATransferInformation = [ .sourceIgnoreWrites ]
     static let pwmFifoTransferInformation: DMATransferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .sourceAddressIncrement, .destinationDREQ, .waitForWriteResponse ]
     static let pwmRangeTransferInformation: DMATransferInformation = [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ]
+
+    func offsetOfControlBlock(at index: Int) -> Int {
+        return MemoryLayout<DMAControlBlock>.stride * index
+    }
+    
+    func offsetOfData(at index: Int) -> Int {
+        return MemoryLayout<Int>.stride * index
+    }
     
     func parseBitstream(_ bitstream: Bitstream) -> (controlBlocks: [DMAControlBlock], data: [Int]) {
         var controlBlocks: [DMAControlBlock] = []
         var data: [Int] = []
         
+        let pwmFifoDestinationAddress = raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset
+        let pwmChannel1RangeDestinationAddress = raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset
+        
+        // The start control block is used to determine when the DMA engine is operating on this bitstream, so we can free the memory of the prior one. It simply points to the next control block in the chain, and zeros its own next control block address as a signal that it's begun.
+        controlBlocks.append(DMAControlBlock(
+            transferInformation: Driver.selfTransferInformation,
+            sourceAddress: 0,
+            destinationAddress: offsetOfControlBlock(at: 0) + DMAControlBlock.nextControlBlockOffset,
+            transferLength: MemoryLayout<Int>.stride,
+            tdModeStride: 0,
+            nextControlBlockAddress: offsetOfControlBlock(at: 1)))
+        
         for event in bitstream {
             switch event {
             case let .data(word: word, size: size):
-                
-                if controlBlocks.count > 0 {
-                    controlBlocks[controlBlocks.count - 1].nextControlBlockAddress = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
-                }
-
                 controlBlocks.append(DMAControlBlock(
                     transferInformation: Driver.pwmFifoTransferInformation,
-                    sourceAddress: MemoryLayout<Int>.stride * data.count,
-                    destinationAddress: raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset,
-                    transferLength: MemoryLayout<Int>.size,
+                    sourceAddress: offsetOfData(at: data.count),
+                    destinationAddress: pwmFifoDestinationAddress,
+                    transferLength: MemoryLayout<Int>.stride,
                     tdModeStride: 0,
-                    nextControlBlockAddress: 0))
+                    nextControlBlockAddress: offsetOfControlBlock(at: controlBlocks.count + 1)))
                 data.append(word)
                 
-                if controlBlocks.count > 0 {
-                    controlBlocks[controlBlocks.count - 1].nextControlBlockAddress = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
-                }
-
                 controlBlocks.append(DMAControlBlock(
                     transferInformation: Driver.pwmRangeTransferInformation,
-                    sourceAddress: MemoryLayout<Int>.stride * data.count,
-                    destinationAddress: raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset,
-                    transferLength: MemoryLayout<Int>.size,
+                    sourceAddress: offsetOfData(at: data.count),
+                    destinationAddress: pwmChannel1RangeDestinationAddress,
+                    transferLength: MemoryLayout<Int>.stride,
                     tdModeStride: 0,
-                    nextControlBlockAddress: 0))
+                    nextControlBlockAddress: offsetOfControlBlock(at: controlBlocks.count + 1)))
                 data.append(size)
             default:
                 fatalError()
             }
         }
+        
+        // The final control block is used to determine when the DMA engine has completed at least one full broadcast of this bitstream, before looping. It points to the first control block in the loop, after zeroing the entire first control block (which is otherwise unused) as a signal that broadcast has completed.
+        controlBlocks.append(DMAControlBlock(
+            transferInformation: Driver.selfTransferInformation,
+            sourceAddress: 0,
+            destinationAddress: offsetOfControlBlock(at: 0),
+            transferLength: MemoryLayout<DMAControlBlock>.stride,
+            tdModeStride: 0,
+            nextControlBlockAddress: offsetOfControlBlock(at: 1)))
         
         return (controlBlocks, data)
     }
@@ -72,10 +93,10 @@ struct Driver {
         let memory = try raspberryPi.allocateUncachedMemory(minimumSize: controlBlocksSize + dataSize)
         
         for (index, controlBlock) in controlBlocks.enumerated() {
-            if controlBlock.sourceAddress < raspberryPi.peripheralBusAddress {
+            if controlBlock.sourceAddress < raspberryPi.peripheralBusAddress && !controlBlock.transferInformation.contains(.sourceIgnoreWrites) {
                 controlBlocks[index].sourceAddress += memory.busAddress + controlBlocksSize
             }
-            if controlBlock.destinationAddress < raspberryPi.peripheralBusAddress {
+            if controlBlock.destinationAddress < raspberryPi.peripheralBusAddress && !controlBlock.transferInformation.contains(.destinationWidthWide) {
                 controlBlocks[index].destinationAddress += memory.busAddress + controlBlocksSize
             }
             controlBlocks[index].nextControlBlockAddress += memory.busAddress

@@ -387,7 +387,7 @@ public class OldDriver {
         dmaChannel.pointee.controlBlockAddress = controlBlockMemory.busAddress + MemoryLayout<DMAControlBlock>.stride * index
 
         usleep(100)
-        dmaChannel.pointee.controlStatus = [ .waitForOutstandingWrites, .priorityLevel(8), .panicPriorityLevel(8), .active ]
+        dmaChannel.pointee.controlStatus = [ .priorityLevel(8), .panicPriorityLevel(8), .active ]
         
         while !dmaChannel.pointee.controlStatus.contains(.transferComplete) { }
     }

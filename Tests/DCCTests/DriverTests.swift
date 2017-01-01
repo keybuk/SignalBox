@@ -39,27 +39,40 @@ class DriverTests: XCTestCase {
         let driver = Driver(raspberryPi: raspberryPi)
         let (controlBlocks, data) = driver.parseBitstream(bitstream)
         
-        XCTAssertEqual(controlBlocks.count, 2)
+        XCTAssertEqual(controlBlocks.count, 4)
         XCTAssertEqual(data.count, 2)
-
-        XCTAssertEqual(controlBlocks[0].transferInformation,  [ .noWideBursts, .peripheralMapping(.pwm), .sourceAddressIncrement, .destinationDREQ, .waitForWriteResponse ])
-        XCTAssertEqual(controlBlocks[0].sourceAddress,  MemoryLayout<Int>.stride * 0)
-        XCTAssertEqual(controlBlocks[0].destinationAddress, raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset)
-        XCTAssertEqual(controlBlocks[0].transferLength, MemoryLayout<Int>.size)
+        
+        XCTAssertEqual(controlBlocks[0].transferInformation,  [ .sourceIgnoreWrites ])
+        XCTAssertEqual(controlBlocks[0].sourceAddress,  0)
+        XCTAssertEqual(controlBlocks[0].destinationAddress, MemoryLayout<DMAControlBlock>.stride * 0 + DMAControlBlock.nextControlBlockOffset)
+        XCTAssertEqual(controlBlocks[0].transferLength, MemoryLayout<Int>.stride)
         XCTAssertEqual(controlBlocks[0].tdModeStride, 0)
         XCTAssertEqual(controlBlocks[0].nextControlBlockAddress, MemoryLayout<DMAControlBlock>.stride * 1)
+
+        XCTAssertEqual(controlBlocks[1].transferInformation,  [ .noWideBursts, .peripheralMapping(.pwm), .sourceAddressIncrement, .destinationDREQ, .waitForWriteResponse ])
+        XCTAssertEqual(controlBlocks[1].sourceAddress,  MemoryLayout<Int>.stride * 0)
+        XCTAssertEqual(controlBlocks[1].destinationAddress, raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset)
+        XCTAssertEqual(controlBlocks[1].transferLength, MemoryLayout<Int>.stride)
+        XCTAssertEqual(controlBlocks[1].tdModeStride, 0)
+        XCTAssertEqual(controlBlocks[1].nextControlBlockAddress, MemoryLayout<DMAControlBlock>.stride * 2)
         
         XCTAssertEqual(data[0], randomWords[0])
 
-        
-        XCTAssertEqual(controlBlocks[1].transferInformation, [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ])
-        XCTAssertEqual(controlBlocks[1].sourceAddress, MemoryLayout<Int>.stride * 1)
-        XCTAssertEqual(controlBlocks[1].destinationAddress, raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset)
-        XCTAssertEqual(controlBlocks[1].transferLength, MemoryLayout<Int>.size)
-        XCTAssertEqual(controlBlocks[1].tdModeStride, 0)
-        XCTAssertEqual(controlBlocks[1].nextControlBlockAddress, MemoryLayout<DMAControlBlock>.stride * 0)
+        XCTAssertEqual(controlBlocks[2].transferInformation, [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ])
+        XCTAssertEqual(controlBlocks[2].sourceAddress, MemoryLayout<Int>.stride * 1)
+        XCTAssertEqual(controlBlocks[2].destinationAddress, raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset)
+        XCTAssertEqual(controlBlocks[2].transferLength, MemoryLayout<Int>.stride)
+        XCTAssertEqual(controlBlocks[2].tdModeStride, 0)
+        XCTAssertEqual(controlBlocks[2].nextControlBlockAddress, MemoryLayout<DMAControlBlock>.stride * 3)
         
         XCTAssertEqual(data[1], 32)
+        
+        XCTAssertEqual(controlBlocks[3].transferInformation,  [ .sourceIgnoreWrites ])
+        XCTAssertEqual(controlBlocks[3].sourceAddress,  0)
+        XCTAssertEqual(controlBlocks[3].destinationAddress, MemoryLayout<DMAControlBlock>.stride * 0)
+        XCTAssertEqual(controlBlocks[3].transferLength, MemoryLayout<DMAControlBlock>.stride)
+        XCTAssertEqual(controlBlocks[3].tdModeStride, 0)
+        XCTAssertEqual(controlBlocks[3].nextControlBlockAddress, MemoryLayout<DMAControlBlock>.stride * 1)
     }
     
 }
