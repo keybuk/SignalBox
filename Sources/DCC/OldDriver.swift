@@ -79,8 +79,8 @@ public class OldDriver {
         dataMemory = try raspberryPi.allocateUncachedMemory(minimumSize: MemoryLayout<Int>.stride * 65536)
         data = dataMemory.pointer.bindMemory(to: Int.self, capacity: 65536)
         
-        print("ControlBlocks at 0x" + String(UInt(bitPattern: controlBlockMemory.busAddress & ~raspberryPi.uncachedAliasAddress), radix: 16))
-        print("         Data at 0x" + String(UInt(bitPattern: dataMemory.busAddress  & ~raspberryPi.uncachedAliasAddress), radix: 16))
+        print("ControlBlocks at 0x" + String(UInt(bitPattern: controlBlockMemory.busAddress & ~raspberryPi.uncachedAliasBusAddress), radix: 16))
+        print("         Data at 0x" + String(UInt(bitPattern: dataMemory.busAddress  & ~raspberryPi.uncachedAliasBusAddress), radix: 16))
 
     }
     

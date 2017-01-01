@@ -55,7 +55,7 @@ func functionPacket(_ function: Int, value: Bool) -> Packet {
     }
 }
 
-let raspberryPi = try! RaspberryPi()
+let raspberryPi = RaspberryPi()
 
 let driver = try! OldDriver(raspberryPi: raspberryPi)
 driver.setup()

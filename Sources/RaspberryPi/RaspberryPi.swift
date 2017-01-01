@@ -21,75 +21,64 @@ let O_SYNC: Int32 = 0
 import Foundation
 
 
-public enum RaspberryPiError: Error {
-    case failed
-    case memoryMapFailed(errno: Int32)
-}
-
 /// Raspberry Pi hardware.
 ///
-/// This class wraps the details of the Raspberry Pi hardware, and operations on it, including memory mapping.
+/// Provides details about the Raspberry Pi hardware, such as memory addresses of peripherals.
 public class RaspberryPi {
 
-    public let uncachedAliasAddress = Int(bitPattern: 0xc0000000)
-
-    /// Size in bytes of memory pages.
+    /// Size, in bytes, of memory pages.
     public let pageSize = 4096
-
-    /// Bus address where I/O Peripherals begin.
+    
+    /// Bus address of I/O Peripherals.
     ///
     /// The bus address is the address utilized for hardware, including the DMA engine.
     public let peripheralBusAddress = 0x7e000000
 
-    /// Physical address where I/O Peripherals begin on the earlier Pi models.
-    let bcm2835PhysicalAddress = 0x20000000
+    /// Bus address of the uncached memory 'C' alias.
+    ///
+    /// The Raspberry Pi hardware provides an alias to memory addresses that bypasses the L1 and L2 caches, and can be allocated using `allocateUncachedMemory(minimumSize:)`. To translate the `busAddress` of that object into a un-aliased physical address, remove this constant from it; likewise to translate an un-aliased physical address into an aliased bus address, add this constant.
+    public let uncachedAliasBusAddress = Int(bitPattern: 0xc0000000)
+
+    /// Bus address of I/O Peripherals on the earlier Pi models.
+    let bcm2835Address = 0x20000000
     
     /// Size of the I/O Peripherals address range on the earlier Pi models.
     let bcm2835AddressSize = 0x01000000
     
-    /// Physical address where I/O Peripherals begin.
+    /// Address where I/O Peripherals begin.
     ///
-    /// The physical address is the address at which memory may be mapped from `/dev/mem`.
-    public let peripheralPhysicalAddress: Int
+    /// This is a physical address suitable for using with `mapMemory(at:size:)`, the value of which varies depending on the specific Raspberry Pi model. For hardware such as the DMA Engine, use the fixed `peripheralBusAddress`.
+    public let peripheralAddress: Int
     
     /// Size of the I/O Peripherals address range.
+    ///
+    /// This value varies depending on the specific Raspberry Pi model, and applies equally to `peripheralAddress` and `peripheralBusAddress`.
     public let peripheralAddressSize: Int
 
-    /// Location of the `/dev/mem` device.
-    let memPath = "/dev/mem"
-    
-    /// File handle for `/dev/mem`.
-    var memFileHandle: FileHandle!
-    
-    /// Mailbox instance for GPU memory allocation.
-    var mailbox: Mailbox!
-    
-    init(physicalAddress: Int, addressSize: Int) {
-        peripheralPhysicalAddress = physicalAddress
-        peripheralAddressSize = addressSize
-    }
-    
-    public init() throws {
-        let rangeMap = try RaspberryPi.loadRanges()
-        if let (physicalAddress, addressSize) = rangeMap[peripheralBusAddress] {
-            peripheralPhysicalAddress = physicalAddress
+    public init() {
+        if let rangeMap = try? RaspberryPi.loadRanges(),
+            let (address, addressSize) = rangeMap[peripheralBusAddress]
+        {
+            peripheralAddress = address
             peripheralAddressSize = addressSize
         } else {
-            peripheralPhysicalAddress = bcm2835PhysicalAddress
+            peripheralAddress = bcm2835Address
             peripheralAddressSize = bcm2835AddressSize
         }
     }
     
     /// Location of the device tree ranges map.
-    static let socRangesPath = "/proc/device-tree/soc/ranges"
+    static let deviceTreeRangesPath = "/proc/device-tree/soc/ranges"
 
     /// Loads system-specific memory ranges from the device tree.
     ///
     /// Returns: a map from bus address to physical address and size for each mapped area.
+    ///
+    /// Throws: errors from `Data(contentsOf:)`.
     static func loadRanges() throws -> [Int: (Int, Int)] {
-        let ranges = try Data(contentsOf: URL(fileURLWithPath: socRangesPath))
+        let ranges = try Data(contentsOf: URL(fileURLWithPath: RaspberryPi.deviceTreeRangesPath))
         return ranges.withUnsafeBytes { (addresses: UnsafePointer<Int>) -> [Int: (Int, Int)] in
-            let numberOfAddresses = ranges.count / MemoryLayout<Int>.size
+            let numberOfAddresses = ranges.count / MemoryLayout<Int>.stride
             var addressMap: [Int: (Int, Int)] = [:]
             
             for i in 0..<(numberOfAddresses / 3) {
@@ -100,26 +89,80 @@ public class RaspberryPi {
         }
     }
     
+    /// Initialize for testing.
+    ///
+    /// - Parameters:
+    ///   - peripheralAddress: address where peripherals should be on the real hardware.
+    ///   - peripheralAddressSize: size of peripheral memory region on the real hardware.
+    init(peripheralAddress: Int, peripheralAddressSize: Int) {
+        self.peripheralAddress = peripheralAddress
+        self.peripheralAddressSize = peripheralAddressSize
+    }
+    
+    /// Location of the `/dev/mem` device.
+    static let memDevicePath = "/dev/mem"
+    
+    /// File handle for `/dev/mem`.
+    ///
+    /// This is opened on the first call to `mapMemory(at:size:)` but then cached afterwards.
+    var memFileHandle: FileHandle!
+
+    /// Make a memory region accessible via pointer.
+    ///
+    /// When reading from a datasheet, `address` is the physical address of the region.
+    ///
+    /// Use `munmap` to release the pointer.
+    ///
+    /// - Parameters:
+    ///   - address: physical address of the memory region.
+    ///   - size: size, in bytes, of the memory region.
+    ///
+    /// - Returns: raw pointer to the local virtual address of the memory region.
+    ///
+    /// - Throws: `RaspberryPiError` on failure.
     func mapMemory(at address: Int, size: Int) throws -> UnsafeMutableRawPointer {
         if memFileHandle == nil {
             // O_SYNC on Linux provides us with an uncached mmap.
-            let memFd = open(memPath, O_RDWR | O_SYNC)
-            guard memFd >= 0 else { throw RaspberryPiError.failed }
+            let memFd = open(RaspberryPi.memDevicePath, O_RDWR | O_SYNC)
+            guard memFd >= 0 else {
+                switch errno {
+                case EACCES:
+                    throw RaspberryPiError.permissionDenied
+                default:
+                    throw RaspberryPiError.systemCallFailed(errno: errno)
+                }
+            }
+            
             memFileHandle = FileHandle(fileDescriptor: memFd, closeOnDealloc: true)
         }
         
-        guard let pointer = mmap(
-            nil,
-            size,
-            PROT_READ | PROT_WRITE,
-            MAP_SHARED,
-            memFileHandle.fileDescriptor,
-            off_t(address)),
-            pointer != MAP_FAILED
-            else { throw RaspberryPiError.memoryMapFailed(errno: errno) }
+        // Since "the zero page" is a valid address to which memory can be mapped, mmap() always returns a pointer.
+        // Compare against the special MAP_FAILED value (-1) to determine failure.
+        let pointer: UnsafeMutableRawPointer = mmap(nil, size, PROT_READ | PROT_WRITE, MAP_SHARED, memFileHandle.fileDescriptor, off_t(address))
+        guard pointer != MAP_FAILED else {
+            throw RaspberryPiError.systemCallFailed(errno: errno)
+        }
+
         return pointer
     }
     
+    /// Mailbox instance for uncached memory allocation.
+    ///
+    /// This is opened on the first call to `allocateUncachedMemory` but then cached afterwards.
+    var mailbox: Mailbox!
+    
+    /// Allocate a region of uncached memory.
+    ///
+    /// Uncached memory is accessed through the Raspberry Pi's "'C' Alias" such that all reads directly come from, and all writes directly go to, RAM bypassing the core's L1 and L2 caches. While such accesses are significantly slower, this allows for interacting with hardware such as the DMA Engine which cannot _see_ these caches.
+    ///
+    /// The returned object must be retained as long as the region is required, and will release the memory region on deinitialization. In addition, due to the way in which uncached memory is allocated, the memory region is **not** automatically released on process exit. You must deallocate it manually by either releasing the object or calling its `deallocate()` method.
+    ///
+    /// - Parameters:
+    ///   - minimumSize: minimum size, in bytes, of the region. This will be rounded up to the nearest multiple of `pageSize`.
+    ///
+    /// - Returns: `UncachedMemory` object describing the region.
+    ///
+    /// - Throws: `MailboxError` or `RaspberryPiError` on failure.
     public func allocateUncachedMemory(minimumSize: Int) throws -> UncachedMemory {
         let size = pageSize * (((minimumSize - 1) / pageSize) + 1)
         
@@ -130,40 +173,69 @@ public class RaspberryPi {
         
         do {
             let busAddress = try mailbox.lockMemory(handle: handle)
-            let pointer = try mapMemory(at: busAddress & ~uncachedAliasAddress, size: size)
+            let pointer = try mapMemory(at: busAddress & ~uncachedAliasBusAddress, size: size)
             
-            return UncachedMemory(size: size, mailbox: mailbox, handle: handle, busAddress: busAddress, pointer: pointer)
+            return UncachedMemory(mailbox: mailbox, handle: handle, pointer: pointer, busAddress: busAddress, size: size)
         } catch {
             try! mailbox.releaseMemory(handle: handle)
             throw error
         }
     }
-
     
 }
 
+/// Region of Uncached Memory.
+///
+/// Uncached memory is accessed through the Raspberry Pi's "'C' Alias" such that all reads directly come from, and all writes directly go to, RAM bypassing the core's L1 and L2 caches. While such accesses are significantly slower, this allows for interacting with hardware such as the DMA Engine which cannot _see_ these caches.
+///
+/// Instances of this object are created using `RaspberryPi.allocateUncachedMemory(minimumSize:)` and must be retained as long as the region is required. The instance will release the memory region on deinitialization. In addition, due to the way in which uncached memory is allocated, the memory region is **not** automatically released on process exit. You must deallocate it manually by either releasing the object or calling `deallocate()`.
 public class UncachedMemory {
-    
-    let size: Int
+
+    /// `Mailbox` instance used to allocate the region, and used to release it.
     let mailbox: Mailbox
-    let handle: Mailbox.MemoryHandle
     
-    public let busAddress: Int
+    /// Mailbox handle for the memory region, used to release it.
+    var handle: MailboxMemoryHandle?
     
+    /// Pointer to the region.
     public let pointer: UnsafeMutableRawPointer
     
-    init(size: Int, mailbox: Mailbox, handle: Mailbox.MemoryHandle, busAddress: Int, pointer: UnsafeMutableRawPointer) {
-        self.size = size
+    /// Bus address of the region.
+    ///
+    /// This address is within the "'C' Alias" and may be handed directly to hardware such as the DMA Engine. To obtain an equivalent address outside the alias, remove `RaspberryPi.uncachedAliasBusAddress` from this value.
+    public let busAddress: Int
+    
+    /// Size of the region, a multiple of `RaspberryPi.pageSize`.
+    public let size: Int
+    
+    init(mailbox: Mailbox, handle: MailboxMemoryHandle, pointer: UnsafeMutableRawPointer, busAddress: Int, size: Int) {
         self.mailbox = mailbox
         self.handle = handle
-        self.busAddress = busAddress
         self.pointer = pointer
+        self.busAddress = busAddress
+        self.size = size
+    }
+    
+    /// Release the region.
+    ///
+    /// This is automatically called on object destruction, but may be called in advance if necessary. Uncached memory regions must be deallocated manually on process exit, otherwise the region will remain allocated.
+    ///
+    /// Accessing the memory region through `pointer` after calling this method will result in a runtime error.
+    ///
+    /// - Throws: `MailboxError` or `RaspberryPiError` on failure.
+    public func deallocate() throws {
+        guard let handle = handle else { return }
+
+        // Release the memory with the mailbox first; since it matters more whether this takes place than the munmap.
+        try mailbox.releaseMemory(handle: handle)
+        self.handle = nil
+
+        guard munmap(pointer, size) == 0 else { throw RaspberryPiError.systemCallFailed(errno: errno) }
     }
 
     deinit {
         // There isn't much we can do if we fail to release memory. Fortunately it's one of those operations that also shouldn't ever happen.
-        munmap(pointer, size)
-        try! mailbox.releaseMemory(handle: handle)
+        try! deallocate()
     }
     
 }

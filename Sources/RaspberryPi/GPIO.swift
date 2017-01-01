@@ -177,7 +177,7 @@ public struct GPIO {
     // FIXME: this name is bad, and Swift-style requires the 'On' be inside the '('.
     public static func on(_ raspberryPi: RaspberryPi) throws -> UnsafeMutablePointer<GPIO> {
         // FIXME: this memory map gets leaked.
-        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralPhysicalAddress + GPIO.offset, size: GPIO.size)
+        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralAddress + GPIO.offset, size: GPIO.size)
         return pointer.bindMemory(to: GPIO.self, capacity: 1)
     }
     

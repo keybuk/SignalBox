@@ -120,7 +120,7 @@ public struct Clock {
     // FIXME: this name is bad. Do we really want one of these methods per-clock? We have to map the entire register space anyway, otherwise mmap() fails.
     public static func pwm(on raspberryPi: RaspberryPi) throws -> UnsafeMutablePointer<Clock> {
         // FIXME: this memory map gets leaked.
-        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralPhysicalAddress + Clock.offset, size: Clock.size)
+        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralAddress + Clock.offset, size: Clock.size)
         return pointer.advanced(by: Clock.pwmOffset).bindMemory(to: Clock.self, capacity: 1)
     }
 

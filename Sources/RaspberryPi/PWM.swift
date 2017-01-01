@@ -115,7 +115,7 @@ public struct PWM {
     // FIXME: this name is bad, and Swift-style requires the 'On' be inside the '('.
     public static func on(_ raspberryPi: RaspberryPi) throws -> UnsafeMutablePointer<PWM> {
         // FIXME: this memory map gets leaked.
-        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralPhysicalAddress + PWM.offset, size: PWM.size)
+        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralAddress + PWM.offset, size: PWM.size)
         return pointer.bindMemory(to: PWM.self, capacity: 1)
     }
     
