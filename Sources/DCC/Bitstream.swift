@@ -392,20 +392,23 @@ public struct Bitstream : Collection {
 
 /// Event than can occur within the DCC bitstream.
 public enum BitstreamEvent : Equatable {
-    /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than `wordSize`.
+    /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than the Bitstream `wordSize`.
     case data(word: Int, size: Int)
     
-    /// Indicates that the RailCom cutout period should begin aligned with the start of the next `.data`.
+    /// The RailCom cutout period should begin aligned with the start of the next `.data`.
     case railComCutoutStart
     
-    /// Indicates that the RailCom cutout period should end aligned with the start of the next `.data`.
+    /// The RailCom cutout period should end aligned with the start of the next `.data`.
     case railComCutoutEnd
     
-    /// Indicates that the debug packet period should begin aligned with the start of the next `.data`.
+    /// The debug packet period should begin aligned with the start of the next `.data`.
     case debugStart
     
-    /// Indicates that the debug packet period should end aligned with the start of the next `.data`.
+    /// The debug packet period should end aligned with the start of the next `.data`.
     case debugEnd
+    
+    /// The repeating part of the bitstream begins with the start of the next `.data`.
+    case loopStart
     
     public static func ==(lhs: BitstreamEvent, rhs: BitstreamEvent) -> Bool {
         switch (lhs, rhs) {
@@ -419,12 +422,15 @@ public enum BitstreamEvent : Equatable {
             return true
         case (.debugEnd, .debugEnd):
             return true
+        case (.loopStart, .loopStart):
+            return true
 
         case (.data(_, _), _),
              (.railComCutoutStart, _),
              (.railComCutoutEnd, _),
              (.debugStart, _),
-             (.debugEnd, _):
+             (.debugEnd, _),
+             (.loopStart, _):
             return false
         }
     }
