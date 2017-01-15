@@ -6,7 +6,7 @@
 //
 //
 
-public struct PWMControl : OptionSet {
+public struct PWMControl : OptionSet, CustomStringConvertible {
 
     public let rawValue: Int
     
@@ -30,9 +30,31 @@ public struct PWMControl : OptionSet {
     public static let channel1SerializerMode = PWMControl(rawValue: 1 << 1)
     public static let channel1Enable         = PWMControl(rawValue: 1 << 0)
     
+    public var description: String {
+        var parts: [String] = []
+        
+        if contains(.channel2UseMarkspace) { parts.append(".channel2UseMarkspace") }
+        if contains(.channel2UseFifo) { parts.append(".channel2UseFifo") }
+        if contains(.channel2InvertPolarity) { parts.append(".channel2InvertPolarity") }
+        if contains(.channel2SilenceBit) { parts.append(".channel2SilenceBit") }
+        if contains(.channel2RepeatLastData) { parts.append(".channel2RepeatLastData") }
+        if contains(.channel2SerializerMode) { parts.append(".channel2SerializerMode") }
+        if contains(.channel2Enable) { parts.append(".channel2Enable") }
+        if contains(.channel1UseMarkspace) { parts.append(".channel1UseMarkspace") }
+        if contains(.clearFifo) { parts.append(".clearFifo") }
+        if contains(.channel1UseFifo) { parts.append(".channel1UseFifo") }
+        if contains(.channel1InvertPolarity) { parts.append(".channel1InvertPolarity") }
+        if contains(.channel1SilenceBit) { parts.append(".channel1SilenceBit") }
+        if contains(.channel1RepeatLastData) { parts.append(".channel1RepeatLastData") }
+        if contains(.channel1SerializerMode) { parts.append(".channel1SerializerMode") }
+        if contains(.channel1Enable) { parts.append(".channel1Enable") }
+        
+        return "[" + parts.joined(separator: ", ") + "]"
+    }
+
 }
 
-public struct PWMStatus : OptionSet {
+public struct PWMStatus : OptionSet, CustomStringConvertible {
     
     public let rawValue: Int
     
@@ -54,9 +76,29 @@ public struct PWMStatus : OptionSet {
     public static let fifoEmpty            = PWMStatus(rawValue: 1 << 1)
     public static let fifoFull             = PWMStatus(rawValue: 1 << 0)
 
+    public var description: String {
+        var parts: [String] = []
+        
+        if contains(.channel4Transmitting) { parts.append(".channel4Transmitting") }
+        if contains(.channel3Transmitting) { parts.append(".channel3Transmitting") }
+        if contains(.channel2Transmitting) { parts.append(".channel2Transmitting") }
+        if contains(.channel1Transmitting) { parts.append(".channel1Transmitting") }
+        if contains(.busError) { parts.append(".busError") }
+        if contains(.channel4GapOccurred) { parts.append(".channel4GapOccurred") }
+        if contains(.channel3GapOccurred) { parts.append(".channel3GapOccurred") }
+        if contains(.channel2GapOccurred) { parts.append(".channel2GapOccurred") }
+        if contains(.channel1GapOccurred) { parts.append(".channel1GapOccurred") }
+        if contains(.fifoReadError) { parts.append(".fifoReadError") }
+        if contains(.fifoWriteError) { parts.append(".fifoWriteError") }
+        if contains(.fifoEmpty) { parts.append(".fifoEmpty") }
+        if contains(.fifoFull) { parts.append(".fifoFull") }
+        
+        return "[" + parts.joined(separator: ", ") + "]"
+    }
+
 }
 
-public struct PWMDMAConfiguration : OptionSet {
+public struct PWMDMAConfiguration : OptionSet, CustomStringConvertible {
     
     public let rawValue: Int
     
@@ -82,6 +124,15 @@ public struct PWMDMAConfiguration : OptionSet {
     
     public var dreqThreshold: Int {
         return (rawValue >> 0) & ((1 << 8) - 1)
+    }
+    
+    public var description: String {
+        var parts: [String] = []
+
+        parts.append(".dreqThreshold(\(dreqThreshold))")
+        parts.append(".panicThreshold(\(panicThreshold))")
+        
+        return "[" + parts.joined(separator: ", ") + "]"
     }
 
 }

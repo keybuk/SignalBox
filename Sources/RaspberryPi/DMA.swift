@@ -13,7 +13,7 @@ import Darwin
 #endif
 
 
-public struct DMAControlStatus : OptionSet {
+public struct DMAControlStatus : OptionSet, CustomStringConvertible {
     
     public let rawValue: Int
     
@@ -50,6 +50,33 @@ public struct DMAControlStatus : OptionSet {
     
     public var priorityLevel: Int {
         return (rawValue >> 16) & ((1 << 4) - 1)
+    }
+    
+    public var description: String {
+        var parts: [String] = []
+
+        if contains(.reset) { parts.append(".reset") }
+        if contains(.abort) { parts.append(".abort") }
+        if contains(.disableDebugPauseSignal) { parts.append(".disableDebugPauseSignal") }
+        if contains(.waitForOutstandingWrites) { parts.append(".waitForOutstandingWrites") }
+        if contains(.errorDetected) { parts.append(".errorDetected") }
+        if contains(.waitingForOutstandingWrites) { parts.append(".waitingForOutstandingWrites") }
+        if contains(.pausedByDREQ) { parts.append(".pausedByDREQ") }
+        if contains(.paused) { parts.append(".paused") }
+        if contains(.requestingData) { parts.append(".requestingData") }
+        if contains(.interrupted) { parts.append(".interrupted") }
+        if contains(.transferComplete) { parts.append(".transferComplete") }
+        if contains(.active) { parts.append(".active") }
+
+        if priorityLevel > 0 {
+            parts.append(".priorityLevel(\(priorityLevel))")
+        }
+
+        if panicPriorityLevel > 0 {
+            parts.append(".panicPriorityLevel(\(panicPriorityLevel))")
+        }
+
+        return "[" + parts.joined(separator: ", ") + "]"
     }
 
 }
@@ -90,7 +117,7 @@ public enum DMAPeripheral : Int {
 
 }
 
-public struct DMATransferInformation : OptionSet {
+public struct DMATransferInformation : OptionSet, CustomStringConvertible {
     
     public let rawValue: Int
     
@@ -137,10 +164,43 @@ public struct DMATransferInformation : OptionSet {
     public var burstTransferLength: Int {
         return (rawValue >> 12) & ((1 << 4) - 1)
     }
-
+    
+    public var description: String {
+        var parts: [String] = []
+        
+        if contains(.noWideBursts) { parts.append(".noWideBursts") }
+        if contains(.sourceIgnoreWrites) { parts.append(".sourceIgnoreWrites") }
+        if contains(.sourceDREQ) { parts.append(".sourceDREQ") }
+        if contains(.sourceWidthWide) { parts.append(".sourceWidthWide") }
+        if contains(.sourceAddressIncrement) { parts.append(".sourceAddressIncrement") }
+        if contains(.destinationIgnoreWrites) { parts.append(".destinationIgnoreWrites") }
+        if contains(.destinationDREQ) { parts.append(".destinationDREQ") }
+        if contains(.destinationWidthWide) { parts.append(".destinationWidthWide") }
+        if contains(.destinationAddressIncrement) { parts.append(".destinationAddressIncrement") }
+        if contains(.waitForWriteResponse) { parts.append(".waitForWriteResponse") }
+        if contains(.tdMode) { parts.append(".tdMode") }
+        if contains(.interruptEnable) { parts.append(".interruptEnable") }
+        
+        if waitCycles > 0 {
+            parts.append(".waitCycles(\(waitCycles))")
+        }
+        
+        if let peripheralMapping = peripheralMapping,
+            peripheralMapping != .none
+        {
+            parts.append(".peripheralMapping(.\(peripheralMapping))")
+        }
+        
+        if burstTransferLength > 0 {
+            parts.append(".burstTransferLength(\(burstTransferLength))")
+        }
+        
+        return "[" + parts.joined(separator: ", ") + "]"
+    }
+    
 }
 
-public struct DMADebug : OptionSet {
+public struct DMADebug : OptionSet, CustomStringConvertible {
     
     public let rawValue: Int
     
@@ -187,6 +247,23 @@ public struct DMADebug : OptionSet {
     
     public var numberOfOutstandingWrites: Int {
         return (rawValue >> 4) & ((1 << 4) - 1)
+    }
+    
+    public var description: String {
+        var parts: [String] = []
+        
+        if contains(.isLite) { parts.append(".isLite") }
+        
+        parts.append(".version(\(version))")
+        parts.append(".axiIdentifier(\(axiIdentifier))")
+        parts.append(".stateMachineState(\(stateMachineState))")
+        parts.append(".numberOfOutstandingWrites(\(numberOfOutstandingWrites))")
+        
+        if contains(.readError) { parts.append(".readError") }
+        if contains(.fifoError) { parts.append(".fifoError") }
+        if contains(.readLastNotSetError) { parts.append(".readLastNotSetError") }
+
+        return "[" + parts.joined(separator: ", ") + "]"
     }
     
 }

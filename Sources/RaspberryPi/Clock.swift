@@ -35,7 +35,7 @@ public enum ClockSource : Int {
     
 }
 
-public struct ClockControl : OptionSet {
+public struct ClockControl : OptionSet, CustomStringConvertible {
     
     public let rawValue: Int
     
@@ -65,10 +65,28 @@ public struct ClockControl : OptionSet {
     public var source: ClockSource? {
         return ClockSource(rawValue: (rawValue >> 0) & ((1 << 4) - 1))
     }
+    
+    public var description: String {
+        var parts: [String] = []
+        
+        if let source = source {
+            parts.append(".source(.\(source))")
+        }
+        if let mash = mash {
+            parts.append(".mash(.\(mash))")
+        }
+        
+        if contains(.invertOutput) { parts.append(".invertOutput") }
+        if contains(.busy) { parts.append(".busy") }
+        if contains(.killClock) { parts.append(".killClock") }
+        if contains(.enabled) { parts.append(".enabled") }
+        
+        return "[" + parts.joined(separator: ", ") + "]"
+    }
 
 }
 
-public struct ClockDivisor : OptionSet {
+public struct ClockDivisor : OptionSet, CustomStringConvertible {
 
     public let rawValue: Int
     
@@ -92,6 +110,15 @@ public struct ClockDivisor : OptionSet {
 
     public var fraction: Int {
         return (rawValue >> 0) & ((1 << 12) - 1)
+    }
+    
+    public var description: String {
+        var parts: [String] = []
+
+        parts.append(".integer(\(integer))")
+        parts.append(".fraction(\(fraction))")
+        
+        return "[" + parts.joined(separator: ", ") + "]"
     }
     
 }
