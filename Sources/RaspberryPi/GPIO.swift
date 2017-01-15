@@ -90,8 +90,8 @@ public struct GPIOFunctionSelect : Collection {
 
 public struct GPIOBitField : Collection {
     
-    var field0: Int
-    var field1: Int
+    public var field0: Int
+    public var field1: Int
     var reserved: Int
     
     // These are computed properties, rather than constants, so that they don't take up space in the structure.
@@ -119,13 +119,27 @@ public struct GPIOBitField : Collection {
             let bit = 1 << (index % 32)
             switch index / 32 {
             case 0:
-                field0 |= bit
+                if newValue {
+                    field0 |= bit
+                } else {
+                    field0 &= ~bit
+                }
             case 1:
-                field1 |= bit
+                if newValue {
+                    field1 |= bit
+                } else {
+                    field1 &= ~bit
+                }
             default:
                 fatalError("GPIO index out of bounds")
             }
         }
+    }
+    
+    public init() {
+        field0 = 0
+        field1 = 0
+        reserved = 0
     }
     
 }
