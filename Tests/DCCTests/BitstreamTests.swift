@@ -1094,6 +1094,60 @@ class BitstreamTests: XCTestCase {
         XCTAssertEqual(x[27], .data(word: Int(bitPattern: 0b00) << 30, size: 2))
     }
 
+    
+    // MARK: duration
+    
+    /// Test that a duration of an empty bitstream is zero.
+    func testDurationEmptyBitstream() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(repeatingPhysicalBit: 1, count: 0)
+        
+        XCTAssertEqual(x.duration, 0)
+    }
+    
+    /// Test that the duration of a bitstream of a single bit is the bit duration.
+    func testDurationSingleBit() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(repeatingPhysicalBit: 1, count: 1)
+        
+        XCTAssertEqual(x.duration, 14.5)
+    }
+
+    /// Test that the duration of a bitstream with a single data entry is calculated.
+    func testDurationSingleData() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(repeatingPhysicalBit: 1, count: 10)
+        
+        XCTAssertEqual(x.duration, 145.0)
+    }
+
+    /// Test that the duration of a bitstream with a single data entry, combined from different insertions, is calculated.
+    func testDurationSingleDataFromMulitpleAppends() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(repeatingPhysicalBit: 1, count: 10)
+        x.append(repeatingPhysicalBit: 0, count: 10)
+
+        XCTAssertEqual(x.duration, 290.0)
+    }
+
+    /// Test that the duration of a bitstream made up of multiple data entries is calculated.
+    func testDurationMultipleData() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(repeatingPhysicalBit: 1, count: 100)
+        
+        XCTAssertEqual(x.duration, 1450.0)
+    }
+    
+    /// Test that other non-data events are ignored in the bitstream when calculating the duration.
+    func testDurationDataBrokenByEvent() {
+        var x = Bitstream(bitDuration: 14.5)
+        x.append(repeatingPhysicalBit: 1, count: 10)
+        x.append(.debugStart)
+        x.append(repeatingPhysicalBit: 0, count: 10)
+
+        XCTAssertEqual(x.duration, 290.0)
+    }
+
 }
 
 extension BitstreamTests {
@@ -1176,6 +1230,13 @@ extension BitstreamTests {
             ("testOperationsModePacketWithDebug", testOperationsModePacketWithDebug),
             ("testOperationsModePacketAlternateLength", testOperationsModePacketAlternateLength),
             ("testOperationsModePacketAlternateLengthWithDebug", testOperationsModePacketAlternateLengthWithDebug),
+            
+            ("testDurationEmptyBitstream", testDurationEmptyBitstream),
+            ("testDurationSingleBit", testDurationSingleBit),
+            ("testDurationSingleData", testDurationSingleData),
+            ("testDurationSingleDataFromMulitpleAppends", testDurationSingleDataFromMulitpleAppends),
+            ("testDurationMultipleData", testDurationMultipleData),
+            ("testDurationDataBrokenByEvent", testDurationDataBrokenByEvent),
             ]
     }()
 

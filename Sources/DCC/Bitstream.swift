@@ -169,6 +169,19 @@ public struct Bitstream : Collection {
         return events[index]
     }
     
+    /// Duration in microseconds of the bitstream.
+    public var duration: Float {
+        let numberOfBits = events.reduce(0) { result, event in
+            if case let .data(word: _, size: size) = event {
+                return result + size
+            } else {
+                return result
+            }
+        }
+        
+        return Float(numberOfBits) * bitDuration
+    }
+    
     /// Append an event.
     ///
     /// - Parameters:
