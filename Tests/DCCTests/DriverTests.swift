@@ -1294,7 +1294,6 @@ extension DriverTests {
             ("testParseBitstreamGPIOEventUnrollsLoopRepeatingData", testParseBitstreamGPIOEventUnrollsLoopRepeatingData),
             
             ("testParseBitstreamWithRepeatingSection", testParseBitstreamWithRepeatingSection),
-            ("testParseBitstreamWithEmptyRepeatingSection", testParseBitstreamWithEmptyRepeatingSection),
             ("testParseBitstreamGPIOEventUnrollsToRepeatingSection", testParseBitstreamGPIOEventUnrollsToRepeatingSection),
             ("testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection", testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection),
             
