@@ -16,6 +16,38 @@ import CBSD
 #endif
 
 
+class TestMemory : MemoryRegion {
+
+    let pointer: UnsafeMutableRawPointer
+    let busAddress: Int
+    let size: Int
+
+    init(size: Int) {
+        pointer = UnsafeMutableRawPointer.allocate(bytes: size, alignedTo: MemoryLayout<DMAControlBlock>.alignment)
+        busAddress = Int(bitPattern: pointer)
+        self.size = size
+    }
+    
+    deinit {
+        pointer.deallocate(bytes: size, alignedTo: MemoryLayout<DMAControlBlock>.alignment)
+    }
+    
+}
+
+class TestRaspberryPi : RaspberryPi {
+
+    override func allocateUncachedMemory(minimumSize: Int) throws -> MemoryRegion {
+        // Don't use the GPU memory for testing for a few reasons:
+        //  1. we don't want to run tests as root.
+        //  2. failing tests won't necessarily give it back.
+        //  3. tests should work on macOS.
+        let size = pageSize * (((minimumSize - 1) / pageSize) + 1)
+
+        return TestMemory(size: size)
+    }
+    
+}
+
 class DriverTests: XCTestCase {
 
     var raspberryPi: RaspberryPi!
@@ -24,7 +56,7 @@ class DriverTests: XCTestCase {
     override func setUp() {
         super.setUp()
         
-        raspberryPi = RaspberryPi(peripheralAddress: 0x3f000000, peripheralAddressSize: 0x01000000)
+        raspberryPi = TestRaspberryPi(peripheralAddress: 0x3f000000, peripheralAddressSize: 0x01000000)
         
         // Generate a set of random word data for testing.
         randomWords.removeAll()
@@ -94,11 +126,11 @@ class DriverTests: XCTestCase {
     /// Test that a bitstream containing a single word outputs a control block writing it to the fifo.
     ///
     /// The first word is always followed by a range matching its size.
-    func testParsedBitstreamSingleWord() {
+    func testParseBitstreamSingleWord() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 4)
         XCTAssertEqual(parsed.data.count, 5)
@@ -122,12 +154,12 @@ class DriverTests: XCTestCase {
     /// Test that a bitstream containing two words outputs two control blocks to write each one to the fifo.
     ///
     /// The first word is followed by the range as for a single word, but the second word shouldn't need one when the range is the same.
-    func testParsedBitstreamSecondWordSameSize() {
+    func testParseBitstreamSecondWordSameSize() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
 
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 5)
         XCTAssertEqual(parsed.data.count, 6)
@@ -154,12 +186,12 @@ class DriverTests: XCTestCase {
     /// Test that a bitstream containing two words of different sizes also outputs an extra range change.
     ///
     /// Both words should be followed by a range.
-    func testParsedBitstreamSecondWordDifferentSize() {
+    func testParseBitstreamSecondWordDifferentSize() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 24)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 7)
@@ -189,13 +221,13 @@ class DriverTests: XCTestCase {
     /// Test that a bitstream containing three words outputs only two control blocks, the second with a longer data.
     ///
     /// Multiple same-size writes are merged into a single control block.
-    func testParsedBitstreamThirdWordSameSize() {
+    func testParseBitstreamThirdWordSameSize() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
 
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 5)
         XCTAssertEqual(parsed.data.count, 7)
@@ -223,13 +255,13 @@ class DriverTests: XCTestCase {
     /// Test that a bitstream containing three words outputs with the third a different size, follows it with a range.
     ///
     /// Multiple are still merged into a single control block, with the first of a different size followed by a range.
-    func testParsedBitstreamThirdWordDifferentSize() {
+    func testParseBitstreamThirdWordDifferentSize() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 24)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 8)
@@ -261,14 +293,14 @@ class DriverTests: XCTestCase {
     // MARK: GPIO Events
     
     /// Test that a GPIO event is output two PWM words after its actual position in the bitstream using a GPIO control block.
-    func testParsedBitstreamGPIOEvent() {
+    func testParseBitstreamGPIOEvent() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.debugStart)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 11)
@@ -300,7 +332,7 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that multiple GPIO set events are combined into a single control block.
-    func testParsedBitstreamMultipleGPIOSetEvent() {
+    func testParseBitstreamMultipleGPIOSetEvent() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.railComCutoutEnd)
@@ -308,7 +340,7 @@ class DriverTests: XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 11)
@@ -340,7 +372,7 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that multiple GPIO clear events are combined into a single control block.
-    func testParsedBitstreamMultipleGPIOClearEvent() {
+    func testParseBitstreamMultipleGPIOClearEvent() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.railComCutoutStart)
@@ -348,7 +380,7 @@ class DriverTests: XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 11)
@@ -380,7 +412,7 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that GPIO set and clear events are combined into a single control block.
-    func testParsedBitstreamMultipleGPIOEvent() {
+    func testParseBitstreamMultipleGPIOEvent() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.railComCutoutEnd)
@@ -388,7 +420,7 @@ class DriverTests: XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 11)
@@ -422,7 +454,7 @@ class DriverTests: XCTestCase {
     /// Test that when multiple GPIO events for the same GPIO end up in the same control block, the most recent one wins.
     ///
     /// Rather than have four separate test cases for this, we test all the combinations in two non-conflicting groups.
-    func testParsedBitstreamMultipleGPIOLastWins() {
+    func testParseBitstreamMultipleGPIOLastWins() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.railComCutoutStart)
@@ -437,7 +469,7 @@ class DriverTests: XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(physicalBits: randomWords[3], count: 32)
 
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 16)
@@ -478,7 +510,7 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that a GPIO event breaks data when it needs to appear.
-    func testParsedBitstreamGPIOEventBreaksData() {
+    func testParseBitstreamGPIOEventBreaksData() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.debugStart)
@@ -486,7 +518,7 @@ class DriverTests: XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(physicalBits: randomWords[3], count: 32)
 
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 7)
         XCTAssertEqual(parsed.data.count, 12)
@@ -524,14 +556,14 @@ class DriverTests: XCTestCase {
     // MARK: GPIO Event loop unrolling
     
     /// Test that if a GPIO event appears towards the end of the Bitstream, we compensate by unrolling the loop until we're caught up and can insert a later jump.
-    func testParsedBitstreamGPIOEventUnrollsLoop() {
+    func testParseBitstreamGPIOEventUnrollsLoop() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(.debugStart)
         bitstream.append(physicalBits: randomWords[2], count: 32)
 
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
 
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 12)
@@ -567,7 +599,7 @@ class DriverTests: XCTestCase {
     }
     
     /// Test that a loop can be unrolled even when a GPIO event would be pending across the loop index.
-    func testParsedBitstreamGPIOEventUnrollsLoopAcrossOtherGPIOEvent() {
+    func testParseBitstreamGPIOEventUnrollsLoopAcrossOtherGPIOEvent() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(.railComCutoutStart)
         bitstream.append(physicalBits: randomWords[0], count: 32)
@@ -575,7 +607,7 @@ class DriverTests: XCTestCase {
         bitstream.append(.debugStart)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 16)
@@ -621,7 +653,7 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that a loop can be unrolled even when the GPIO event appears right at the end.
-    func testParsedBitstreamGPIOEventAtEndUnrollsLoop() {
+    func testParseBitstreamGPIOEventAtEndUnrollsLoop() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(.railComCutoutStart)
         bitstream.append(physicalBits: randomWords[0], count: 32)
@@ -629,7 +661,7 @@ class DriverTests: XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(.debugStart)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 17)
@@ -676,14 +708,14 @@ class DriverTests: XCTestCase {
     }
     
     /// Test that a loop can be unrolled twice when necessary to synchronize back with a delayed event.
-    func testParsedBitstreamGPIOEventUnrollsLoopTwice() {
+    func testParseBitstreamGPIOEventUnrollsLoopTwice() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(.debugStart)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 20)
@@ -733,13 +765,13 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that a loop is unrolled twice rather than resetting back to the start.
-    func testParsedBitstreamGPIOEventUnrollsLoopTwiceNotToStart() {
+    func testParseBitstreamGPIOEventUnrollsLoopTwiceNotToStart() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(.debugStart)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 18)
@@ -787,12 +819,12 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that a loop unroll will repeat a single piece of data if necessary to synchornize.
-    func testParsedBitstreamGPIOEventUnrollsLoopRepeatingData() {
+    func testParseBitstreamGPIOEventUnrollsLoopRepeatingData() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.debugStart)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 16)
@@ -841,7 +873,7 @@ class DriverTests: XCTestCase {
     /// Test that a bitstream with a marked repeating section loops to the start of that section, not the start of the bitstream.
     ///
     /// The data should be broken at the loop point, and the end control block pointed after it rather than to the first.
-    func testParsedBitstreamWithRepeatingSection() {
+    func testParseBitstreamWithRepeatingSection() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
@@ -850,7 +882,7 @@ class DriverTests: XCTestCase {
         bitstream.append(physicalBits: randomWords[3], count: 32)
 
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 8)
@@ -881,7 +913,7 @@ class DriverTests: XCTestCase {
     }
     
     /// Test that an unrolled loop unrolls into the repeating section and not the start.
-    func testParsedBitstreamGPIOEventUnrollsToRepeatingSection() {
+    func testParseBitstreamGPIOEventUnrollsToRepeatingSection() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
@@ -892,7 +924,7 @@ class DriverTests: XCTestCase {
         bitstream.append(.debugStart)
         bitstream.append(physicalBits: randomWords[4], count: 32)
         
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 11)
         XCTAssertEqual(parsed.data.count, 23)
@@ -953,7 +985,7 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that when a GPIO event is delayed across a repeating section start, that itself is unrolled in order to repeat without it.
-    func testParsedBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection() {
+    func testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.debugStart)
@@ -962,7 +994,7 @@ class DriverTests: XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(physicalBits: randomWords[3], count: 32)
 
-        let parsed = try! ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 13)
@@ -1012,7 +1044,7 @@ class DriverTests: XCTestCase {
         let bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         
         do {
-            let _ = try ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
             XCTFail("Parsing should not have been successful")
         } catch DriverError.bitstreamContainsNoData {
             // Pass
@@ -1022,12 +1054,12 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that a bitstream without any data throws an error.
-    func testParsedBitstreamWithoutData() {
+    func testParseBitstreamWithoutData() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(.debugStart)
         
         do {
-            let _ = try ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
             XCTFail("Parsing should not have been successful")
         } catch DriverError.bitstreamContainsNoData {
             // Pass
@@ -1037,14 +1069,14 @@ class DriverTests: XCTestCase {
     }
     
     /// Test that a bitstream with nothing following a repeating section start throws an error.
-    func testParsedBitstreamWithEmptyRepeatingSection() {
+    func testParseBitstreamWithEmptyRepeatingSection() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(.loopStart)
         
         do {
-            let _ = try ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
             XCTFail("Parsing should not have been successful")
         } catch DriverError.bitstreamContainsNoData {
             // Pass
@@ -1054,7 +1086,7 @@ class DriverTests: XCTestCase {
     }
 
     /// Test that a bitstream with no data following a repeating section start throws an error.
-    func testParsedBitstreamWithoutDataInRepeatingSection() {
+    func testParseBitstreamWithoutDataInRepeatingSection() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
@@ -1062,7 +1094,7 @@ class DriverTests: XCTestCase {
         bitstream.append(.debugStart)
         
         do {
-            let _ = try ParsedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
             XCTFail("Parsing should not have been successful")
         } catch DriverError.bitstreamContainsNoData {
             // Pass
@@ -1070,6 +1102,95 @@ class DriverTests: XCTestCase {
             XCTFail("Unexpected error thrown: \(error)")
         }
     }
+    
+    
+    // MARK: Commit
+    
+    /// Test that we can commit a parsed bitstream to uncached memory.
+    ///
+    /// The control blocks and data of the parsed bitstream should be concatenated into the allocated memory region.
+    func testCommitConcatenates() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        
+        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        try! parsed.commit()
+
+        XCTAssertNotNil(parsed.memory)
+        
+        var bytes = parsed.memory!.pointer
+
+        for controlBlock in parsed.controlBlocks {
+            let committedControlBlock = bytes.load(as: DMAControlBlock.self)
+            XCTAssertEqual(committedControlBlock, controlBlock)
+            
+            bytes = bytes.advanced(by: MemoryLayout<DMAControlBlock>.stride)
+        }
+        
+        for data in parsed.data {
+            let committedData = bytes.load(as: Int.self)
+            XCTAssertEqual(committedData, data)
+            
+            bytes = bytes.advanced(by: MemoryLayout<Int>.stride)
+        }
+    }
+    
+    /// Test that the address values are modified during commit.
+    ///
+    /// Committing the bitstream modifies the source and destination addresses to point within the data block of the returned memory region, and the next control block address to point within the control blocks in the returned memory region.
+    ///
+    /// Make sure the destination address in the data and range control blocks aren't modified, since those are within the peripheral address space.
+    func testCommitModifiesAddresses() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        
+        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let oldControlBlocks = parsed.controlBlocks
+        let dataOffset = MemoryLayout<DMAControlBlock>.stride * oldControlBlocks.count
+
+        try! parsed.commit()
+        
+        XCTAssertNotNil(parsed.memory)
+        let busAddress = parsed.memory!.busAddress
+        
+        XCTAssertEqual(parsed.controlBlocks.count, oldControlBlocks.count)
+
+        // Start.
+        XCTAssertEqual(parsed.controlBlocks[0].sourceAddress, busAddress + dataOffset + oldControlBlocks[0].sourceAddress)
+        XCTAssertEqual(parsed.controlBlocks[0].destinationAddress, busAddress + dataOffset + oldControlBlocks[0].destinationAddress)
+        XCTAssertEqual(parsed.controlBlocks[0].nextControlBlockAddress, busAddress + oldControlBlocks[0].nextControlBlockAddress)
+
+        // Data.
+        XCTAssertEqual(parsed.controlBlocks[1].sourceAddress, busAddress + dataOffset + oldControlBlocks[1].sourceAddress)
+        XCTAssertEqual(parsed.controlBlocks[1].destinationAddress, oldControlBlocks[1].destinationAddress)
+        XCTAssertEqual(parsed.controlBlocks[1].nextControlBlockAddress, busAddress + oldControlBlocks[1].nextControlBlockAddress)
+
+        // Range.
+        XCTAssertEqual(parsed.controlBlocks[2].sourceAddress, busAddress + dataOffset + oldControlBlocks[2].sourceAddress)
+        XCTAssertEqual(parsed.controlBlocks[2].destinationAddress, oldControlBlocks[2].destinationAddress)
+        XCTAssertEqual(parsed.controlBlocks[2].nextControlBlockAddress, busAddress + oldControlBlocks[2].nextControlBlockAddress)
+
+        // End.
+        XCTAssertEqual(parsed.controlBlocks[3].sourceAddress, busAddress + dataOffset + oldControlBlocks[3].sourceAddress)
+        XCTAssertEqual(parsed.controlBlocks[3].destinationAddress, busAddress + dataOffset + oldControlBlocks[3].destinationAddress)
+        XCTAssertEqual(parsed.controlBlocks[3].nextControlBlockAddress, busAddress + oldControlBlocks[3].nextControlBlockAddress)
+    }
+    
+    /// Test that the data values are not modified during commit.
+    func testCommitDoesNotModifyData() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        
+        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        let oldData = parsed.data
+
+        try! parsed.commit()
+        
+        XCTAssertNotNil(parsed.memory)
+
+        XCTAssertEqual(parsed.data, oldData)
+    }
+
 
 }
 
@@ -1077,35 +1198,39 @@ extension DriverTests {
     
     static var allTests = {
         return [
-            ("testParsedBitstreamSingleWord", testParsedBitstreamSingleWord),
-            ("testParsedBitstreamSecondWordSameSize", testParsedBitstreamSecondWordSameSize),
-            ("testParsedBitstreamSecondWordDifferentSize", testParsedBitstreamSecondWordDifferentSize),
-            ("testParsedBitstreamThirdWordSameSize", testParsedBitstreamThirdWordSameSize),
-            ("testParsedBitstreamThirdWordDifferentSize", testParsedBitstreamThirdWordDifferentSize),
+            ("testParseBitstreamSingleWord", testParseBitstreamSingleWord),
+            ("testParseBitstreamSecondWordSameSize", testParseBitstreamSecondWordSameSize),
+            ("testParseBitstreamSecondWordDifferentSize", testParseBitstreamSecondWordDifferentSize),
+            ("testParseBitstreamThirdWordSameSize", testParseBitstreamThirdWordSameSize),
+            ("testParseBitstreamThirdWordDifferentSize", testParseBitstreamThirdWordDifferentSize),
             
-            ("testParsedBitstreamGPIOEvent", testParsedBitstreamGPIOEvent),
-            ("testParsedBitstreamMultipleGPIOSetEvent", testParsedBitstreamMultipleGPIOSetEvent),
-            ("testParsedBitstreamMultipleGPIOClearEvent", testParsedBitstreamMultipleGPIOClearEvent),
-            ("testParsedBitstreamMultipleGPIOEvent", testParsedBitstreamMultipleGPIOEvent),
-            ("testParsedBitstreamMultipleGPIOLastWins", testParsedBitstreamMultipleGPIOLastWins),
-            ("testParsedBitstreamGPIOEventBreaksData", testParsedBitstreamGPIOEventBreaksData),
+            ("testParseBitstreamGPIOEvent", testParseBitstreamGPIOEvent),
+            ("testParseBitstreamMultipleGPIOSetEvent", testParseBitstreamMultipleGPIOSetEvent),
+            ("testParseBitstreamMultipleGPIOClearEvent", testParseBitstreamMultipleGPIOClearEvent),
+            ("testParseBitstreamMultipleGPIOEvent", testParseBitstreamMultipleGPIOEvent),
+            ("testParseBitstreamMultipleGPIOLastWins", testParseBitstreamMultipleGPIOLastWins),
+            ("testParseBitstreamGPIOEventBreaksData", testParseBitstreamGPIOEventBreaksData),
             
-            ("testParsedBitstreamGPIOEventUnrollsLoop", testParsedBitstreamGPIOEventUnrollsLoop),
-            ("testParsedBitstreamGPIOEventUnrollsLoopAcrossOtherGPIOEvent", testParsedBitstreamGPIOEventUnrollsLoopAcrossOtherGPIOEvent),
-            ("testParsedBitstreamGPIOEventAtEndUnrollsLoop", testParsedBitstreamGPIOEventAtEndUnrollsLoop),
-            ("testParsedBitstreamGPIOEventUnrollsLoopTwice", testParsedBitstreamGPIOEventUnrollsLoopTwice),
-            ("testParsedBitstreamGPIOEventUnrollsLoopTwiceNotToStart", testParsedBitstreamGPIOEventUnrollsLoopTwiceNotToStart),
-            ("testParsedBitstreamGPIOEventUnrollsLoopRepeatingData", testParsedBitstreamGPIOEventUnrollsLoopRepeatingData),
+            ("testParseBitstreamGPIOEventUnrollsLoop", testParseBitstreamGPIOEventUnrollsLoop),
+            ("testParseBitstreamGPIOEventUnrollsLoopAcrossOtherGPIOEvent", testParseBitstreamGPIOEventUnrollsLoopAcrossOtherGPIOEvent),
+            ("testParseBitstreamGPIOEventAtEndUnrollsLoop", testParseBitstreamGPIOEventAtEndUnrollsLoop),
+            ("testParseBitstreamGPIOEventUnrollsLoopTwice", testParseBitstreamGPIOEventUnrollsLoopTwice),
+            ("testParseBitstreamGPIOEventUnrollsLoopTwiceNotToStart", testParseBitstreamGPIOEventUnrollsLoopTwiceNotToStart),
+            ("testParseBitstreamGPIOEventUnrollsLoopRepeatingData", testParseBitstreamGPIOEventUnrollsLoopRepeatingData),
             
-            ("testParsedBitstreamWithRepeatingSection", testParsedBitstreamWithRepeatingSection),
-            ("testParsedBitstreamWithEmptyRepeatingSection", testParsedBitstreamWithEmptyRepeatingSection),
-            ("testParsedBitstreamGPIOEventUnrollsToRepeatingSection", testParsedBitstreamGPIOEventUnrollsToRepeatingSection),
-            ("testParsedBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection", testParsedBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection),
+            ("testParseBitstreamWithRepeatingSection", testParseBitstreamWithRepeatingSection),
+            ("testParseBitstreamWithEmptyRepeatingSection", testParseBitstreamWithEmptyRepeatingSection),
+            ("testParseBitstreamGPIOEventUnrollsToRepeatingSection", testParseBitstreamGPIOEventUnrollsToRepeatingSection),
+            ("testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection", testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection),
             
             ("testParseEmptyBitstream", testParseEmptyBitstream),
-            ("testParsedBitstreamWithoutData", testParsedBitstreamWithoutData),
-            ("testParsedBitstreamWithEmptyRepeatingSection", testParsedBitstreamWithEmptyRepeatingSection),
-            ("testParsedBitstreamWithoutDataInRepeatingSection", testParsedBitstreamWithoutDataInRepeatingSection),
+            ("testParseBitstreamWithoutData", testParseBitstreamWithoutData),
+            ("testParseBitstreamWithEmptyRepeatingSection", testParseBitstreamWithEmptyRepeatingSection),
+            ("testParseBitstreamWithoutDataInRepeatingSection", testParseBitstreamWithoutDataInRepeatingSection),
+            
+            ("testCommitConcatenates", testCommitConcatenates),
+            ("testCommitModifiesAddresses", testCommitModifiesAddresses),
+            ("testCommitDoesNotModifyData", testCommitDoesNotModifyData),
         ]
     }()
 

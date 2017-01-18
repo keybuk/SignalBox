@@ -37,7 +37,7 @@ struct Driver {
 /// Initialize with a `Bitstream` to generate the appropriate DMA Control Blocks and Data for use with `Driver`.
 ///
 /// The principle difficulty is that the PWM doesn't immediately begin outputting the word written after a DREQ, which requires that associated GPIO events such as the RailCom cutout and Debug period have to be delayed relative to the words they are intended to accompany. This ultimately requires in some cases that the bitstream loop be partially or even completely unrolled in order to generate a correct repeating output.
-struct ParsedBitstream {
+struct QueuedBitstream {
  
     /// Raspberry Pi hardware information.
     let raspberryPi: RaspberryPi
@@ -287,7 +287,20 @@ struct ParsedBitstream {
         addControlBlockForEnd(next: loopControlBlockIndex)
     }
     
-    mutating func commit() throws -> UncachedMemory {
+    /// Memory region containing copy of bitstream in uncached memory.
+    ///
+    /// The value is `nil` until `commit()` is called.
+    var memory: MemoryRegion?
+    
+    /// Make the bitstream available to the DMA engine.
+    ///
+    /// Allocates a region of memory within the uncached alias and initializes it from the parsed bitstream, which will have its addresses updated to refer to the bus address of the memory region.
+    ///
+    /// - Throws:
+    ///   `MailboxError` or `RaspberryPiError` if the memory region cannot be allocated.
+    mutating func commit() throws {
+        guard self.memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
+
         let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
         let dataSize = MemoryLayout<Int>.stride * data.count
         
@@ -302,18 +315,18 @@ struct ParsedBitstream {
             }
             controlBlocks[index].nextControlBlockAddress += memory.busAddress
         }
-        
+
         memory.pointer.bindMemory(to: DMAControlBlock.self, capacity: controlBlocks.count).initialize(from: controlBlocks)
         memory.pointer.advanced(by: controlBlocksSize).bindMemory(to: Int.self, capacity: data.count).initialize(from: data)
         
-        return memory
+        self.memory = memory
     }
 
 }
 
 /// Ordered queue of delayed `BitstreamEvent`.
 ///
-/// This is a helper structure used by `ParsedBitstream` to encapsulate its delayed events set, and provide equatability.
+/// This is a helper structure used by `QueuedBitstream` to encapsulate its delayed events set, and provide equatability.
 struct DelayedEvents : Equatable {
     
     /// Number of DREQ signals to delay non-PWM events to synchronize with the PWM output.

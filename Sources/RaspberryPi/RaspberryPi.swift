@@ -163,7 +163,7 @@ public class RaspberryPi {
     /// - Returns: `UncachedMemory` object describing the region.
     ///
     /// - Throws: `MailboxError` or `RaspberryPiError` on failure.
-    public func allocateUncachedMemory(minimumSize: Int) throws -> UncachedMemory {
+    public func allocateUncachedMemory(minimumSize: Int) throws -> MemoryRegion {
         let size = pageSize * (((minimumSize - 1) / pageSize) + 1)
         
         if mailbox == nil {
@@ -184,12 +184,27 @@ public class RaspberryPi {
     
 }
 
+
+/// Region of Memory.
+public protocol MemoryRegion {
+    
+    /// Pointer to the region.
+    var pointer: UnsafeMutableRawPointer { get }
+    
+    /// Bus address of the region.
+    var busAddress: Int { get }
+    
+    /// Size of the region.
+    var size: Int { get }
+    
+}
+
 /// Region of Uncached Memory.
 ///
 /// Uncached memory is accessed through the Raspberry Pi's "'C' Alias" such that all reads directly come from, and all writes directly go to, RAM bypassing the core's L1 and L2 caches. While such accesses are significantly slower, this allows for interacting with hardware such as the DMA Engine which cannot _see_ these caches.
 ///
 /// Instances of this object are created using `RaspberryPi.allocateUncachedMemory(minimumSize:)` and must be retained as long as the region is required. The instance will release the memory region on deinitialization. In addition, due to the way in which uncached memory is allocated, the memory region is **not** automatically released on process exit. You must deallocate it manually by either releasing the object or calling `deallocate()`.
-public class UncachedMemory {
+public class UncachedMemory : MemoryRegion {
 
     /// `Mailbox` instance used to allocate the region, and used to release it.
     let mailbox: Mailbox
