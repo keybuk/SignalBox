@@ -57,8 +57,8 @@ func functionPacket(_ function: Int, value: Bool) -> Packet {
 
 let raspberryPi = RaspberryPi()
 
-let driver = try! OldDriver(raspberryPi: raspberryPi)
-driver.setup()
+var driver = try! Driver(raspberryPi: raspberryPi)
+driver.startup()
 
 var startupBitstream = Bitstream(bitDuration: driver.bitDuration)
 startupBitstream.append(.railComCutoutEnd)
@@ -66,13 +66,11 @@ for _ in 0..<20 {
     startupBitstream.appendPreamble()
     startupBitstream.append(packet: .softReset(address: .broadcast))
 }
+startupBitstream.append(.loopStart)
 for _ in 0..<10 {
     startupBitstream.appendPreamble()
     startupBitstream.append(packet: .idle)
 }
-// Would loop this one.
-startupBitstream.appendPreamble()
-startupBitstream.append(packet: .idle)
 
 print("One bit has length \(startupBitstream.oneBitLength)b, and duration \(Float(startupBitstream.oneBitLength) * startupBitstream.bitDuration)µs")
 print("Zero bit has length \(startupBitstream.zeroBitLength)b, and duration \(Float(startupBitstream.zeroBitLength) * startupBitstream.bitDuration)µs")
@@ -80,9 +78,7 @@ print("RailCom delay has length \(startupBitstream.railComDelayLength)b, and dur
 print("RailCom cutout has length \(startupBitstream.railComCutoutLength)b, and duration \(Float(startupBitstream.railComCutoutLength) * startupBitstream.bitDuration)µs")
 print()
 
-let index = try! driver.queue(bitstream: startupBitstream)
-driver.start(at: index)
-
+try! driver.queue(bitstream: startupBitstream)
 
 loop: while true {
     print("> ", terminator: "")
@@ -117,11 +113,10 @@ loop: while true {
         var bitstream = Bitstream(bitDuration: driver.bitDuration)
         bitstream.append(operationsModePacket: packet, debug: debug)
         
-        let index = try! driver.queue(bitstream: bitstream)
-        driver.start(at: index)
+        try! driver.queue(bitstream: bitstream)
     }
     packet = nil
 }
 
-driver.stop()
 driver.shutdown()
+driver.clearQueue()

@@ -6,6 +6,8 @@
 //
 //
 
+import Dispatch
+
 import RaspberryPi
 
 
@@ -17,16 +19,201 @@ public enum DriverError : Error {
 
 }
 
-struct Driver {
+public struct Driver {
     
     public static let dccGpio = 18
     public static let railComGpio = 17
     public static let debugGpio = 19
     
-    let raspberryPi: RaspberryPi
+    public static let dmaChannelNumber = 5
+
+    public let bitDuration: Float = 14.5
     
-    init(raspberryPi: RaspberryPi) {
+    public let raspberryPi: RaspberryPi
+    
+    let dma: DMA
+    let dmaChannel: UnsafeMutablePointer<DMAChannel>
+    let clock: UnsafeMutablePointer<Clock>
+    let pwm: UnsafeMutablePointer<PWM>
+    let gpio: UnsafeMutablePointer<GPIO>
+
+    public init(raspberryPi: RaspberryPi) throws {
         self.raspberryPi = raspberryPi
+        
+        dma = try DMA.on(raspberryPi)
+        dmaChannel = dma.channel[Driver.dmaChannelNumber]
+        
+        pwm = try PWM.on(raspberryPi)
+        
+        clock = try Clock.pwm(on: raspberryPi)
+        
+        gpio = try GPIO.on(raspberryPi)
+    }
+    
+    /// Initialize hardware.
+    ///
+    /// Sets up the PWM, GPIO and DMA hardware and prepares for a bitstream to be queued. The DMA Engine will not be activated until the first bitstream is queued with `queue(bitstream:)`.
+    public func startup() {
+        // Disable both PWM channels, and reset the error state.
+        pwm.pointee.dmaConfiguration.remove(.enabled)
+        pwm.pointee.control.remove([ .channel1Enable, .channel2Enable ])
+        pwm.pointee.status.insert([ .busError, .fifoReadError, .fifoWriteError, .channel1GapOccurred, .channel2GapOccurred, .channel3GapOccurred, .channel4GapOccurred ])
+
+        // Clear the FIFO, and ensure neither channel is consuming from it.
+        pwm.pointee.control.remove([ .channel1UseFifo, .channel2UseFifo ])
+        pwm.pointee.control.insert(.clearFifo)
+        
+        let divisor = Int(bitDuration * 19.2)
+        print("DMA Driver startup: bit duration \(bitDuration)µs, divisor \(divisor)")
+        
+        // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
+        clock.pointee.disable()
+        clock.pointee.control = [ .source(.oscillator), .mash(.integer) ]
+        clock.pointee.divisor = [ .integer(divisor) ]
+        clock.pointee.enable()
+        
+        // Make sure that the DMA Engine is enabled, abort any existing use of it, and clear error state.
+        dma.enable.pointee |= 1 << Driver.dmaChannelNumber
+        dmaChannel.pointee.controlStatus.insert(.abort)
+        dmaChannel.pointee.controlStatus.insert(.reset)
+        dmaChannel.pointee.debug.insert([ .readError, .fifoError, .readLastNotSetError ])
+
+        // Set the DCC GPIO for PWM output.
+        gpio.pointee.functionSelect[Driver.dccGpio] = .alternateFunction5
+        
+        // Set the RailCom GPIO for output and clear.
+        gpio.pointee.functionSelect[Driver.railComGpio] = .output
+        gpio.pointee.outputClear[Driver.railComGpio] = true
+        
+        // Set the debug GPIO for output and clear.
+        gpio.pointee.functionSelect[Driver.debugGpio] = .output
+        gpio.pointee.outputClear[Driver.debugGpio] = true
+        
+        // Enable the PWM, using the FIFO in serializer mode, and DREQ signals sent to the DMA Engine.
+        pwm.pointee.dmaConfiguration = [ .enabled, .dreqThreshold(1), .panicThreshold(1) ]
+        pwm.pointee.control = [ .channel1UseFifo, .channel1SerializerMode, .channel1Enable ]
+        
+        // Set the DMA Engine priority levels.
+        dmaChannel.pointee.controlStatus = [ .priorityLevel(8), .panicPriorityLevel(8) ]
+        
+        // Prime the FIFO, completely filling it. This ensures our attempts to align GPIO and PWM data are successful.
+        print("Priming FIFO", terminator: "")
+        while !pwm.pointee.status.contains(.fifoFull) {
+            print(".", terminator: "")
+            pwm.pointee.fifoInput = 0
+        }
+        print("")
+    }
+    
+    /// Shutdown hardware.
+    ///
+    /// Disables the PWM and DMA hardware, and resets the GPIOs to a default state.
+    ///
+    /// It is essential that this be called before exit, as otherwise the DMA Engine will continue on its programmed sequence and endlessly repeat the last queued bitstream.
+    public func shutdown() {
+        // Disable the PWM channel.
+        pwm.pointee.control.remove(.channel1Enable)
+        pwm.pointee.dmaConfiguration.remove(.enabled)
+
+        // Stop the clock.
+        clock.pointee.disable()
+
+        // Stop the DMA Engine.
+        dmaChannel.pointee.controlStatus.remove(.active)
+        dmaChannel.pointee.controlStatus.insert(.abort)
+        
+        // Restore the DCC GPIO to output, and clear all pins.
+        gpio.pointee.functionSelect[Driver.dccGpio] = .output
+        gpio.pointee.outputClear[Driver.dccGpio] = true
+        gpio.pointee.outputClear[Driver.railComGpio] = true
+        gpio.pointee.outputClear[Driver.debugGpio] = true
+        
+        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(10), execute: watchdog)
+    }
+    
+    var currentBitstream: QueuedBitstream?
+
+    /// Queue bitstream.
+    ///
+    /// - Parameters:
+    ///   - bitstream: DCC Bitstream to be queued.
+    ///
+    /// - Throws:
+    ///   Errors from `DriverError`, `MailboxError`, and `RaspberryPiError` on failure.
+    public mutating func queue(bitstream: Bitstream) throws {
+        var queuedBitstream = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        try queuedBitstream.commit()
+
+        print("Bitstream duration \(queuedBitstream.duration)µs")
+        print("Bus  " + String(UInt(bitPattern: queuedBitstream.busAddress), radix: 16))
+        print("Phys " + String(UInt(bitPattern: queuedBitstream.busAddress & ~raspberryPi.uncachedAliasBusAddress), radix: 16))
+        
+        if let currentBitstream = currentBitstream {
+            currentBitstream.transfer(toBusAddress: queuedBitstream.busAddress)
+        } else {
+            dmaChannel.pointee.controlBlockAddress = queuedBitstream.busAddress
+            dmaChannel.pointee.controlStatus.insert(.active)
+        }
+
+        while !queuedBitstream.isTransmitting { }
+
+        currentBitstream = queuedBitstream
+
+        while !queuedBitstream.isRepeating { }
+    }
+    
+    public mutating func clearQueue() {
+        currentBitstream = nil
+    }
+
+    func watchdog() {
+        if pwm.pointee.status.contains(.busError) {
+            // Always seems to be set, and doesn't go away *shrug*
+            //print("PWM Bus Error")
+            pwm.pointee.status.insert(.busError)
+        }
+        
+        if pwm.pointee.status.contains(.fifoReadError) {
+            print("PWM FIFO Read Error")
+            pwm.pointee.status.insert(.fifoReadError)
+        }
+        
+        if pwm.pointee.status.contains(.fifoWriteError) {
+            print("PWM FIFO Write Error")
+            pwm.pointee.status.insert(.fifoWriteError)
+        }
+        
+        if pwm.pointee.status.contains(.channel1GapOccurred) {
+            print("PWM Channel 1 Gap Occurred")
+            pwm.pointee.status.insert(.channel1GapOccurred)
+        }
+        
+        if pwm.pointee.status.contains(.fifoEmpty) {
+            // Doesn't seem to be an issue, unless maybe we get a gap as above?
+            //print("PWM FIFO Empty")
+        }
+        
+        
+        if dmaChannel.pointee.controlStatus.contains(.errorDetected) {
+            print("DMA Channel \(Driver.dmaChannelNumber) Error Detected:")
+        }
+        
+        if dmaChannel.pointee.debug.contains(.readError) {
+            print("DMA Channel \(Driver.dmaChannelNumber) Read Error")
+            dmaChannel.pointee.debug.insert(.readError)
+        }
+        
+        if dmaChannel.pointee.debug.contains(.fifoError) {
+            print("DMA Channel \(Driver.dmaChannelNumber) FIFO Error")
+            dmaChannel.pointee.debug.insert(.fifoError)
+        }
+        
+        if dmaChannel.pointee.debug.contains(.readLastNotSetError) {
+            print("DMA Channel \(Driver.dmaChannelNumber) Read Last Not Set Error")
+            dmaChannel.pointee.debug.insert(.readLastNotSetError)
+        }
+        
+        DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(10), execute: watchdog)
     }
 
 }
@@ -360,6 +547,14 @@ struct QueuedBitstream {
         let uncachedData = memory.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: Int.self)
         
         return uncachedData[0] < 0
+    }
+    
+    func transfer(toBusAddress busAddress: Int) {
+        guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
+
+        let uncachedControlBlocks = memory.pointer.assumingMemoryBound(to: DMAControlBlock.self)
+        
+        uncachedControlBlocks[controlBlocks.count - 1].nextControlBlockAddress = busAddress
     }
 
 }
