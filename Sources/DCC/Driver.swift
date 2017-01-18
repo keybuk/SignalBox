@@ -48,7 +48,9 @@ struct ParsedBitstream {
     var controlBlocks: [DMAControlBlock] = []
     
     /// Data parsed from the bitstream.
-    var data: [Int] = []
+    ///
+    /// The first value is always the flag used by the start and end control blocks and begins as zero.
+    var data: [Int] = [ 0 ]
 
     /// Parse a bitstream.
     ///
@@ -66,31 +68,33 @@ struct ParsedBitstream {
     
     /// Adds a DMA Control Block for the start of a bitstream.
     ///
-    /// The start control block is used to detect when a bitstream has begun outputting, it overwrites its own `nextControlBlockAddress` with zero and simply points at the first true control block in the sequence. Thus the `Driver` can watch the value of this field, and know that once it changes to zero, it can free up any memory associated with the previously running bitstream.
+    /// The start control block is used to detect when a bitstream has begun outputting; it writes the value 1 to the first data item and then points at the first true control block in the sequence. Thus the `Driver` can watch the value of this field, and know that once it changes from zero, it can free up any memory associated with the previously running bitstream.
     mutating func addControlBlockForStart() {
         controlBlocks.append(DMAControlBlock(
-            transferInformation: [ .sourceIgnoreWrites ],
-            sourceAddress: 0,
-            destinationAddress: MemoryLayout<DMAControlBlock>.stride * 0 + DMAControlBlock.nextControlBlockOffset,
+            transferInformation: [ .waitForWriteResponse ],
+            sourceAddress: MemoryLayout<Int>.stride * data.count,
+            destinationAddress: 0,
             transferLength: MemoryLayout<Int>.stride,
             tdModeStride: 0,
             nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1)))
+        data.append(1)
     }
     
     /// Adds a DMA Control Block for the end of a bitstream.
     ///
-    /// The end control block is used to detect when a bitstream has completely output at least once, by overwriting the entire control block created by `addControlBlockForStart` with zero and then pointing at the appropriate looping control block. Thus the `Driver` can watch the value of any field in the first control block, and know that once it changes to zero, the bitstream has been output at least once and it can move onto the next queued bitstream if one exists.
+    /// The end control block is used to detect when a bitstream has completely output at least once; it writes the value -1 to the first date item and then points back to the appropriate looping control block. Thus the `Driver` can watch the value of this field, and know that once it changes to below zero, the bitstream has been output at least once and it can move onto the next queued bitstream if one exists.
     ///
     /// - Parameters:
     ///   - next: the index within `controlBlocks` of the control block to loop back to.
     mutating func addControlBlockForEnd(next nextIndex: Int) {
         controlBlocks.append(DMAControlBlock(
-            transferInformation: [ .sourceIgnoreWrites ],
-            sourceAddress: 0,
-            destinationAddress: MemoryLayout<DMAControlBlock>.stride * 0,
-            transferLength: MemoryLayout<DMAControlBlock>.stride,
+            transferInformation: [ .waitForWriteResponse ],
+            sourceAddress: MemoryLayout<Int>.stride * data.count,
+            destinationAddress: 0,
+            transferLength: MemoryLayout<Int>.stride,
             tdModeStride: 0,
             nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * nextIndex))
+        data.append(-1)
     }
     
     /// Adds a DMA Control Block and accompanying data for a section of bitstream data.
@@ -290,10 +294,10 @@ struct ParsedBitstream {
         let memory = try raspberryPi.allocateUncachedMemory(minimumSize: controlBlocksSize + dataSize)
         
         for index in controlBlocks.indices {
-            if controlBlocks[index].sourceAddress < raspberryPi.peripheralBusAddress && !controlBlocks[index].transferInformation.contains(.sourceIgnoreWrites) {
+            if controlBlocks[index].sourceAddress < raspberryPi.peripheralBusAddress {
                 controlBlocks[index].sourceAddress += memory.busAddress + controlBlocksSize
             }
-            if controlBlocks[index].destinationAddress < raspberryPi.peripheralBusAddress && !controlBlocks[index].transferInformation.contains(.destinationWidthWide) {
+            if controlBlocks[index].destinationAddress < raspberryPi.peripheralBusAddress {
                 controlBlocks[index].destinationAddress += memory.busAddress + controlBlocksSize
             }
             controlBlocks[index].nextControlBlockAddress += memory.busAddress
