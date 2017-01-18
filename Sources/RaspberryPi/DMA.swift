@@ -126,7 +126,7 @@ public struct DMATransferInformation : OptionSet, CustomStringConvertible {
     }
     
     public static let noWideBursts                = DMATransferInformation(rawValue: 1 << 26)
-    public static let sourceIgnoreWrites          = DMATransferInformation(rawValue: 1 << 11)
+    public static let sourceIgnoreReads           = DMATransferInformation(rawValue: 1 << 11)
     public static let sourceDREQ                  = DMATransferInformation(rawValue: 1 << 10)
     public static let sourceWidthWide             = DMATransferInformation(rawValue: 1 << 9)
     public static let sourceAddressIncrement      = DMATransferInformation(rawValue: 1 << 8)
@@ -169,7 +169,7 @@ public struct DMATransferInformation : OptionSet, CustomStringConvertible {
         var parts: [String] = []
         
         if contains(.noWideBursts) { parts.append(".noWideBursts") }
-        if contains(.sourceIgnoreWrites) { parts.append(".sourceIgnoreWrites") }
+        if contains(.sourceIgnoreReads) { parts.append(".sourceIgnoreReads") }
         if contains(.sourceDREQ) { parts.append(".sourceDREQ") }
         if contains(.sourceWidthWide) { parts.append(".sourceWidthWide") }
         if contains(.sourceAddressIncrement) { parts.append(".sourceAddressIncrement") }
