@@ -1190,7 +1190,69 @@ class DriverTests: XCTestCase {
 
         XCTAssertEqual(parsed.data, oldData)
     }
+    
+    
+    // MARK: Post-commit details.
+    
+    /// Test that the bus address of the memory region is copied into the queued bitstream structure.
+    func testBusAddress() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        
+        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        try! parsed.commit()
 
+        XCTAssertNotNil(parsed.memory)
+        XCTAssertEqual(parsed.busAddress, parsed.memory!.busAddress)
+    }
+
+    /// Test that isTransmitting has the right value at the different stages.
+    func testIsTransmitting() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        
+        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        try! parsed.commit()
+        
+        XCTAssertFalse(parsed.isTransmitting)
+        
+        let dataOffset = MemoryLayout<DMAControlBlock>.stride * parsed.controlBlocks.count
+        let data = parsed.memory!.pointer.advanced(by: dataOffset).assumingMemoryBound(to: Int.self)
+        
+        // Make sure it goes true after the start control block.
+        data[0] = data[1]
+        
+        XCTAssertTrue(parsed.isTransmitting)
+        
+        // And remains true after the end control block.
+        data[0] = data[parsed.data.count - 1]
+
+        XCTAssertTrue(parsed.isTransmitting)
+    }
+    
+    /// Test that isRepeating has the right value at the different stages.
+    func testIsRepeating() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        
+        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        try! parsed.commit()
+        
+        XCTAssertFalse(parsed.isRepeating)
+        
+        let dataOffset = MemoryLayout<DMAControlBlock>.stride * parsed.controlBlocks.count
+        let data = parsed.memory!.pointer.advanced(by: dataOffset).assumingMemoryBound(to: Int.self)
+        
+        // Make sure it remains false after the start control block.
+        data[0] = data[1]
+        
+        XCTAssertFalse(parsed.isRepeating)
+        
+        // And goes true after the end control block.
+        data[0] = data[parsed.data.count - 1]
+        
+        XCTAssertTrue(parsed.isRepeating)
+    }
 
 }
 
@@ -1231,6 +1293,10 @@ extension DriverTests {
             ("testCommitConcatenates", testCommitConcatenates),
             ("testCommitModifiesAddresses", testCommitModifiesAddresses),
             ("testCommitDoesNotModifyData", testCommitDoesNotModifyData),
+            
+            ("testBusAddress", testBusAddress),
+            ("testIsTransmitting", testIsTransmitting),
+            ("testIsRepeating", testIsRepeating),
         ]
     }()
 

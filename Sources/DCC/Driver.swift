@@ -321,6 +321,42 @@ struct QueuedBitstream {
         
         self.memory = memory
     }
+    
+    /// Bus address of the bitstream in memory.
+    ///
+    /// This address is within the “‘C’ Alias” and may be handed directly to hardware such as the DMA Engine. To obtain an equivalent address outside the alias, remove RaspberryPi.uncachedAliasBusAddress from this value.
+    ///
+    /// This value is only available once `commit()` has been called.
+    var busAddress: Int {
+        guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
+        return memory.busAddress
+    }
+
+    /// Indicates whether the bitstream is currently transmitting.
+    ///
+    /// This value is only available once `commit()` has been called.
+    var isTransmitting: Bool {
+        guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
+
+        let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
+        let uncachedData = memory.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: Int.self)
+        
+        return uncachedData[0] != 0
+    }
+
+    /// Indicates whether the bitstream is currently repeating transmission after the first complete transmission.
+    ///
+    /// Where the bitstream includes a `.loopStart` event, only the portion after that event is repeated.
+    ///
+    /// This value is only available once `commit()` has been called.
+    var isRepeating: Bool {
+        guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
+        
+        let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
+        let uncachedData = memory.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: Int.self)
+        
+        return uncachedData[0] < 0
+    }
 
 }
 
