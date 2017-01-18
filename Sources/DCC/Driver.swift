@@ -42,6 +42,9 @@ struct QueuedBitstream {
     /// Raspberry Pi hardware information.
     let raspberryPi: RaspberryPi
     
+    /// Duration in microseconds of the bitstream.
+    var duration: Float
+    
     /// DMA Control Blocks parsed from the bitstream.
     ///
     /// Since the physical uncached addresses are not yet known, the values of `sourceAddress` are offsets in bytes from the start of the `data` array; and the values of `destinationAddress`, and `nextControlBlockAddress` are offsets in bytes from the start of the `controlBlocks` array if they are below `RaspberryPi.peripheralBusAddress`.
@@ -63,6 +66,7 @@ struct QueuedBitstream {
     init(raspberryPi: RaspberryPi, bitstream: Bitstream) throws {
         self.raspberryPi = raspberryPi
         
+        duration = bitstream.duration
         try parseBitstream(bitstream)
     }
     

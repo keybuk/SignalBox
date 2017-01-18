@@ -1104,6 +1104,19 @@ class DriverTests: XCTestCase {
     }
     
     
+    // MARK: Properties
+    
+    /// Test that the bitstream duration is copied into the queued bitstream.
+    func testBitstreamDuration() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.duration, bitstream.duration)
+    }
+
+    
     // MARK: Commit
     
     /// Test that we can commit a parsed bitstream to uncached memory.
@@ -1290,6 +1303,8 @@ extension DriverTests {
             ("testParseBitstreamWithEmptyRepeatingSection", testParseBitstreamWithEmptyRepeatingSection),
             ("testParseBitstreamWithoutDataInRepeatingSection", testParseBitstreamWithoutDataInRepeatingSection),
             
+            ("testBitstreamDuration", testBitstreamDuration),
+
             ("testCommitConcatenates", testCommitConcatenates),
             ("testCommitModifiesAddresses", testCommitModifiesAddresses),
             ("testCommitDoesNotModifyData", testCommitDoesNotModifyData),
