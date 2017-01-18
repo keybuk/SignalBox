@@ -54,11 +54,11 @@ public class OldDriver {
     
     let dmaChannel: UnsafeMutablePointer<DMAChannel>
     
-    var controlBlockMemory: UncachedMemory!
+    var controlBlockMemory: MemoryRegion!
     var controlBlock: UnsafeMutablePointer<DMAControlBlock>
     var controlBlockIndex = 0
     
-    var dataMemory: UncachedMemory!
+    var dataMemory: MemoryRegion!
     var data: UnsafeMutablePointer<Int>
     var dataIndex = 0
 
