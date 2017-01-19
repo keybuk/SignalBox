@@ -34,15 +34,11 @@ public class Driver {
 
     public let raspberryPi: RaspberryPi
     
-    let pwm: UnsafeMutablePointer<PWM>
-    
-    public init(raspberryPi: RaspberryPi) throws {
+    public init(raspberryPi: RaspberryPi) {
         self.raspberryPi = raspberryPi
         
         divisor = Int(Driver.desiredBitDuration * 19.2)
         bitDuration = Float(divisor) / 19.2
-        
-        pwm = try PWM.on(raspberryPi)
     }
     
     /// Initialize hardware.
@@ -52,13 +48,14 @@ public class Driver {
         print("DMA Driver startup: divisor \(divisor), bit duration \(bitDuration)µs")
 
         // Disable both PWM channels, and reset the error state.
-        pwm.pointee.dmaConfiguration.remove(.enabled)
-        pwm.pointee.control.remove([ .channel1Enable, .channel2Enable ])
-        pwm.pointee.status.insert([ .busError, .fifoReadError, .fifoWriteError, .channel1GapOccurred, .channel2GapOccurred, .channel3GapOccurred, .channel4GapOccurred ])
+        var pwm = raspberryPi.pwm()
+        pwm.dmaConfiguration.remove(.enabled)
+        pwm.control.remove([ .channel1Enable, .channel2Enable ])
+        pwm.status.insert([ .busError, .fifoReadError, .fifoWriteError, .channel1GapOccurred, .channel2GapOccurred, .channel3GapOccurred, .channel4GapOccurred ])
 
         // Clear the FIFO, and ensure neither channel is consuming from it.
-        pwm.pointee.control.remove([ .channel1UseFifo, .channel2UseFifo ])
-        pwm.pointee.control.insert(.clearFifo)
+        pwm.control.remove([ .channel1UseFifo, .channel2UseFifo ])
+        pwm.control.insert(.clearFifo)
         
         // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
         var clock = raspberryPi.clock(identifier: Driver.clockIdentifier)
@@ -89,17 +86,17 @@ public class Driver {
         gpio.value = false
         
         // Enable the PWM, using the FIFO in serializer mode, and DREQ signals sent to the DMA Engine.
-        pwm.pointee.dmaConfiguration = [ .enabled, .dreqThreshold(1), .panicThreshold(1) ]
-        pwm.pointee.control = [ .channel1UseFifo, .channel1SerializerMode, .channel1Enable ]
+        pwm.dmaConfiguration = [ .enabled, .dreqThreshold(1), .panicThreshold(1) ]
+        pwm.control = [ .channel1UseFifo, .channel1SerializerMode, .channel1Enable ]
         
         // Set the DMA Engine priority levels.
         dma.controlStatus = [ .priorityLevel(8), .panicPriorityLevel(8) ]
         
         // Prime the FIFO, completely filling it. This ensures our attempts to align GPIO and PWM data are successful.
         print("Priming FIFO", terminator: "")
-        while !pwm.pointee.status.contains(.fifoFull) {
+        while !pwm.status.contains(.fifoFull) {
             print(".", terminator: "")
-            pwm.pointee.fifoInput = 0
+            pwm.fifoInput = 0
         }
         print("")
     }
@@ -111,8 +108,9 @@ public class Driver {
     /// It is essential that this be called before exit, as otherwise the DMA Engine will continue on its programmed sequence and endlessly repeat the last queued bitstream.
     public func shutdown() {
         // Disable the PWM channel.
-        pwm.pointee.control.remove(.channel1Enable)
-        pwm.pointee.dmaConfiguration.remove(.enabled)
+        var pwm = raspberryPi.pwm()
+        pwm.control.remove(.channel1Enable)
+        pwm.dmaConfiguration.remove(.enabled)
 
         // Stop the clock.
         var clock = raspberryPi.clock(identifier: Driver.clockIdentifier)
@@ -173,28 +171,29 @@ public class Driver {
     }
     
     func watchdog() {
-        if pwm.pointee.status.contains(.busError) {
+        var pwm = raspberryPi.pwm()
+        if pwm.status.contains(.busError) {
             // Always seems to be set, and doesn't go away *shrug*
             //print("PWM Bus Error")
-            pwm.pointee.status.insert(.busError)
+            pwm.status.insert(.busError)
         }
         
-        if pwm.pointee.status.contains(.fifoReadError) {
+        if pwm.status.contains(.fifoReadError) {
             print("PWM FIFO Read Error")
-            pwm.pointee.status.insert(.fifoReadError)
+            pwm.status.insert(.fifoReadError)
         }
         
-        if pwm.pointee.status.contains(.fifoWriteError) {
+        if pwm.status.contains(.fifoWriteError) {
             print("PWM FIFO Write Error")
-            pwm.pointee.status.insert(.fifoWriteError)
+            pwm.status.insert(.fifoWriteError)
         }
         
-        if pwm.pointee.status.contains(.channel1GapOccurred) {
+        if pwm.status.contains(.channel1GapOccurred) {
             print("PWM Channel 1 Gap Occurred")
-            pwm.pointee.status.insert(.channel1GapOccurred)
+            pwm.status.insert(.channel1GapOccurred)
         }
         
-        if pwm.pointee.status.contains(.fifoEmpty) {
+        if pwm.status.contains(.fifoEmpty) {
             // Doesn't seem to be an issue, unless maybe we get a gap as above?
             //print("PWM FIFO Empty")
         }

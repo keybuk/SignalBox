@@ -202,6 +202,13 @@ public class RaspberryPi {
         return Clock(identifier: identifier, peripherals: peripherals)
     }
     
+    /// Obtain an object to manipulate the PWM.
+    ///
+    /// - Returns: `PWM` object.
+    public func pwm() -> PWM {
+        return PWM(peripherals: peripherals)
+    }
+    
     /// Mailbox instance for uncached memory allocation.
     ///
     /// This is opened on the first call to `allocateUncachedMemory` but then cached afterwards.

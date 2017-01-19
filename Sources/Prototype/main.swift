@@ -57,7 +57,7 @@ func functionPacket(_ function: Int, value: Bool) -> Packet {
 
 let raspberryPi = try RaspberryPi()
 
-var driver = try! Driver(raspberryPi: raspberryPi)
+var driver = Driver(raspberryPi: raspberryPi)
 driver.startup()
 
 var startupBitstream = Bitstream(bitDuration: driver.bitDuration)

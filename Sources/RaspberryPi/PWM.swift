@@ -137,19 +137,22 @@ public struct PWMDMAConfiguration : OptionSet, CustomStringConvertible {
 
 }
 
-// FIXME: this is really an internal register map, and not a good public API.
 public struct PWM {
+
+    struct Registers {
+        var control: PWMControl
+        var status: PWMStatus
+        var dmaConfiguration: PWMDMAConfiguration
+        var reserved0: Int
+        var channel1Range: Int
+        var channel1Data: Int
+        var fifoInput: Int
+        var reserved1: Int
+        var channel2Range: Int
+        var channel2Data: Int
+    }
     
-    public var control: PWMControl
-    public var status: PWMStatus
-    public var dmaConfiguration: PWMDMAConfiguration
-    var reserved0: Int
-    public var channel1Range: Int
-    public var channel1Data: Int
-    public var fifoInput: Int
-    var reserved1: Int
-    public var channel2Range: Int
-    public var channel2Data: Int
+    let registers: UnsafeMutablePointer<Registers>
 
     public static let offset = 0x20c000
     public static let size   = 0x00002c
@@ -163,21 +166,48 @@ public struct PWM {
     public static let channel2RangeOffset    = 0x20
     public static let channel2DataOffset     = 0x28
     
-    // FIXME: this name is bad, and Swift-style requires the 'On' be inside the '('.
-    public static func on(_ raspberryPi: RaspberryPi) throws -> UnsafeMutablePointer<PWM> {
-        // FIXME: this memory map gets leaked.
-        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralAddress + PWM.offset, size: PWM.size)
-        return pointer.bindMemory(to: PWM.self, capacity: 1)
+    public var control: PWMControl {
+        get { return registers.pointee.control }
+        set { registers.pointee.control = newValue }
     }
     
-    public mutating func disable() {
-        control.remove([ .channel1Enable, .channel2Enable ])
-        dmaConfiguration.remove(.enabled)
+    public var status: PWMStatus {
+        get { return registers.pointee.status }
+        set { registers.pointee.status = newValue }
     }
     
-    public mutating func reset() {
-        control = []
-        status.insert([ .busError, .fifoReadError, .fifoWriteError, .channel1GapOccurred, .channel2GapOccurred, .channel3GapOccurred, .channel4GapOccurred ])
+    public var dmaConfiguration: PWMDMAConfiguration {
+        get { return registers.pointee.dmaConfiguration }
+        set { registers.pointee.dmaConfiguration = newValue }
     }
-
+    
+    public var channel1Range: Int {
+        get { return registers.pointee.channel1Range }
+        set { registers.pointee.channel1Range = newValue }
+    }
+    
+    public var channel1Data: Int {
+        get { return registers.pointee.channel1Data }
+        set { registers.pointee.channel1Data = newValue }
+    }
+    
+    public var fifoInput: Int {
+        get { return 0 }
+        set { registers.pointee.fifoInput = newValue }
+    }
+    
+    public var channel2Range: Int {
+        get { return registers.pointee.channel2Range }
+        set { registers.pointee.channel2Range = newValue }
+    }
+    
+    public var channel2Data: Int {
+        get { return registers.pointee.channel2Data }
+        set { registers.pointee.channel2Data = newValue }
+    }
+    
+    init(peripherals: UnsafeMutableRawPointer) {
+        self.registers = peripherals.advanced(by: PWM.offset).bindMemory(to: Registers.self, capacity: 1)
+    }
+    
 }
