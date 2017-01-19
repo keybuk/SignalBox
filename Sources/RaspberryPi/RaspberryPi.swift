@@ -192,6 +192,16 @@ public class RaspberryPi {
         return GPIO(number: number, peripherals: peripherals)
     }
     
+    /// Obtain an object to manipulate a Clock.
+    ///
+    /// - Parameters:
+    ///   - identifier: identifier for Clock.
+    ///
+    /// - Returns: `Clock` object for the identifier given.
+    public func clock(identifier: ClockIdentifier) -> Clock {
+        return Clock(identifier: identifier, peripherals: peripherals)
+    }
+    
     /// Mailbox instance for uncached memory allocation.
     ///
     /// This is opened on the first call to `allocateUncachedMemory` but then cached afterwards.

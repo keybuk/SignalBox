@@ -399,10 +399,9 @@ public struct DMAChannel {
     
     init(channel number: Int, peripherals: UnsafeMutableRawPointer) {
         self.number = number
-
-        registers = peripherals.advanced(by: DMA.offset + DMA.channelStride * number).bindMemory(to: Registers.self, capacity: 1)
-        interruptStatusRegister = peripherals.advanced(by: DMA.offset + DMA.interruptStatusOffset).bindMemory(to: Int.self, capacity: 1)
-        enableRegister = peripherals.advanced(by: DMA.offset + DMA.enableOffset).bindMemory(to: Int.self, capacity: 1)
+        self.registers = peripherals.advanced(by: DMA.offset + DMA.channelStride * number).bindMemory(to: Registers.self, capacity: 1)
+        self.interruptStatusRegister = peripherals.advanced(by: DMA.offset + DMA.interruptStatusOffset).bindMemory(to: Int.self, capacity: 1)
+        self.enableRegister = peripherals.advanced(by: DMA.offset + DMA.enableOffset).bindMemory(to: Int.self, capacity: 1)
     }
     
 }

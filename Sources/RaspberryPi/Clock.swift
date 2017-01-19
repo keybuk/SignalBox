@@ -123,11 +123,25 @@ public struct ClockDivisor : OptionSet, CustomStringConvertible {
     
 }
 
-// FIXME: this is really an internal register map, and not a good public API.
+public enum ClockIdentifier {
+    case generalPurpose0
+    case generalPurpose1
+    case generalPurpose2
+    
+    case pcm
+    case pwm
+}
+
 public struct Clock {
     
-    public var control: ClockControl
-    public var divisor: ClockDivisor
+    let identifier: ClockIdentifier
+    
+    struct Registers {
+        var control: ClockControl
+        var divisor: ClockDivisor
+    }
+    
+    let registers: UnsafeMutablePointer<Registers>
     
     public static let offset = 0x101000
     public static let size   = 0x000100
@@ -144,11 +158,33 @@ public struct Clock {
     public static let controlOffset = 0x00
     public static let divisorOffset = 0x04
     
-    // FIXME: this name is bad. Do we really want one of these methods per-clock? We have to map the entire register space anyway, otherwise mmap() fails.
-    public static func pwm(on raspberryPi: RaspberryPi) throws -> UnsafeMutablePointer<Clock> {
-        // FIXME: this memory map gets leaked.
-        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralAddress + Clock.offset, size: Clock.size)
-        return pointer.advanced(by: Clock.pwmOffset).bindMemory(to: Clock.self, capacity: 1)
+    public var control: ClockControl {
+        get { return registers.pointee.control }
+        set { registers.pointee.control = newValue }
+    }
+    
+    public var divisor: ClockDivisor {
+        get { return registers.pointee.divisor }
+        set { registers.pointee.divisor = newValue }
+    }
+    
+    init(identifier: ClockIdentifier, peripherals: UnsafeMutableRawPointer) {
+        let offset: Int
+        switch identifier {
+        case .generalPurpose0:
+            offset = Clock.generalPurpose0Offset
+        case .generalPurpose1:
+            offset = Clock.generalPurpose1Offset
+        case .generalPurpose2:
+            offset = Clock.generalPurpose2Offset
+        case .pcm:
+            offset = Clock.pcmOffset
+        case .pwm:
+            offset = Clock.pwmOffset
+        }
+        
+        self.identifier = identifier
+        self.registers = peripherals.advanced(by: Clock.offset + offset).bindMemory(to: Registers.self, capacity: 1)
     }
 
     public mutating func disable() {

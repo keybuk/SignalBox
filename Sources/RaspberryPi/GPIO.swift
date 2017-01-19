@@ -212,8 +212,7 @@ public struct GPIO {
 
     init(number: Int, peripherals: UnsafeMutableRawPointer) {
         self.number = number
-        
-        registers = peripherals.advanced(by: GPIO.offset).bindMemory(to: Registers.self, capacity: 1)
+        self.registers = peripherals.advanced(by: GPIO.offset).bindMemory(to: Registers.self, capacity: 1)
     }
 
 }

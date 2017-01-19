@@ -26,6 +26,7 @@ public class Driver {
     public static let debugGpio = 19
     
     public static let dmaChannel = 5
+    public static let clockIdentifier: ClockIdentifier = .pwm
 
     public static let desiredBitDuration: Float = 14.5
     public let bitDuration: Float
@@ -33,7 +34,6 @@ public class Driver {
 
     public let raspberryPi: RaspberryPi
     
-    let clock: UnsafeMutablePointer<Clock>
     let pwm: UnsafeMutablePointer<PWM>
     
     public init(raspberryPi: RaspberryPi) throws {
@@ -43,8 +43,6 @@ public class Driver {
         bitDuration = Float(divisor) / 19.2
         
         pwm = try PWM.on(raspberryPi)
-        
-        clock = try Clock.pwm(on: raspberryPi)
     }
     
     /// Initialize hardware.
@@ -63,10 +61,11 @@ public class Driver {
         pwm.pointee.control.insert(.clearFifo)
         
         // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
-        clock.pointee.disable()
-        clock.pointee.control = [ .source(.oscillator), .mash(.integer) ]
-        clock.pointee.divisor = [ .integer(divisor) ]
-        clock.pointee.enable()
+        var clock = raspberryPi.clock(identifier: Driver.clockIdentifier)
+        clock.disable()
+        clock.control = [ .source(.oscillator), .mash(.integer) ]
+        clock.divisor = [ .integer(divisor) ]
+        clock.enable()
         
         // Make sure that the DMA Engine is enabled, abort any existing use of it, and clear error state.
         var dma = raspberryPi.dma(channel: Driver.dmaChannel)
@@ -116,7 +115,8 @@ public class Driver {
         pwm.pointee.dmaConfiguration.remove(.enabled)
 
         // Stop the clock.
-        clock.pointee.disable()
+        var clock = raspberryPi.clock(identifier: Driver.clockIdentifier)
+        clock.disable()
 
         // Stop the DMA Engine.
         var dma = raspberryPi.dma(channel: Driver.dmaChannel)
