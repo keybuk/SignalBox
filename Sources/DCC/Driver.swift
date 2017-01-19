@@ -27,8 +27,10 @@ public struct Driver {
     
     public static let dmaChannelNumber = 5
 
-    public let bitDuration: Float = 14.5
-    
+    public static let desiredBitDuration: Float = 14.5
+    public let bitDuration: Float
+    let divisor: Int
+
     public let raspberryPi: RaspberryPi
     
     let dma: DMA
@@ -39,6 +41,9 @@ public struct Driver {
 
     public init(raspberryPi: RaspberryPi) throws {
         self.raspberryPi = raspberryPi
+        
+        divisor = Int(Driver.desiredBitDuration * 19.2)
+        bitDuration = Float(divisor) / 19.2
         
         dma = try DMA.on(raspberryPi)
         dmaChannel = dma.channel[Driver.dmaChannelNumber]
@@ -54,6 +59,8 @@ public struct Driver {
     ///
     /// Sets up the PWM, GPIO and DMA hardware and prepares for a bitstream to be queued. The DMA Engine will not be activated until the first bitstream is queued with `queue(bitstream:)`.
     public func startup() {
+        print("DMA Driver startup: divisor \(divisor), bit duration \(bitDuration)µs")
+
         // Disable both PWM channels, and reset the error state.
         pwm.pointee.dmaConfiguration.remove(.enabled)
         pwm.pointee.control.remove([ .channel1Enable, .channel2Enable ])
@@ -62,9 +69,6 @@ public struct Driver {
         // Clear the FIFO, and ensure neither channel is consuming from it.
         pwm.pointee.control.remove([ .channel1UseFifo, .channel2UseFifo ])
         pwm.pointee.control.insert(.clearFifo)
-        
-        let divisor = Int(bitDuration * 19.2)
-        print("DMA Driver startup: bit duration \(bitDuration)µs, divisor \(divisor)")
         
         // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
         clock.pointee.disable()
