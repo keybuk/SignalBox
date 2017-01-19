@@ -409,6 +409,8 @@ public struct DMAChannel {
 
 public enum DMA {
 
+    static let count = 16
+    
     static let offset                = 0x007000
     static let size                  = 0x001000
     static let channel15Offset       = 0xe05000

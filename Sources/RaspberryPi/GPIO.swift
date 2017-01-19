@@ -152,28 +152,34 @@ public enum GPIOPullUpDown : Int {
     
 }
 
-// FIXME: this is really an internal register map, and not a good public API.
 public struct GPIO {
+
+    let number: Int
     
-    public var functionSelect: GPIOFunctionSelect
-    public var outputSet: GPIOBitField
-    public var outputClear: GPIOBitField
-    public var level: GPIOBitField
-    public var levelDetectStatus: GPIOBitField
-    public var risingEdgeDetectEnable: GPIOBitField
-    public var fallingEdgeDetectEnable: GPIOBitField
-    public var highDetectEnable: GPIOBitField
-    public var lowDetectEnable: GPIOBitField
-    public var asyncRisingEdgeDetect: GPIOBitField
-    public var asyncFallingEdgeDetect: GPIOBitField
-    public var pullUpDownEnable: GPIOPullUpDown
-    public var pullUpDownEnableClock: GPIOBitField
-    
+    struct Registers {
+        var functionSelect: GPIOFunctionSelect
+        var outputSet: GPIOBitField
+        var outputClear: GPIOBitField
+        var level: GPIOBitField
+        // FIXME: the following registers are unimplemented.
+        var levelDetectStatus: GPIOBitField
+        var risingEdgeDetectEnable: GPIOBitField
+        var fallingEdgeDetectEnable: GPIOBitField
+        var highDetectEnable: GPIOBitField
+        var lowDetectEnable: GPIOBitField
+        var asyncRisingEdgeDetect: GPIOBitField
+        var asyncFallingEdgeDetect: GPIOBitField
+        var pullUpDownEnable: GPIOPullUpDown
+        var pullUpDownEnableClock: GPIOBitField
+    }
+
+    let registers: UnsafeMutablePointer<Registers>
+
     public static let count = 54
     
     public static let offset = 0x200000
     public static let size   = 0x0000c0
-    
+
     public static let functionSelectOffset          = 0x00
     public static let outputSetOffset               = 0x1c
     public static let outputClearOffset             = 0x28
@@ -187,12 +193,27 @@ public struct GPIO {
     public static let asyncFallingEdgeDetectOffset  = 0x88
     public static let pullUpDownEnableOffset        = 0x94
     public static let pullUpDownEnableClockOffset   = 0x98
-    
-    // FIXME: this name is bad, and Swift-style requires the 'On' be inside the '('.
-    public static func on(_ raspberryPi: RaspberryPi) throws -> UnsafeMutablePointer<GPIO> {
-        // FIXME: this memory map gets leaked.
-        let pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralAddress + GPIO.offset, size: GPIO.size)
-        return pointer.bindMemory(to: GPIO.self, capacity: 1)
+
+    public var function: GPIOFunction {
+        get { return registers.pointee.functionSelect[number] }
+        set { registers.pointee.functionSelect[number] = newValue }
     }
     
+    public var value: Bool {
+        get { return registers.pointee.level[number] }
+        set {
+            if newValue {
+                registers.pointee.outputSet[number] = true
+            } else {
+                registers.pointee.outputClear[number] = true
+            }
+        }
+    }
+
+    init(number: Int, peripherals: UnsafeMutableRawPointer) {
+        self.number = number
+        
+        registers = peripherals.advanced(by: GPIO.offset).bindMemory(to: Registers.self, capacity: 1)
+    }
+
 }

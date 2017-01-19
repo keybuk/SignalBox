@@ -33,24 +33,18 @@ public class Driver {
 
     public let raspberryPi: RaspberryPi
     
-    var dma: DMAChannel
     let clock: UnsafeMutablePointer<Clock>
     let pwm: UnsafeMutablePointer<PWM>
-    let gpio: UnsafeMutablePointer<GPIO>
-
+    
     public init(raspberryPi: RaspberryPi) throws {
         self.raspberryPi = raspberryPi
         
         divisor = Int(Driver.desiredBitDuration * 19.2)
         bitDuration = Float(divisor) / 19.2
         
-        dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        
         pwm = try PWM.on(raspberryPi)
         
         clock = try Clock.pwm(on: raspberryPi)
-        
-        gpio = try GPIO.on(raspberryPi)
     }
     
     /// Initialize hardware.
@@ -75,21 +69,25 @@ public class Driver {
         clock.pointee.enable()
         
         // Make sure that the DMA Engine is enabled, abort any existing use of it, and clear error state.
+        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
         dma.enabled = true
         dma.controlStatus.insert(.abort)
         dma.controlStatus.insert(.reset)
         dma.debug.insert([ .readError, .fifoError, .readLastNotSetError ])
 
         // Set the DCC GPIO for PWM output.
-        gpio.pointee.functionSelect[Driver.dccGpio] = .alternateFunction5
+        var gpio = raspberryPi.gpio(number: Driver.dccGpio)
+        gpio.function = .alternateFunction5
         
         // Set the RailCom GPIO for output and clear.
-        gpio.pointee.functionSelect[Driver.railComGpio] = .output
-        gpio.pointee.outputClear[Driver.railComGpio] = true
+        gpio = raspberryPi.gpio(number: Driver.railComGpio)
+        gpio.function = .output
+        gpio.value = false
         
         // Set the debug GPIO for output and clear.
-        gpio.pointee.functionSelect[Driver.debugGpio] = .output
-        gpio.pointee.outputClear[Driver.debugGpio] = true
+        gpio = raspberryPi.gpio(number: Driver.debugGpio)
+        gpio.function = .output
+        gpio.value = false
         
         // Enable the PWM, using the FIFO in serializer mode, and DREQ signals sent to the DMA Engine.
         pwm.pointee.dmaConfiguration = [ .enabled, .dreqThreshold(1), .panicThreshold(1) ]
@@ -121,6 +119,7 @@ public class Driver {
         clock.pointee.disable()
 
         // Stop the DMA Engine.
+        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
         dma.controlStatus.remove(.active)
         dma.controlStatus.insert(.abort)
 
@@ -128,11 +127,16 @@ public class Driver {
         currentBitstream = nil
         
         // Restore the DCC GPIO to output, and clear all pins.
-        gpio.pointee.functionSelect[Driver.dccGpio] = .output
-        gpio.pointee.outputClear[Driver.dccGpio] = true
-        gpio.pointee.outputClear[Driver.railComGpio] = true
-        gpio.pointee.outputClear[Driver.debugGpio] = true
+        var gpio = raspberryPi.gpio(number: Driver.dccGpio)
+        gpio.function = .output
+        gpio.value = false
         
+        gpio = raspberryPi.gpio(number: Driver.railComGpio)
+        gpio.value = false
+        
+        gpio = raspberryPi.gpio(number: Driver.debugGpio)
+        gpio.value = false
+
         DispatchQueue.global().asyncAfter(deadline: .now() + .milliseconds(10), execute: watchdog)
     }
     
@@ -156,6 +160,7 @@ public class Driver {
         if let currentBitstream = currentBitstream {
             currentBitstream.transfer(toBusAddress: queuedBitstream.busAddress)
         } else {
+            var dma = raspberryPi.dma(channel: Driver.dmaChannel)
             dma.controlBlockAddress = queuedBitstream.busAddress
             dma.controlStatus.insert(.active)
         }
@@ -194,7 +199,8 @@ public class Driver {
             //print("PWM FIFO Empty")
         }
         
-        
+        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
+
         if dma.controlStatus.contains(.errorDetected) {
             print("DMA Error Detected:")
         }

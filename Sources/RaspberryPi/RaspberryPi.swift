@@ -177,8 +177,19 @@ public class RaspberryPi {
     ///
     /// - Returns: `DMAChannel` object for the channel given.
     public func dma(channel: Int) -> DMAChannel {
-        assert(channel >= 0 && channel <= 15, "\(channel) is out of range")
+        assert(channel >= 0 && channel < DMA.count, "\(channel) is out of range")
         return DMAChannel(channel: channel, peripherals: peripherals)
+    }
+    
+    /// Obtain an object to manipulate a GPIO pin.
+    ///
+    /// - Parameters:
+    ///   - number: GPIO number.
+    ///
+    /// - Returns: `GPIO` object for the pin given.
+    public func gpio(number: Int) -> GPIO {
+        assert(number >= 0 && number < GPIO.count, "\(number) is out of range")
+        return GPIO(number: number, peripherals: peripherals)
     }
     
     /// Mailbox instance for uncached memory allocation.
