@@ -43,28 +43,39 @@ public class RaspberryPi {
     let bcm2835Address = 0x20000000
     
     /// Size of the I/O Peripherals address range on the earlier Pi models.
-    let bcm2835AddressSize = 0x01000000
+    let bcm2835Size = 0x01000000
     
     /// Address where I/O Peripherals begin.
     ///
     /// This is a physical address suitable for using with `mapMemory(at:size:)`, the value of which varies depending on the specific Raspberry Pi model. For hardware such as the DMA Engine, use the fixed `peripheralBusAddress`.
     public let peripheralAddress: Int
     
-    /// Size of the I/O Peripherals address range.
+    /// Size of the I/O Peripherals range.
     ///
     /// This value varies depending on the specific Raspberry Pi model, and applies equally to `peripheralAddress` and `peripheralBusAddress`.
-    public let peripheralAddressSize: Int
+    public let peripheralSize: Int
 
-    public init() {
+    /// Mapped I/O peripherals memory region.
+    var peripherals: UnsafeMutableRawPointer!
+    
+    /// Indicates whether `peripherals` should be unmapped on deinitialization.
+    var unmapPeripheralsOnDeinit: Bool = true
+
+    /// Initalize.
+    ///
+    /// - Throws: `RaspberryPiError` on failure.
+    public init() throws {
         if let rangeMap = try? RaspberryPi.loadRanges(),
-            let (address, addressSize) = rangeMap[peripheralBusAddress]
+            let (address, size) = rangeMap[peripheralBusAddress]
         {
             peripheralAddress = address
-            peripheralAddressSize = addressSize
+            peripheralSize = size
         } else {
             peripheralAddress = bcm2835Address
-            peripheralAddressSize = bcm2835AddressSize
+            peripheralSize = bcm2835Size
         }
+        
+        peripherals = try mapMemory(at: peripheralAddress, size: peripheralSize)
     }
     
     /// Location of the device tree ranges map.
@@ -94,9 +105,22 @@ public class RaspberryPi {
     /// - Parameters:
     ///   - peripheralAddress: address where peripherals should be on the real hardware.
     ///   - peripheralAddressSize: size of peripheral memory region on the real hardware.
-    init(peripheralAddress: Int, peripheralAddressSize: Int) {
+    init(peripheralAddress: Int, peripheralSize: Int) {
         self.peripheralAddress = peripheralAddress
-        self.peripheralAddressSize = peripheralAddressSize
+        self.peripheralSize = peripheralSize
+        
+        self.peripherals = UnsafeMutableRawPointer.allocate(bytes: peripheralSize, alignedTo: pageSize)
+        unmapPeripheralsOnDeinit = false
+    }
+    
+    deinit {
+        if let peripherals = peripherals {
+            if unmapPeripheralsOnDeinit {
+                munmap(peripherals, peripheralSize)
+            } else {
+                peripherals.deallocate(bytes: peripheralSize, alignedTo: pageSize)
+            }
+        }
     }
     
     /// Location of the `/dev/mem` device.
@@ -144,6 +168,17 @@ public class RaspberryPi {
         }
 
         return pointer
+    }
+    
+    /// Obtain an object to manipulate a DMA Channel.
+    ///
+    /// - Parameters:
+    ///   - channel; DMA Channel number.
+    ///
+    /// - Returns: `DMAChannel` object for the channel given.
+    public func dma(channel: Int) -> DMAChannel {
+        assert(channel >= 0 && channel <= 15, "\(channel) is out of range")
+        return DMAChannel(channel: channel, peripherals: peripherals)
     }
     
     /// Mailbox instance for uncached memory allocation.

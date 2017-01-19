@@ -56,7 +56,7 @@ class DriverTests: XCTestCase {
     override func setUp() {
         super.setUp()
         
-        raspberryPi = TestRaspberryPi(peripheralAddress: 0x3f000000, peripheralAddressSize: 0x01000000)
+        raspberryPi = TestRaspberryPi(peripheralAddress: 0x3f000000, peripheralSize: 0x01000000)
         
         // Generate a set of random word data for testing.
         randomWords.removeAll()

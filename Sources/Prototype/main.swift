@@ -55,7 +55,7 @@ func functionPacket(_ function: Int, value: Bool) -> Packet {
     }
 }
 
-let raspberryPi = RaspberryPi()
+let raspberryPi = try RaspberryPi()
 
 var driver = try! Driver(raspberryPi: raspberryPi)
 driver.startup()
@@ -119,4 +119,3 @@ loop: while true {
 }
 
 driver.shutdown()
-driver.clearQueue()

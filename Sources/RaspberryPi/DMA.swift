@@ -277,8 +277,8 @@ public struct DMAControlBlock : Equatable {
     public var transferLength: Int
     public var tdModeStride: Int
     public var nextControlBlockAddress: Int
-    var reserved0: Int
-    var reserved1: Int
+    private var reserved0: Int
+    private var reserved1: Int
     
     public static let transferInformationOffset = 0x00
     public static let sourceAddressOffset       = 0x04
@@ -316,67 +316,106 @@ public struct DMAControlBlock : Equatable {
 }
 
 public struct DMAChannel {
-
-    public var controlStatus: DMAControlStatus
-    public var controlBlockAddress: Int
-    public var transferInformation: DMATransferInformation
-    public var sourceAddress: Int
-    public var destinationAddress: Int
-    public var transferLength: Int
-    public var tdModeStride: Int
-    public var nextControlBlockAddress: Int
-    public var debug: DMADebug
     
+    let number: Int
+
+    struct Registers {
+        var controlStatus: DMAControlStatus
+        var controlBlockAddress: Int
+        var transferInformation: DMATransferInformation
+        var sourceAddress: Int
+        var destinationAddress: Int
+        var transferLength: Int
+        var tdModeStride: Int
+        var nextControlBlockAddress: Int
+        var debug: DMADebug
+    }
+    
+    let registers: UnsafeMutablePointer<Registers>
+    let interruptStatusRegister: UnsafeMutablePointer<Int>
+    let enableRegister: UnsafeMutablePointer<Int>
+
     public static let controlStatusOffset       = 0x00
     public static let controlBlockAddressOffset = 0x04
     public static let debugOffset               = 0x20
+
+    public var controlStatus: DMAControlStatus {
+        get { return registers.pointee.controlStatus }
+        set { registers.pointee.controlStatus = newValue }
+    }
     
-    public mutating func reset() {
-        controlStatus.insert(.reset)
-        usleep(100)
-        debug.insert([ .readError, .fifoError, .readLastNotSetError ])
+    public var controlBlockAddress: Int {
+        get { return registers.pointee.controlBlockAddress }
+        set { registers.pointee.controlBlockAddress = newValue }
+    }
+    
+    public var transferInformation: DMATransferInformation {
+        get { return registers.pointee.transferInformation }
     }
 
+    public var sourceAddress: Int {
+        get { return registers.pointee.sourceAddress }
+    }
+    
+    public var destinationAddress: Int {
+        get { return registers.pointee.destinationAddress }
+    }
+    
+    public var transferLength: Int {
+        get { return registers.pointee.transferLength }
+    }
+    
+    // 2D transfer length
+    
+    public var tdModeStride: Int {
+        get { return registers.pointee.tdModeStride }
+    }
+    
+    // 2D mode stride split
+    
+    public var nextControlBlockAddress: Int {
+        get { return registers.pointee.nextControlBlockAddress }
+    }
+    
+    public var debug: DMADebug {
+        get { return registers.pointee.debug }
+        set { registers.pointee.debug = newValue }
+    }
+    
+    public var enabled: Bool {
+        get { return (enableRegister.pointee & (1 << number)) != 0 }
+        set {
+            if newValue {
+                enableRegister.pointee |= (1 << number)
+            } else {
+                enableRegister.pointee &= ~(1 << number)
+            }
+        }
+    }
+    
+    public var interruptStatus: Bool {
+        get { return (interruptStatusRegister.pointee & (1 << number)) != 0 }
+    }
+    
+    init(channel number: Int, peripherals: UnsafeMutableRawPointer) {
+        self.number = number
+
+        registers = peripherals.advanced(by: DMA.offset + DMA.channelStride * number).bindMemory(to: Registers.self, capacity: 1)
+        interruptStatusRegister = peripherals.advanced(by: DMA.offset + DMA.interruptStatusOffset).bindMemory(to: Int.self, capacity: 1)
+        enableRegister = peripherals.advanced(by: DMA.offset + DMA.enableOffset).bindMemory(to: Int.self, capacity: 1)
+    }
+    
 }
 
-// FIXME: this isn't a register map, but it's also not a good abstraction to DMA Channels.
-public struct DMA {
-    
-    public static let offset                = 0x007000
-    public static let size                  = 0x001000
-    public static let dma15Offset           = 0xe05000
-    public static let dma15Size             = 0x000100
-    
-    public static let channelSize           = 0x100
-    public static let interruptStatusOffset = 0xfe0
-    public static let enableOffset          = 0xff0
+public enum DMA {
 
-    public let channel: [UnsafeMutablePointer<DMAChannel>]
-    public let interruptStatus: UnsafeMutablePointer<Int>
-    public let enable: UnsafeMutablePointer<Int>
+    static let offset                = 0x007000
+    static let size                  = 0x001000
+    static let channel15Offset       = 0xe05000
+    static let channel15Size         = 0x000100
     
-    // FIXME: this name is bad, and Swift-style requires the 'On' be inside the '('.
-    public static func on(_ raspberryPi: RaspberryPi) throws -> DMA {
-        return try DMA(on: raspberryPi)
-    }
-    
-    private init(on raspberryPi: RaspberryPi) throws {
-        // FIXME: this memory map gets leaked.
-        var pointer = try raspberryPi.mapMemory(at: raspberryPi.peripheralAddress + DMA.offset, size: DMA.size)
-        
-        interruptStatus = pointer.advanced(by: DMA.interruptStatusOffset).bindMemory(to: Int.self, capacity: 1)
-        enable = pointer.advanced(by: DMA.enableOffset).bindMemory(to: Int.self, capacity: 1)
-
-        var channels: [UnsafeMutablePointer<DMAChannel>] = []
-        for _ in 0..<15 {
-            channels.append(pointer.bindMemory(to: DMAChannel.self, capacity: 1))
-            pointer = pointer.advanced(by: DMA.channelSize)
-        }
-        
-        pointer = try! raspberryPi.mapMemory(at: raspberryPi.peripheralAddress + DMA.dma15Offset, size: DMA.dma15Size)
-        channels.append(pointer.bindMemory(to: DMAChannel.self, capacity: 1))
-
-        channel = channels
-    }
+    static let channelStride         = 0x100
+    static let interruptStatusOffset = 0xfe0
+    static let enableOffset          = 0xff0
     
 }
