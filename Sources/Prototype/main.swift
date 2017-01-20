@@ -99,6 +99,24 @@ loop: while true {
     case "reset":
         packet = resetPacket
         debug = false
+    case "tootstart":
+        var bitstream = Bitstream(bitDuration: driver.bitDuration)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: true, f3: false, f4: false), debug: false)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: true, f3: false, f4: false), debug: false)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: true, f3: false, f4: false), debug: false)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: true, f3: false, f4: false), debug: false)
+        try! driver.queue(bitstream: bitstream)
+
+        bitstream = Bitstream(bitDuration: driver.bitDuration)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: false, f3: false, f4: false), debug: false)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: false, f3: false, f4: false), debug: false)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: false, f3: false, f4: false), debug: false)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: false, f3: false, f4: false), debug: false)
+        try! driver.queue(bitstream: bitstream)
+
+        bitstream = Bitstream(bitDuration: driver.bitDuration)
+        bitstream.append(operationsModePacket: startPacket, debug: true)
+        try! driver.queue(bitstream: bitstream)
     case _ where line.hasPrefix("fon "):
         let function = Int(line.substring(from: line.index(line.startIndex, offsetBy: 4)))
         packet = functionPacket(function!, value: true)
