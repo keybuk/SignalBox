@@ -489,12 +489,12 @@ struct QueuedBitstream {
         // Usually we loop through the entire bitstream, but if the bitstream contains a repeating section marker, we only loop through the latter part on subsequent iterations.
         var restartFromIndex = bitstream.startIndex
         
-        // Write out the start control block, and then track whether we've written out the end control block yet; we only ever want to write one.
+        // Write out the start control block.
         addControlBlockForStart()
-        var appendEnd = true
 
         repeat {
             var foundData = false
+            var appendEnd = true
             bitstream: for index in bitstream.suffix(from: restartFromIndex).indices {
                 let event = bitstream[index]
                 switch event {

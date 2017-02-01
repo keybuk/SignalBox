@@ -709,8 +709,8 @@ class DriverTests: XCTestCase {
         
         let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
-        XCTAssertEqual(parsed.controlBlocks.count, 8)
-        XCTAssertEqual(parsed.data.count, 14)
+        XCTAssertEqual(parsed.controlBlocks.count, 9)
+        XCTAssertEqual(parsed.data.count, 15)
         
         XCTAssertEqual(parsed.data[0], 0)
 
@@ -743,9 +743,13 @@ class DriverTests: XCTestCase {
         XCTAssertEqual(parsed.data[11], 0)
         XCTAssertEqual(parsed.data[12], 0)
 
-        // Now we've completely output the second loop, we can return back to the start of its own unrolling.
-        XCTAssertEqual(parsed.controlBlocks[7], dataControlBlock(dataAt: 13, length: 1, next: 5))
+        XCTAssertEqual(parsed.controlBlocks[7], dataControlBlock(dataAt: 13, length: 1, next: 8))
         XCTAssertEqual(parsed.data[13], randomWords[2])
+        
+        // End of second loop.
+        // Now we've completely output the second loop, we can return back to the start of its own unrolling.
+        XCTAssertEqual(parsed.controlBlocks[8], endControlBlock(dataAt: 14, next: 5))
+        XCTAssertEqual(parsed.data[14], -1)
     }
 
     /// Test that a loop is unrolled twice rather than resetting back to the start.
@@ -757,8 +761,8 @@ class DriverTests: XCTestCase {
         
         let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
-        XCTAssertEqual(parsed.controlBlocks.count, 7)
-        XCTAssertEqual(parsed.data.count, 12)
+        XCTAssertEqual(parsed.controlBlocks.count, 8)
+        XCTAssertEqual(parsed.data.count, 13)
         
         XCTAssertEqual(parsed.data[0], 0)
 
@@ -785,11 +789,15 @@ class DriverTests: XCTestCase {
         XCTAssertEqual(parsed.data[7], randomWords[1])
         
         // With the GPIO output, this time we can repeat the unrolling that consists simply of the data and the GPIO.
-        XCTAssertEqual(parsed.controlBlocks[6], gpioControlBlock(dataAt: 8, next: 5))
+        XCTAssertEqual(parsed.controlBlocks[6], gpioControlBlock(dataAt: 8, next: 7))
         XCTAssertEqual(parsed.data[8], 1 << 19)
         XCTAssertEqual(parsed.data[9], 0)
         XCTAssertEqual(parsed.data[10], 0)
         XCTAssertEqual(parsed.data[11], 0)
+        
+        // End of second loop
+        XCTAssertEqual(parsed.controlBlocks[7], endControlBlock(dataAt: 12, next: 5))
+        XCTAssertEqual(parsed.data[12], -1)
     }
 
     /// Test that a loop unroll will repeat a single piece of data if necessary to synchornize.
@@ -800,8 +808,8 @@ class DriverTests: XCTestCase {
         
         let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         
-        XCTAssertEqual(parsed.controlBlocks.count, 7)
-        XCTAssertEqual(parsed.data.count, 11)
+        XCTAssertEqual(parsed.controlBlocks.count, 9)
+        XCTAssertEqual(parsed.data.count, 13)
         
         XCTAssertEqual(parsed.data[0], 0)
 
@@ -822,15 +830,23 @@ class DriverTests: XCTestCase {
         XCTAssertEqual(parsed.controlBlocks[4], dataControlBlock(dataAt: 5, length: 1, next: 5))
         XCTAssertEqual(parsed.data[5], randomWords[0])
         
-        XCTAssertEqual(parsed.controlBlocks[5], dataControlBlock(dataAt: 6, length: 1, next: 6))
-        XCTAssertEqual(parsed.data[6], randomWords[0])
+        // End of second loop
+        XCTAssertEqual(parsed.controlBlocks[5], endControlBlock(dataAt: 6, next: 6))
+        XCTAssertEqual(parsed.data[6], -1)
+
+        XCTAssertEqual(parsed.controlBlocks[6], dataControlBlock(dataAt: 7, length: 1, next: 7))
+        XCTAssertEqual(parsed.data[7], randomWords[0])
         
-        // Since now every other data can be followed by a GPIO event, we repeat the previous one.
-        XCTAssertEqual(parsed.controlBlocks[6], gpioControlBlock(dataAt: 7, next: 5))
-        XCTAssertEqual(parsed.data[7], 1 << 19)
-        XCTAssertEqual(parsed.data[8], 0)
+        // Now we've output enough data to do the GPIO event.
+        XCTAssertEqual(parsed.controlBlocks[7], gpioControlBlock(dataAt: 8, next: 8))
+        XCTAssertEqual(parsed.data[8], 1 << 19)
         XCTAssertEqual(parsed.data[9], 0)
         XCTAssertEqual(parsed.data[10], 0)
+        XCTAssertEqual(parsed.data[11], 0)
+        
+        // End of third loop. Now each loop is a single data followed by a GPIO event, so we can loop back to that entry.
+        XCTAssertEqual(parsed.controlBlocks[8], endControlBlock(dataAt: 12, next: 6))
+        XCTAssertEqual(parsed.data[12], -1)
     }
 
     
