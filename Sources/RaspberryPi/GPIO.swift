@@ -136,9 +136,9 @@ public struct GPIOBitField : Collection {
         }
     }
     
-    public init() {
-        field0 = 0
-        field1 = 0
+    public init(field0: Int = 0, field1: Int = 0) {
+        self.field0 = field0
+        self.field1 = field1
         reserved = 0
     }
     
