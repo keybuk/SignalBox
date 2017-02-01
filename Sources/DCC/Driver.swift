@@ -14,7 +14,7 @@ import RaspberryPi
 /// Errors that can be thrown by the DMA Driver.
 public enum DriverError : Error {
     
-    /// The DCC Bitstream contains no data to be transmitted.
+    /// Bitstream contains no data to be transmitted.
     case bitstreamContainsNoData
 
 }
@@ -164,9 +164,9 @@ public class Driver {
     ///   Errors from `DriverError`, `MailboxError`, and `RaspberryPiError` on failure.
     public func queue(bitstream: Bitstream, completionHandler: (() -> Void)? = nil) throws {
         var queuedBitstream = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
-        try queuedBitstream.commit()
         queuedBitstream.completionHandler = completionHandler
 
+        try queuedBitstream.commit()
         print("Bitstream duration \(queuedBitstream.duration)µs")
         print("Bus  " + String(UInt(bitPattern: queuedBitstream.busAddress), radix: 16))
         print("Phys " + String(UInt(bitPattern: queuedBitstream.busAddress & ~raspberryPi.uncachedAliasBusAddress), radix: 16))
@@ -316,7 +316,7 @@ struct QueuedBitstream {
     let raspberryPi: RaspberryPi
     
     /// Duration in microseconds of the bitstream.
-    var duration: Float
+    let duration: Float
     
     /// DMA Control Blocks parsed from the bitstream.
     ///
@@ -363,17 +363,14 @@ struct QueuedBitstream {
     /// Adds a DMA Control Block for the end of a bitstream.
     ///
     /// The end control block is used to detect when a bitstream has completely output at least once; it writes the value -1 to the first date item and then points back to the appropriate looping control block. Thus the `Driver` can watch the value of this field, and know that once it changes to below zero, the bitstream has been output at least once and it can move onto the next queued bitstream if one exists.
-    ///
-    /// - Parameters:
-    ///   - next: the index within `controlBlocks` of the control block to loop back to.
-    mutating func addControlBlockForEnd(next nextIndex: Int) {
+    mutating func addControlBlockForEnd() {
         controlBlocks.append(DMAControlBlock(
             transferInformation: [ .waitForWriteResponse ],
             sourceAddress: MemoryLayout<Int>.stride * data.count,
             destinationAddress: 0,
             transferLength: MemoryLayout<Int>.stride,
             tdModeStride: 0,
-            nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * nextIndex))
+            nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1)))
         data.append(-1)
     }
     
@@ -456,6 +453,15 @@ struct QueuedBitstream {
         data.append(gpioClear.field0)
         data.append(gpioClear.field1)
     }
+    
+    /// Adjusts the last control block's `nextControlBlockAddress`.
+    ///
+    /// - Parameters:
+    ///   - next: index of control block to change to.
+    mutating func setNextControlBlock(_ next: Int) {
+        assert(!controlBlocks.isEmpty, "Cannot be called without control blocks.")
+        controlBlocks[controlBlocks.count - 1].nextControlBlockAddress = MemoryLayout<DMAControlBlock>.stride * next
+    }
 
     /// Parse a `Bitstream`.
     ///
@@ -465,10 +471,11 @@ struct QueuedBitstream {
     /// - Throws:
     ///   `DriverError.bitstreamContainsNoData` if `bitstream` is missing data records, which may include within a repeating section. Recommended recovery is to add preamble bits and try again.
     mutating func parseBitstream(_ bitstream: Bitstream) throws  {
-        addControlBlockForStart()
-        
         // Keep track of the current range register value, since we don't know what it was prior to this bitstream beginning, use zero so that the first data event will always set it correctly.
         var range: Int = 0
+        
+        // Also keep track the set of GPIO events that are being delayed so that they line up with the correct PWM word.
+        var delayedEvents = DelayedEvents()
 
         // For efficiency, we collect multiple consecutive words of data together into a single control block, and only break where necessary. For loop unrolling we track the index within the bitstream that the `words` array began, and the set of delayed events at each of those points.
         var words: [Int] = []
@@ -476,18 +483,19 @@ struct QueuedBitstream {
         var wordsDelayedEvents: [Array.Index: DelayedEvents] = [:]
         
         // As we output control blocks for data, we keep track of the map between index within the bitstream and index within the control blocks array, so we can loop back to them. After we exit the loop, the `loopControlBlockIndex` contains the appropraite control block index for the end control block.
-        var controlBlockIndex: [Array.Index: Int] = [:]
-        var loopControlBlockIndex = 0
-
-        // Track the set of GPIO events that are being delayed so that they line up with the correct PWM word.
-        var delayedEvents = DelayedEvents()
-
+        var controlBlockIndexes: [Array.Index: Int] = [:]
+        var loopControlBlockIndex = -1
+        
         // Usually we loop through the entire bitstream, but if the bitstream contains a repeating section marker, we only loop through the latter part on subsequent iterations.
         var restartFromIndex = bitstream.startIndex
-    
-        unroll: while true {
+        
+        // Write out the start control block, and then track whether we've written out the end control block yet; we only ever want to write one.
+        addControlBlockForStart()
+        var appendEnd = true
+
+        repeat {
             var foundData = false
-            for index in bitstream.suffix(from: restartFromIndex).indices {
+            bitstream: for index in bitstream.suffix(from: restartFromIndex).indices {
                 let event = bitstream[index]
                 switch event {
                 case let .data(word: word, size: size):
@@ -498,15 +506,17 @@ struct QueuedBitstream {
                         previousDelayedEvents == delayedEvents
                     {
                         // Generally we expect that to mean that this data began a control block in the prior iteration, in which case that control block becomes our loop target and we're done.
-                        if let previousControlBlockIndex = controlBlockIndex[index] {
+                        if let previousControlBlockIndex = controlBlockIndexes[index] {
                             loopControlBlockIndex = previousControlBlockIndex
-                            break unroll
+                            appendEnd = false
+                            break bitstream
                         }
                         
                         // But it can also mean that we've consumed nothing but data and looped back to ourselves, in which case we just break out knowing we'll write out that data, and set that to be the loop target.
                         if index == wordsIndex {
                             loopControlBlockIndex = controlBlocks.count
-                            break unroll
+                            appendEnd = false
+                            break bitstream
                         }
                     }
                     
@@ -526,7 +536,7 @@ struct QueuedBitstream {
                     }
                     
                     // Output the control block, and record the index for it.
-                    controlBlockIndex[wordsIndex] = controlBlocks.count
+                    controlBlockIndexes[wordsIndex] = controlBlocks.count
                     addControlBlockForData(words)
                     words.removeAll()
                     
@@ -547,24 +557,31 @@ struct QueuedBitstream {
                     // Adjust the loop so that we skip past ourselves on the next iteration.
                     restartFromIndex = bitstream.index(after: index)
                     
-                    // If there is pending data, we write it out here; this isn't strictly necessary because it'll happen anyway, but it results in a nice clean data break at the loop point and avoids unnecessary unrolling. We cheat and don't bother with the `controlBlockIndex` and `wordsDelayedEvents` arrays here because we know that we'll never come back to them.
+                    // If there is pending data, we write it out here; this isn't strictly necessary because it'll happen anyway, but it results in a nice clean data break at the loop point and avoids unnecessary unrolling.
                     if !words.isEmpty {
+                        controlBlockIndexes[wordsIndex] = controlBlocks.count
                         addControlBlockForData(words)
                         words.removeAll()
                     }
                 }
             }
             
+            if !words.isEmpty {
+                // Some trailing words in the bitstream need to be written out.
+                controlBlockIndexes[wordsIndex] = controlBlocks.count
+                addControlBlockForData(words)
+                words.removeAll()
+            }
+
+            if appendEnd {
+                addControlBlockForEnd()
+                appendEnd = false
+            }
+            
             guard foundData else { throw DriverError.bitstreamContainsNoData }
-        }
+        } while loopControlBlockIndex < 0
         
-        if !words.isEmpty {
-            // Some trailing words in the bitstream need to be written out.
-            addControlBlockForData(words)
-            words.removeAll()
-        }
-        
-        addControlBlockForEnd(next: loopControlBlockIndex)
+        setNextControlBlock(loopControlBlockIndex)
     }
     
     /// Memory region containing copy of bitstream in uncached memory.
