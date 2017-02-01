@@ -1088,6 +1088,206 @@ class DriverTests: XCTestCase {
     }
     
     
+    // MARK: Functional tests
+    
+    /// Test with an operations mode packet.
+    func testParseBitstreamOperationsMode() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(operationsModePacket: .speed28Step(address: 3, direction: .forward, speed: 14))
+        
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.controlBlocks.count, 15)
+        XCTAssertEqual(parsed.data.count, 45)
+        
+        XCTAssertEqual(parsed.data[0], 0)
+        
+        XCTAssertEqual(parsed.controlBlocks[0], startControlBlock(dataAt: 1, next: 1))
+        XCTAssertEqual(parsed.data[1], 1)
+
+        XCTAssertEqual(parsed.controlBlocks[1], dataControlBlock(dataAt: 2, length: 1, next: 2))
+        XCTAssertEqual(parsed.data[2], Int(bitPattern: 0b11110000111100001111000011110000))
+
+        XCTAssertEqual(parsed.controlBlocks[2], rangeControlBlock(rangeAt: 3, next: 3))
+        XCTAssertEqual(parsed.data[3], 32)
+
+        XCTAssertEqual(parsed.controlBlocks[3], dataControlBlock(dataAt: 4, length: 13, next: 4))
+        XCTAssertEqual(parsed.data[4],  Int(bitPattern: 0b11110000111100001111000011110000))
+        XCTAssertEqual(parsed.data[5],  Int(bitPattern: 0b11110000111100001111000011110000))
+        XCTAssertEqual(parsed.data[6],  Int(bitPattern: 0b11110000111100001111111000000011))
+        XCTAssertEqual(parsed.data[7],  Int(bitPattern: 0b11111000000011111110000000111111))
+        XCTAssertEqual(parsed.data[8],  Int(bitPattern: 0b10000000111111100000001111111000))
+        XCTAssertEqual(parsed.data[9],  Int(bitPattern: 0b00001111111000000011110000111100))
+        XCTAssertEqual(parsed.data[10], Int(bitPattern: 0b00111111100000001111111000000011))
+        XCTAssertEqual(parsed.data[11], Int(bitPattern: 0b11000011110000111100001111000011))
+        XCTAssertEqual(parsed.data[12], Int(bitPattern: 0b11111000000011111110000000111111))
+        XCTAssertEqual(parsed.data[13], Int(bitPattern: 0b10000000111111100000001111111000))
+        XCTAssertEqual(parsed.data[14], Int(bitPattern: 0b00001111000011110000111100001111))
+        XCTAssertEqual(parsed.data[15], Int(bitPattern: 0b00001111111000000011110000111100))
+        XCTAssertEqual(parsed.data[16], Int(bitPattern: 0b001111000011) << 20)
+        
+        XCTAssertEqual(parsed.controlBlocks[4], rangeControlBlock(rangeAt: 17, next: 5))
+        XCTAssertEqual(parsed.data[17], 12)
+        
+        // Delayed RailCom Cutout start aligned here.
+        XCTAssertEqual(parsed.controlBlocks[5], dataControlBlock(dataAt: 18, length: 1, next: 6))
+        XCTAssertEqual(parsed.data[18], Int(bitPattern: 0b110000111100001111000011110000) << 2) // 30
+
+        XCTAssertEqual(parsed.controlBlocks[6], rangeControlBlock(rangeAt: 19, next: 7))
+        XCTAssertEqual(parsed.data[19], 30)
+        
+        // End of first loop.
+        // Delayed RailCom Cutout end aligned here.
+        XCTAssertEqual(parsed.controlBlocks[7], endControlBlock(dataAt: 20, next: 8))
+        XCTAssertEqual(parsed.data[20], -1)
+        
+        // Unroll of loop begins here.
+        // The first data item is enough to end the delayed RailCom cutout start, so and also needs a range.
+        XCTAssertEqual(parsed.controlBlocks[8], dataControlBlock(dataAt: 21, length: 1, next: 9))
+        XCTAssertEqual(parsed.data[21], Int(bitPattern: 0b11110000111100001111000011110000))
+
+        XCTAssertEqual(parsed.controlBlocks[9], rangeControlBlock(rangeAt: 22, next: 10))
+        XCTAssertEqual(parsed.data[22], 32)
+
+        XCTAssertEqual(parsed.controlBlocks[10], gpioControlBlock(dataAt: 23, next: 11))
+        XCTAssertEqual(parsed.data[23], 0)
+        XCTAssertEqual(parsed.data[24], 0)
+        XCTAssertEqual(parsed.data[25], 1 << 17)
+        XCTAssertEqual(parsed.data[26], 0)
+        
+        // One more data is enough to end the delayed RailCom cutout end.
+        XCTAssertEqual(parsed.controlBlocks[11], dataControlBlock(dataAt: 27, length: 1, next: 12))
+        XCTAssertEqual(parsed.data[27], Int(bitPattern: 0b11110000111100001111000011110000))
+
+        XCTAssertEqual(parsed.controlBlocks[12], gpioControlBlock(dataAt: 28, next: 13))
+        XCTAssertEqual(parsed.data[28], 1 << 17)
+        XCTAssertEqual(parsed.data[29], 0)
+        XCTAssertEqual(parsed.data[30], 0)
+        XCTAssertEqual(parsed.data[31], 0)
+        
+        // We now have to keep unrolling forwards until we reach the first data that we can loop to, which is where we broke for the RailCom Cutout start.
+        XCTAssertEqual(parsed.controlBlocks[13], dataControlBlock(dataAt: 32, length: 12, next: 14))
+        XCTAssertEqual(parsed.data[32], Int(bitPattern: 0b11110000111100001111000011110000))
+        XCTAssertEqual(parsed.data[33], Int(bitPattern: 0b11110000111100001111111000000011))
+        XCTAssertEqual(parsed.data[34], Int(bitPattern: 0b11111000000011111110000000111111))
+        XCTAssertEqual(parsed.data[35], Int(bitPattern: 0b10000000111111100000001111111000))
+        XCTAssertEqual(parsed.data[36], Int(bitPattern: 0b00001111111000000011110000111100))
+        XCTAssertEqual(parsed.data[37], Int(bitPattern: 0b00111111100000001111111000000011))
+        XCTAssertEqual(parsed.data[38], Int(bitPattern: 0b11000011110000111100001111000011))
+        XCTAssertEqual(parsed.data[39], Int(bitPattern: 0b11111000000011111110000000111111))
+        XCTAssertEqual(parsed.data[40], Int(bitPattern: 0b10000000111111100000001111111000))
+        XCTAssertEqual(parsed.data[41], Int(bitPattern: 0b00001111000011110000111100001111))
+        XCTAssertEqual(parsed.data[42], Int(bitPattern: 0b00001111111000000011110000111100))
+        XCTAssertEqual(parsed.data[43], Int(bitPattern: 0b001111000011) << 20)
+        
+        XCTAssertEqual(parsed.controlBlocks[14], rangeControlBlock(rangeAt: 44, next: 5))
+        XCTAssertEqual(parsed.data[44], 12)
+    }
+    
+    /// Test with an operations mode packet marked for debugging.
+    func testParseBitstreamOperationsModeWithDebug() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(operationsModePacket: .speed28Step(address: 3, direction: .forward, speed: 14), debug: true)
+        
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.controlBlocks.count, 21)
+        XCTAssertEqual(parsed.data.count, 41)
+        
+        XCTAssertEqual(parsed.data[0], 0)
+        
+        XCTAssertEqual(parsed.controlBlocks[0], startControlBlock(dataAt: 1, next: 1))
+        XCTAssertEqual(parsed.data[1], 1)
+        
+        XCTAssertEqual(parsed.controlBlocks[1], dataControlBlock(dataAt: 2, length: 1, next: 2))
+        XCTAssertEqual(parsed.data[2], Int(bitPattern: 0b11110000111100001111000011110000))
+        
+        XCTAssertEqual(parsed.controlBlocks[2], rangeControlBlock(rangeAt: 3, next: 3))
+        XCTAssertEqual(parsed.data[3], 32)
+
+        XCTAssertEqual(parsed.controlBlocks[3], dataControlBlock(dataAt: 4, length: 3, next: 4))
+        XCTAssertEqual(parsed.data[4], Int(bitPattern: 0b11110000111100001111000011110000))
+        XCTAssertEqual(parsed.data[5], Int(bitPattern: 0b11110000111100001111000011110000))
+        XCTAssertEqual(parsed.data[6], Int(bitPattern: 0b1111000011110000) << 16)
+        
+        XCTAssertEqual(parsed.controlBlocks[4], rangeControlBlock(rangeAt: 7, next: 5))
+        XCTAssertEqual(parsed.data[7], 16)
+        
+        // Delayed Debug start aligned here.
+        XCTAssertEqual(parsed.controlBlocks[5], dataControlBlock(dataAt: 8, length: 1, next: 6))
+        XCTAssertEqual(parsed.data[8], Int(bitPattern: 0b11111110000000111111100000001111))
+
+        XCTAssertEqual(parsed.controlBlocks[6], rangeControlBlock(rangeAt: 9, next: 7))
+        XCTAssertEqual(parsed.data[9], 32)
+
+        XCTAssertEqual(parsed.controlBlocks[7], dataControlBlock(dataAt: 10, length: 1, next: 8))
+        XCTAssertEqual(parsed.data[10], Int(bitPattern: 0b11100000001111111000000011111110))
+
+        XCTAssertEqual(parsed.controlBlocks[8], gpioControlBlock(dataAt: 11, next: 9))
+        XCTAssertEqual(parsed.data[11], 1 << 19)
+        XCTAssertEqual(parsed.data[12], 0)
+        XCTAssertEqual(parsed.data[13], 0)
+        XCTAssertEqual(parsed.data[14], 0)
+
+        XCTAssertEqual(parsed.controlBlocks[9], dataControlBlock(dataAt: 15, length: 8, next: 10))
+        XCTAssertEqual(parsed.data[15], Int(bitPattern: 0b00000011111110000000111111100000))
+        XCTAssertEqual(parsed.data[16], Int(bitPattern: 0b00111100001111000011111110000000))
+        XCTAssertEqual(parsed.data[17], Int(bitPattern: 0b11111110000000111100001111000011))
+        XCTAssertEqual(parsed.data[18], Int(bitPattern: 0b11000011110000111111100000001111))
+        XCTAssertEqual(parsed.data[19], Int(bitPattern: 0b11100000001111111000000011111110))
+        XCTAssertEqual(parsed.data[20], Int(bitPattern: 0b00000011111110000000111100001111))
+        XCTAssertEqual(parsed.data[21], Int(bitPattern: 0b00001111000011110000111111100000))
+        XCTAssertEqual(parsed.data[22], Int(bitPattern: 0b0011110000111100001111000011) << 4)
+        
+        XCTAssertEqual(parsed.controlBlocks[10], rangeControlBlock(rangeAt: 23, next: 11))
+        XCTAssertEqual(parsed.data[23], 28)
+        
+        // Delayed RailCom Cutout start aligned here.
+        XCTAssertEqual(parsed.controlBlocks[11], dataControlBlock(dataAt: 24, length: 1, next: 12))
+        XCTAssertEqual(parsed.data[24], Int(bitPattern: 0b110000111100001111000011110000) << 2)
+        
+        XCTAssertEqual(parsed.controlBlocks[12], rangeControlBlock(rangeAt: 25, next: 13))
+        XCTAssertEqual(parsed.data[25], 30)
+        
+        // End of first loop.
+        // Delayed RailCom Cutout end, and Debug end, aligned here.
+        XCTAssertEqual(parsed.controlBlocks[13], endControlBlock(dataAt: 26, next: 14))
+        XCTAssertEqual(parsed.data[26], -1)
+        
+        // Unroll of loop begins here.
+        // The first data item is enough to end the delayed RailCom cutout start, so and also needs a range.
+        XCTAssertEqual(parsed.controlBlocks[14], dataControlBlock(dataAt: 27, length: 1, next: 15))
+        XCTAssertEqual(parsed.data[27], Int(bitPattern: 0b11110000111100001111000011110000))
+        
+        XCTAssertEqual(parsed.controlBlocks[15], rangeControlBlock(rangeAt: 28, next: 16))
+        XCTAssertEqual(parsed.data[28], 32)
+        
+        XCTAssertEqual(parsed.controlBlocks[16], gpioControlBlock(dataAt: 29, next: 17))
+        XCTAssertEqual(parsed.data[29], 0)
+        XCTAssertEqual(parsed.data[30], 0)
+        XCTAssertEqual(parsed.data[31], 1 << 17)
+        XCTAssertEqual(parsed.data[32], 0)
+        
+        // One more data is enough to end the delayed RailCom cutout end, and Debug end.
+        XCTAssertEqual(parsed.controlBlocks[17], dataControlBlock(dataAt: 33, length: 1, next: 18))
+        XCTAssertEqual(parsed.data[33], Int(bitPattern: 0b11110000111100001111000011110000))
+        
+        XCTAssertEqual(parsed.controlBlocks[18], gpioControlBlock(dataAt: 34, next: 19))
+        XCTAssertEqual(parsed.data[34], 1 << 17)
+        XCTAssertEqual(parsed.data[35], 0)
+        XCTAssertEqual(parsed.data[36], 1 << 19)
+        XCTAssertEqual(parsed.data[37], 0)
+        
+        // We now have to keep unrolling forwards until we reach the first data that we can loop to, which is where we broke for the Debug start.
+        XCTAssertEqual(parsed.controlBlocks[19], dataControlBlock(dataAt: 38, length: 2, next: 20))
+        XCTAssertEqual(parsed.data[38], Int(bitPattern: 0b11110000111100001111000011110000))
+        XCTAssertEqual(parsed.data[39], Int(bitPattern: 0b1111000011110000) << 16)
+
+        XCTAssertEqual(parsed.controlBlocks[20], rangeControlBlock(rangeAt: 40, next: 5))
+        XCTAssertEqual(parsed.data[40], 16)
+    }
+
+    
     // MARK: Properties
     
     /// Test that the bitstream duration is copied into the queued bitstream.
