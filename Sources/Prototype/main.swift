@@ -21,34 +21,34 @@ let stopPacket: Packet = .stop28Step(address: locoAddress, direction: .ignore)
 func functionPacket(_ function: Int, value: Bool) -> Packet {
     switch function {
     case 0:
-        return .function0To4(address: locoAddress, headlight: true, f1: false, f2: false, f3: false, f4: false)
+        return .function0To4(address: locoAddress, headlight: value, f1: false, f2: false, f3: false, f4: false)
 
     case 1:
-        return .function0To4(address: locoAddress, headlight: false, f1: true, f2: false, f3: false, f4: false)
+        return .function0To4(address: locoAddress, headlight: false, f1: value, f2: false, f3: false, f4: false)
     case 2:
-        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: true, f3: false, f4: false)
+        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: value, f3: false, f4: false)
     case 3:
-        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: false, f3: true, f4: false)
+        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: false, f3: value, f4: false)
     case 4:
-        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: false, f3: false, f4: true)
+        return .function0To4(address: locoAddress, headlight: false, f1: false, f2: false, f3: false, f4: value)
 
     case 5:
-        return .function5To8(address: locoAddress, f5: true, f6: false, f7: false, f8: false)
+        return .function5To8(address: locoAddress, f5: value, f6: false, f7: false, f8: false)
     case 6:
-        return .function5To8(address: locoAddress, f5: false, f6: true, f7: false, f8: false)
+        return .function5To8(address: locoAddress, f5: false, f6: value, f7: false, f8: false)
     case 7:
-        return .function5To8(address: locoAddress, f5: false, f6: false, f7: true, f8: false)
+        return .function5To8(address: locoAddress, f5: false, f6: false, f7: value, f8: false)
     case 8:
-        return .function5To8(address: locoAddress, f5: false, f6: false, f7: false, f8: true)
+        return .function5To8(address: locoAddress, f5: false, f6: false, f7: false, f8: value)
 
     case 9:
-        return .function9To12(address: locoAddress, f9: true, f10: false, f11: false, f12: false)
+        return .function9To12(address: locoAddress, f9: value, f10: false, f11: false, f12: false)
     case 10:
-        return .function9To12(address: locoAddress, f9: false, f10: true, f11: false, f12: false)
+        return .function9To12(address: locoAddress, f9: false, f10: value, f11: false, f12: false)
     case 11:
-        return .function9To12(address: locoAddress, f9: false, f10: false, f11: true, f12: false)
+        return .function9To12(address: locoAddress, f9: false, f10: false, f11: value, f12: false)
     case 12:
-        return .function9To12(address: locoAddress, f9: false, f10: false, f11: false, f12: true)
+        return .function9To12(address: locoAddress, f9: false, f10: false, f11: false, f12: value)
         
     default:
         return .idle
