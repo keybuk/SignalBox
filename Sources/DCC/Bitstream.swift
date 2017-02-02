@@ -6,6 +6,7 @@
 //
 //
 
+
 /// Bitstream serializes logical DCC packets into a physical bitstream.
 ///
 /// Each physical bit within the bitstream has a duration of `bitDuration`, passed during initialization. A physical bit value of 1 means the output will be +3.3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
@@ -17,7 +18,7 @@
 /// Additional events such as the RailCom cutout period, and a debug packet period, are included in the bitstream. These markers are placed in the stream prior to the data to which they should be synchronized. The durations of the RailCom cutout confirm to NMRA S-9.3.2.
 ///
 /// This bitstream can be passed to a `Driver`.
-public struct Bitstream : Collection {
+public struct Bitstream : Collection, CustomDebugStringConvertible {
     
     /// Recommended duration in microseconds of the high and low parts of a one bit.
     ///
@@ -400,8 +401,32 @@ public struct Bitstream : Collection {
         
         appendRailComCutout(debug: debug)
     }
+    
+    public var debugDescription: String {
+        var description = "Bitstream:\n"
+        
+        for event in events {
+            switch event {
+            case let .data(word: word, size: size):
+                description += "  \(String(binaryValueOf: word >> (wordSize - size), length: size))\n"
+            case .railComCutoutStart:
+                description += "  ↓ RailCom\n"
+            case .railComCutoutEnd:
+                description += "  ↑ RailCom\n"
+            case .debugStart:
+                description += "  ↑ Debug\n"
+            case .debugEnd:
+                description += "  ↓ Debug\n"
+            case .loopStart:
+                description += "  ↬ Loop start\n"
+            }
+        }
+        
+        return description
+    }
 
 }
+
 
 /// Event than can occur within the DCC bitstream.
 public enum BitstreamEvent : Equatable {
@@ -437,16 +462,33 @@ public enum BitstreamEvent : Equatable {
             return true
         case (.loopStart, .loopStart):
             return true
+        case (.breakpoint, .breakpoint):
+            return true
 
         case (.data(_, _), _),
              (.railComCutoutStart, _),
              (.railComCutoutEnd, _),
              (.debugStart, _),
              (.debugEnd, _),
-             (.loopStart, _):
+             (.loopStart, _),
+             (.breakpoint, _):
             return false
         }
     }
 
 }
 
+
+extension String {
+    
+    /// Initializes a String containing the binary value of an integer, padded to a given length.
+    init(binaryValueOf value: Int, length: Int) {
+        self = String(UInt(bitPattern: value), radix: 2).leftPadding(toLength: length, withPad: "0")
+    }
+
+    /// Returns a new string formed from the String by inserting as many occurrences as necessary of a given pad string to the start.
+    func leftPadding(toLength length: Int, withPad character: Character) -> String {
+        return String(repeating: String(character), count: length - self.characters.count) + self
+    }
+    
+}
