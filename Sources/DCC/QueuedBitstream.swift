@@ -15,6 +15,9 @@ public enum QueuedBitstreamError : Error {
     /// Bitstream contains no data to be transmitted.
     case containsNoData
     
+    /// Bitstream begins with a breakpoint.
+    case breakpointAtStart
+
 }
 
 
@@ -49,6 +52,9 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     ///
     /// The first value is always the flag used by the start and end control blocks and begins as zero.
     public private(set) var data: [Int] = [ 0 ]
+    
+    /// Breakpoints that were present in the bitstream.
+    public private(set) var breakpoints: [Breakpoint] = []
     
     /// Optional completion handler associated with the bitstream.
     public var completionHandler: (() -> Void)?
@@ -181,34 +187,129 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     /// Adjusts the last control block's `nextControlBlockAddress`.
     ///
     /// - Parameters:
-    ///   - next: index of control block to change to.
+    ///   - next: offset of control block to change to.
     mutating func setNextControlBlock(_ next: Int) {
         assert(!controlBlocks.isEmpty, "Cannot be called without control blocks.")
-        controlBlocks[controlBlocks.count - 1].nextControlBlockAddress = MemoryLayout<DMAControlBlock>.stride * next
+
+        controlBlocks[controlBlocks.index(before: controlBlocks.endIndex)].nextControlBlockAddress = MemoryLayout<DMAControlBlock>.stride * next
     }
     
+    /// Offsets of control block written out for the bitstream.
+    ///
+    /// This is indexed by `BitstreamState`, a structure that rolls up the combination of the index within the bitstream, current range value, and set of delayed events. This ensures that a control block is only used if it is an exact match.
+    ///
+    /// Note that `BitstreamState` considers a `range` of 0 in this tructure to be equal to anything, since it only occurs for the first data and is always followed by a range change.
+    var controlBlockOffsets: [BitstreamState: Int] = [:]
+    
+    /// Helper structure to encapsulate the state of the bitstream.
+    ///
+    /// Two bitstream states are considered identical if they have the same index with in the bitstream, the same set of delayed events, and either the same range or the left hand side has a range of 0.
+    /// This special case exists only for the very first data block, and allows it to match itself later on (either when unrolling or transferring) when the range is known—this is safe because the very first data block is always followed by a range change anyway.
+    struct BitstreamState : Hashable {
+        
+        /// Index within the bitstream.
+        let index: Array<Bitstream>.Index
+        
+        /// Current value of the range, or 0 to match anything.
+        let range: Int
+        
+        /// Set of delayed events.
+        let delayedEvents: DelayedEvents
+        
+        var hashValue: Int {
+            // Range is not included in the hash value since it has unusual equality rules.
+            return index.hashValue ^ delayedEvents.hashValue
+        }
+        
+        static func ==(lhs: BitstreamState, rhs: BitstreamState) -> Bool {
+            return lhs.index == rhs.index && lhs.delayedEvents == rhs.delayedEvents && (lhs.range == rhs.range || lhs.range == 0)
+        }
+        
+    }
+
+    /// Helper structure to encapsulate an ordered queue of delayed `BitstreamEvent`.
+    struct DelayedEvents : Hashable {
+        
+        /// Number of DREQ signals to delay non-PWM events to synchronize with the PWM output.
+        ///
+        /// Writing to the PWM FIFO does not immediately result in output, instead the word that we write is first placed into the FIFO, and then next into the PWM's internal queue, before being output. Thus to synchronize an external event, such as a GPIO, with the PWM output we delay it by this many DREQ signals.
+        static let eventDelay = 2
+        
+        /// Set of events being delayed, along with the current delay.
+        var events: [(event: BitstreamEvent, delay: Int)] = []
+        
+        /// Add an event with the default delay.
+        ///
+        /// - Parameters:
+        ///   - event: event to be added.
+        mutating func addEvent(_ event: BitstreamEvent) {
+            events.append((event: event, delay: DelayedEvents.eventDelay))
+        }
+        
+        /// Reduce the delay of all events.
+        ///
+        /// - Returns: the set of events that are now due.
+        mutating func countdown() -> [BitstreamEvent] {
+            var dueEvents: [BitstreamEvent] = []
+            while events.count > dueEvents.count && events[dueEvents.count].delay == 1 {
+                dueEvents.append(events[dueEvents.count].event)
+            }
+            
+            events.removeFirst(dueEvents.count)
+            
+            for index in events.indices {
+                assert(events[index].delay > 1, "events must be sorted in ascending order")
+                events[index] = (event: events[index].event, delay: events[index].delay - 1)
+            }
+            
+            return dueEvents
+        }
+        
+        var hashValue: Int {
+            return events.reduce(0) {
+                $0 ^ $1.event.hashValue ^ $1.delay.hashValue
+            }
+        }
+        
+        static func ==(lhs: DelayedEvents, rhs: DelayedEvents) -> Bool {
+            guard lhs.events.count == rhs.events.count else { return false }
+            
+            for (lhsEvent, rhsEvent) in zip(lhs.events, rhs.events) {
+                guard lhsEvent.event == rhsEvent.event && lhsEvent.delay == rhsEvent.delay else { return false }
+            }
+            
+            return true
+        }
+        
+    }
+
     /// Parse a `Bitstream`.
+    ///
+    /// Outputs a series of control blocks beginning with the start control block, then serializing the bitstream given, then the end control block, and if necessary unrolling the loop so that the output is consistent across delayed events.
+    ///
+    /// This may be called multiple times before calling `commit` to add different start parameters by passing a `breakpoint` to transfer from, these control blocks will jump into any previously output blocks as soon as possible.
     ///
     /// - Parameters:
     ///   - bitstream: the `Bitstream` to be parsed.
+    ///   - breakpoint: optional `Breakpoint` information from another queued bitstream to be resumed from.
     ///
     /// - Throws:
-    ///   `containsNoData` if `bitstream` is missing data records, which may include within a repeating section. Recommended recovery is to add preamble bits and try again.
-    mutating func parseBitstream(_ bitstream: Bitstream) throws  {
+    ///   `DriverError.bitstreamContainsNoData` if `bitstream` is missing data records, which may include within a repeating section. Recommended recovery is to add preamble bits and try again.
+    public mutating func parseBitstream(_ bitstream: Bitstream, transferringFrom breakpoint: Breakpoint? = nil) throws {
+        guard self.memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
+
         // Keep track of the current range register value, since we don't know what it was prior to this bitstream beginning, use zero so that the first data event will always set it correctly.
-        var range: Int = 0
+        var range = breakpoint.map({ $0.range }) ?? 0
         
         // Also keep track the set of GPIO events that are being delayed so that they line up with the correct PWM word.
-        var delayedEvents = DelayedEvents()
+        var delayedEvents = breakpoint.map({ $0.delayedEvents }) ?? DelayedEvents()
         
-        // For efficiency, we collect multiple consecutive words of data together into a single control block, and only break where necessary. For loop unrolling we track the index within the bitstream that the `words` array began, and the set of delayed events at each of those points.
+        // For efficiency, we collect multiple consecutive words of data together into a single control block, and only break where necessary. For loop unrolling we track the bitstream state at the point that the `words` array began.
         var words: [Int] = []
-        var wordsIndex = bitstream.endIndex
-        var wordsDelayedEvents: [Array.Index: DelayedEvents] = [:]
+        var wordsState: BitstreamState?
         
-        // As we output control blocks for data, we keep track of the map between index within the bitstream and index within the control blocks array, so we can loop back to them. After we exit the loop, the `loopControlBlockIndex` contains the appropraite control block index for the end control block.
-        var controlBlockIndexes: [Array.Index: Int] = [:]
-        var loopControlBlockIndex = -1
+        // After we exit the loop, the `loopControlBlockOffset` contains the offset of the appropriate control block index to jump to.
+        var loopControlBlockOffset: Array<DMAControlBlock>.Index? = nil
         
         // Usually we loop through the entire bitstream, but if the bitstream contains a repeating section marker, we only loop through the latter part on subsequent iterations.
         var restartFromIndex = bitstream.startIndex
@@ -225,29 +326,17 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
                 case let .data(word: word, size: size):
                     foundData = true
                     
-                    // We can only break out of the loop here if this data in the prior iteration had the same set of delayed events that we do now.
-                    if let previousDelayedEvents = wordsDelayedEvents[index],
-                        previousDelayedEvents == delayedEvents
-                    {
-                        // Generally we expect that to mean that this data began a control block in the prior iteration, in which case that control block becomes our loop target and we're done.
-                        if let previousControlBlockIndex = controlBlockIndexes[index] {
-                            loopControlBlockIndex = previousControlBlockIndex
-                            appendEnd = false
-                            break bitstream
-                        }
-                        
-                        // But it can also mean that we've consumed nothing but data and looped back to ourselves, in which case we just break out knowing we'll write out that data, and set that to be the loop target.
-                        if index == wordsIndex {
-                            loopControlBlockIndex = controlBlocks.count
-                            appendEnd = false
-                            break bitstream
-                        }
+                    // We can break out of the loop if the bitstream state at this point exactly matches a previous state in which we wrote out a control block, in which case that control block becomes the loop target, and we're done.
+                    let state = BitstreamState(index: index, range: range, delayedEvents: delayedEvents)
+                    if let previousControlBlockOffset = controlBlockOffsets[state] {
+                        loopControlBlockOffset = previousControlBlockOffset
+                        appendEnd = false
+                        break bitstream
                     }
                     
                     // If this data event will begin a new control block, track the index and current set of delayed events for comparison above.
                     if words.isEmpty {
-                        wordsIndex = index
-                        wordsDelayedEvents[wordsIndex] = delayedEvents
+                        wordsState = state
                     }
                     words.append(word)
                     
@@ -260,10 +349,11 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
                     }
                     
                     // Output the control block, and record the index for it.
-                    controlBlockIndexes[wordsIndex] = controlBlocks.count
+                    controlBlockOffsets[wordsState!] = controlBlocks.count
                     addControlBlockForData(words)
                     words.removeAll()
-                    
+                    wordsState = nil
+
                     // Follow with a range change if the size of the final word doesn't match its current value.
                     if size != range {
                         addControlBlockForRange(size)
@@ -283,29 +373,45 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
                     
                     // If there is pending data, we write it out here; this isn't strictly necessary because it'll happen anyway, but it results in a nice clean data break at the loop point and avoids unnecessary unrolling.
                     if !words.isEmpty {
-                        controlBlockIndexes[wordsIndex] = controlBlocks.count
+                        controlBlockOffsets[wordsState!] = controlBlocks.count
                         addControlBlockForData(words)
                         words.removeAll()
+                        wordsState = nil
                     }
+                case .breakpoint:
+                    // If there is pending data, write it out.
+                    if !words.isEmpty {
+                        controlBlockOffsets[wordsState!] = controlBlocks.count
+                        addControlBlockForData(words)
+                        words.removeAll()
+                        wordsState = nil
+                    }
+
+                    guard controlBlocks.count > 1 else { throw QueuedBitstreamError.breakpointAtStart }
+
+                    breakpoints.append(Breakpoint(controlBlockOffset: controlBlocks.count - 1, range: range, delayedEvents: delayedEvents))
                 }
             }
             
             if !words.isEmpty {
                 // Some trailing words in the bitstream need to be written out.
-                controlBlockIndexes[wordsIndex] = controlBlocks.count
+                controlBlockOffsets[wordsState!] = controlBlocks.count
                 addControlBlockForData(words)
                 words.removeAll()
+                wordsState = nil
             }
             
             if appendEnd {
                 addControlBlockForEnd()
+                breakpoints.append(Breakpoint(controlBlockOffset: controlBlocks.count - 1, range: range, delayedEvents: delayedEvents))
+
                 appendEnd = false
             }
             
             guard foundData else { throw QueuedBitstreamError.containsNoData }
-        } while loopControlBlockIndex < 0
+        } while loopControlBlockOffset == nil
         
-        setNextControlBlock(loopControlBlockIndex)
+        setNextControlBlock(loopControlBlockOffset!)
     }
     
     /// Memory region containing copy of bitstream in uncached memory.
@@ -341,6 +447,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         memory.pointer.advanced(by: controlBlocksSize).bindMemory(to: Int.self, capacity: data.count).initialize(from: data)
         
         self.memory = memory
+        self.controlBlockOffsets.removeAll()
     }
     
     /// Bus address of the bitstream in memory.
@@ -404,40 +511,39 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
             dataBase = 0
         }
         
-        for (index, controlBlock) in controlBlocks.enumerated() {
+        for (offset, controlBlock) in controlBlocks.enumerated() {
             let dataIndex = (controlBlock.sourceAddress - dataBase) / MemoryLayout<Int>.stride
             let dataSize = controlBlock.transferLength / MemoryLayout<Int>.stride
             
             let next = (controlBlock.nextControlBlockAddress - controlBlocksBase) / MemoryLayout<DMAControlBlock>.stride
-            
+            let bp = breakpoints.filter({ $0.controlBlockOffset == offset }).isEmpty ? "" : " ◆"
+
             switch controlBlock.destinationAddress {
             case dataBase:
                 // Start or End.
                 switch data[dataIndex] {
                 case 1:
-                    description += "  \(index): Start → \(next)\n"
+                    description += "  \(offset): Start → \(next)\(bp)\n"
                 case -1:
-                    description += "  \(index): End → \(next)\n"
+                    description += "  \(offset): End → \(next)\(bp)\n"
                 default:
-                    description += "  \(index): Unknown start/end \(data[dataIndex]) → \(next)\n"
+                    description += "  \(offset): Unknown start/end \(data[dataIndex]) → \(next)\(bp)\n"
                 }
             case raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset:
                 // PWM Data.
-                description += "  \(index): Data → \(next)\n"
+                description += "  \(offset): Data → \(next)\(bp)\n"
                 for i in dataIndex..<(dataIndex + dataSize) {
-                    let str = String(UInt(bitPattern: data[i]), radix: 2)
-                    let pad = String(repeating: "0", count: wordSize - str.characters.count)
-                    description += "    \(pad)\(str)\n"
+                    description += "    \(String(binaryValueOf: data[i], length: wordSize))\n"
                 }
             case raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset:
                 // PWM Range.
-                description += "  \(index): Range \(data[dataIndex]) → \(next)\n"
+                description += "  \(offset): Range \(data[dataIndex]) → \(next)\(bp)\n"
             case raspberryPi.peripheralBusAddress + GPIO.offset + GPIO.outputSetOffset:
                 // GPIO.
                 let setField = GPIOBitField(field0: data[dataIndex], field1: data[dataIndex + 1])
                 let clearField = GPIOBitField(field0: data[dataIndex + 2], field1: data[dataIndex + 3])
                 
-                description += "  \(index): GPIO → \(next)\n"
+                description += "  \(offset): GPIO → \(next)\(bp)\n"
                 if setField[Driver.railComGpio] {
                     description += "    ↑ RailCom\n"
                 }
@@ -452,7 +558,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
                     description += "    ↓ Debug\n"
                 }
             default:
-                description += "  \(index): Unknown → \(next)\n"
+                description += "  \(offset): Unknown → \(next)\(bp)\n"
             }
         }
         
@@ -461,54 +567,28 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     
 }
 
-/// Ordered queue of delayed `BitstreamEvent`.
+
+/// Breakpoint in a `QueuedBitstream`.
 ///
-/// This is a helper structure used by `QueuedBitstream` to encapsulate its delayed events set, and provide equatability.
-struct DelayedEvents : Equatable {
+/// Collates the location of a breakpooint within a `QueuedBitstream` and the internal state of the bitstraem at that point such that another bitstream can build control blocks to transfer from this point into itself.
+public struct Breakpoint : Hashable {
+
+    /// Offset of the control block that can have its `nextControlBlockAddress` changed.
+    public let controlBlockOffset: Int
+
+    /// PWM Range in effect at this point in the stream.
+    let range: Int
+
+    /// Set of delayed events that are pending at this point in the stream.
+    let delayedEvents: QueuedBitstream.DelayedEvents
     
-    /// Number of DREQ signals to delay non-PWM events to synchronize with the PWM output.
-    ///
-    /// Writing to the PWM FIFO does not immediately result in output, instead the word that we write is first placed into the FIFO, and then next into the PWM's internal queue, before being output. Thus to synchronize an external event, such as a GPIO, with the PWM output we delay it by this many DREQ signals.
-    static let eventDelay = 2
-    
-    /// Set of events being delayed, along with the current delay.
-    var events: [(event: BitstreamEvent, delay: Int)] = []
-    
-    /// Add an event with the default delay.
-    ///
-    /// - Parameters:
-    ///   - event: event to be added.
-    mutating func addEvent(_ event: BitstreamEvent) {
-        events.append((event: event, delay: DelayedEvents.eventDelay))
+    public var hashValue: Int {
+        return controlBlockOffset.hashValue ^ range.hashValue ^ delayedEvents.hashValue
     }
-    
-    /// Reduce the delay of all events.
-    ///
-    /// - Returns: the set of events that are now due.
-    mutating func countdown() -> [BitstreamEvent] {
-        var dueEvents: [BitstreamEvent] = []
-        while events.count > dueEvents.count && events[dueEvents.count].delay == 1 {
-            dueEvents.append(events[dueEvents.count].event)
-        }
-        
-        events.removeFirst(dueEvents.count)
-        
-        for index in events.indices {
-            assert(events[index].delay > 1, "events must be sorted in ascending order")
-            events[index] = (event: events[index].event, delay: events[index].delay - 1)
-        }
-        
-        return dueEvents
+
+    public static func ==(lhs: Breakpoint, rhs: Breakpoint) -> Bool {
+        return lhs.controlBlockOffset == rhs.controlBlockOffset && lhs.range == rhs.range && lhs.delayedEvents == rhs.delayedEvents
     }
-    
-    static func ==(lhs: DelayedEvents, rhs: DelayedEvents) -> Bool {
-        guard lhs.events.count == rhs.events.count else { return false }
-        
-        for (lhsEvent, rhsEvent) in zip(lhs.events, rhs.events) {
-            guard lhsEvent.event == rhsEvent.event && lhsEvent.delay == rhsEvent.delay else { return false }
-        }
-        
-        return true
-    }
-    
+
 }
+

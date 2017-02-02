@@ -1021,6 +1021,391 @@ class QueuedBitstreamTests : XCTestCase {
     }
     
     
+    // MARK: Breakpoints
+    
+    /// Test that a breakpoint is automatically placed pointing at the end control block.
+    func testParseBitstreamWithBreakpointAtEnd() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+
+        XCTAssertEqual(parsed.breakpoints.count, 1)
+        
+        let breakpoint = parsed.breakpoints[0]
+        
+        // Make sure it's an end control block.
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, 0)
+        let dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], -1)
+
+        // Verify the range is correct and delayed events is empty.
+        XCTAssertEqual(breakpoint.range, 32)
+        XCTAssertEqual(breakpoint.delayedEvents, QueuedBitstream.DelayedEvents())
+    }
+    
+    /// Test that a breakpoint at the end carries any alternate range.
+    func testParseBitstreamWithBreakpointAtEndAfterRange() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 24)
+        
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.breakpoints.count, 1)
+        
+        let breakpoint = parsed.breakpoints[0]
+        
+        // Make sure it's an end control block.
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, 0)
+        let dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], -1)
+        
+        // Verify the range is correct and delayed events is empty.
+        XCTAssertEqual(breakpoint.range, 24)
+        XCTAssertEqual(breakpoint.delayedEvents, QueuedBitstream.DelayedEvents())
+    }
+    
+    /// Test that a breakpoint at the end carries any delayed GPIO events.
+    ///
+    /// The GPIO event isn't exactly at the end to avoid the case where loop unrolling leaves us with two copies of the end breakpoint.
+    func testParseBitstreamWithBreakpointAtEndAfterDelayedEvents() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(.debugEnd)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.breakpoints.count, 1)
+        
+        let breakpoint = parsed.breakpoints[0]
+        
+        // Make sure it's an end control block.
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, 0)
+        let dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], -1)
+        
+        // Verify the range is correct and delayed events is empty.
+        XCTAssertEqual(breakpoint.range, 32)
+        XCTAssertEqual(breakpoint.delayedEvents, QueuedBitstream.DelayedEvents(events: [(event: .debugEnd, delay: 1)]))
+    }
+    
+    /// Test that when the end control block is duplicated by GPIO events, the breakpoint is duplicated too.
+    func testParseBitstreamWithBreakpointAtMultipleEndsAfterDelayedEvents() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        bitstream.append(.debugEnd)
+
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.breakpoints.count, 2)
+        
+        var breakpoint = parsed.breakpoints[0]
+        
+        // Make sure it's an end control block.
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, 0)
+        var dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], -1)
+        
+        // Verify the range is correct and delayed events is empty.
+        XCTAssertEqual(breakpoint.range, 32)
+        XCTAssertEqual(breakpoint.delayedEvents, QueuedBitstream.DelayedEvents(events: [(event: .debugEnd, delay: 2)]))
+        
+        // The second should also be an end control block, and otherwise identical.
+        breakpoint = parsed.breakpoints[1]
+        
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, 0)
+        dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], -1)
+        
+        XCTAssertEqual(breakpoint.range, 32)
+        XCTAssertEqual(breakpoint.delayedEvents, QueuedBitstream.DelayedEvents(events: [(event: .debugEnd, delay: 2)]))
+    }
+    
+    /// Test that we can also insert a breakpoint wherever we want.
+    ///
+    /// The breakpoint is attached to the previous event, since that's what will have its nextControlBlockAddress changed.
+    func testParseBitstreamWithBreakpoint() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        bitstream.append(.breakpoint)
+        bitstream.append(physicalBits: randomWords[2], count: 32)
+        
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.breakpoints.count, 2)
+
+        var breakpoint = parsed.breakpoints[0]
+        
+        // It should be attached to the previous data.
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset)
+        var dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], randomWords[1])
+        
+        // Verify the range is correct and delayed events is empty.
+        XCTAssertEqual(breakpoint.range, 32)
+        XCTAssertEqual(breakpoint.delayedEvents, QueuedBitstream.DelayedEvents())
+        
+        // The second should be for the end control block.
+        breakpoint = parsed.breakpoints[1]
+        
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, 0)
+        dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], -1)
+    }
+    
+    /// Test that we can insert a breakpoint after a data with an alternate range.
+    ///
+    /// The breakpoint actually gets attached to the range change, and carries the new range within it.
+    func testParseBitstreamWithBreakpointAfterRange() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 24)
+        bitstream.append(.breakpoint)
+        bitstream.append(physicalBits: randomWords[2], count: 32)
+        
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.breakpoints.count, 2)
+        
+        var breakpoint = parsed.breakpoints[0]
+        
+        // It should be attached to the previous data's range change.
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset)
+        var dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], 24)
+        
+        // Verify the range is correct and delayed events is empty.
+        XCTAssertEqual(breakpoint.range, 24)
+        XCTAssertEqual(breakpoint.delayedEvents, QueuedBitstream.DelayedEvents())
+        
+        // The second should be for the end control block.
+        breakpoint = parsed.breakpoints[1]
+        
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, 0)
+        dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], -1)
+    }
+    
+    /// Test that we can insert a breakpoint after a GPIO event.
+    ///
+    /// The breakpoint gets attached to the data before it, but carries the delayed event with in itself.
+    func testParseBitstreamWithBreakpointAfterDelayedEvent() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        bitstream.append(.debugStart)
+        bitstream.append(.breakpoint)
+        bitstream.append(physicalBits: randomWords[2], count: 32)
+        bitstream.append(physicalBits: randomWords[3], count: 32)
+        
+        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        
+        XCTAssertEqual(parsed.breakpoints.count, 2)
+        
+        var breakpoint = parsed.breakpoints[0]
+        
+        // It should be attached to the previous data.
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset)
+        var dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], randomWords[1])
+        
+        // Verify the range is correct and delayed event carries the debug start.
+        XCTAssertEqual(breakpoint.range, 32)
+        XCTAssertEqual(breakpoint.delayedEvents, QueuedBitstream.DelayedEvents(events: [(event: .debugStart, delay: 2)]))
+        
+        // The second should be for the end control block.
+        breakpoint = parsed.breakpoints[1]
+        
+        XCTAssertGreaterThan(parsed.controlBlocks.count, breakpoint.controlBlockOffset)
+        
+        XCTAssertEqual(parsed.controlBlocks[breakpoint.controlBlockOffset].destinationAddress, 0)
+        dataIndex = parsed.controlBlocks[breakpoint.controlBlockOffset].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed.data[dataIndex], -1)
+    }
+    
+    /// Test that we can call parseBitstream to add entry points for breakpoints in other streams.
+    ///
+    /// An additional start control block is appended that points to the start of the bitstream.
+    func testParseBitstreamTransferringFromBreakpoint() {
+        var bitstream1 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream1.append(physicalBits: randomWords[0], count: 32)
+        bitstream1.append(physicalBits: randomWords[1], count: 32)
+
+        let parsed1 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream1)
+
+        var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream2.append(physicalBits: randomWords[2], count: 32)
+        bitstream2.append(physicalBits: randomWords[3], count: 32)
+        
+        var parsed2 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream2)
+        
+        let controlBlocksBase = parsed2.controlBlocks.count
+        let dataBase = parsed2.data.count
+        
+        try! parsed2.parseBitstream(bitstream2, transferringFrom: parsed1.breakpoints[0])
+        
+        XCTAssertEqual(parsed2.controlBlocks.count, controlBlocksBase + 1)
+        XCTAssertEqual(parsed2.data.count, dataBase + 1)
+
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase], startControlBlock(dataAt: dataBase, next: 1))
+        XCTAssertEqual(parsed2.data[dataBase], 1)
+    }
+    
+    /// Test that we can transfer from a breakpoint that has delayed events pending.
+    ///
+    /// The transfer-in point should end up with an unrolled copy of itself, to clear the delayed events.
+    func testParseBitstreamTransferringFromBreakpointWithDelayedEvents() {
+        var bitstream1 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream1.append(physicalBits: randomWords[0], count: 32)
+        bitstream1.append(physicalBits: randomWords[1], count: 32)
+        bitstream1.append(.debugStart)
+        
+        let parsed1 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream1)
+        
+        var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream2.append(physicalBits: randomWords[2], count: 32)
+        bitstream2.append(physicalBits: randomWords[3], count: 32)
+        
+        var parsed2 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream2)
+        
+        let controlBlocksBase = parsed2.controlBlocks.count
+        let dataBase = parsed2.data.count
+        
+        try! parsed2.parseBitstream(bitstream2, transferringFrom: parsed1.breakpoints[0])
+        
+        XCTAssertEqual(parsed2.controlBlocks.count, controlBlocksBase + 4)
+        XCTAssertEqual(parsed2.data.count, dataBase + 8)
+        
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase], startControlBlock(dataAt: dataBase, next: controlBlocksBase + 1))
+        XCTAssertEqual(parsed2.data[dataBase], 1)
+        
+        // The data is directly unrolled without a range change since the range is known to be consistent.
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase + 1], dataControlBlock(dataAt: dataBase + 1, length: 2, next: controlBlocksBase + 2))
+        XCTAssertEqual(parsed2.data[dataBase + 1], randomWords[2])
+        XCTAssertEqual(parsed2.data[dataBase + 2], randomWords[3])
+        
+        // Then the GPIO is cleared,.
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase + 2], gpioControlBlock(dataAt: dataBase + 3, next: controlBlocksBase + 3))
+        XCTAssertEqual(parsed2.data[dataBase + 3], 1 << 19)
+        XCTAssertEqual(parsed2.data[dataBase + 4], 0)
+        XCTAssertEqual(parsed2.data[dataBase + 5], 0)
+        XCTAssertEqual(parsed2.data[dataBase + 6], 0)
+        
+        // End of the unrolled loop.
+        // This can now loop back to the beginning.
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase + 3], endControlBlock(dataAt: dataBase + 7, next: 1))
+        XCTAssertEqual(parsed2.data[dataBase + 7], -1)
+    }
+    
+    /// Test that we can transfer from a breakpoint that has delayed events pending into a stream which ends with the same set.
+    ///
+    /// Since the same set of delayed events exist at the breakpoint, and at the end of the stream we're transferring into, we can re-use the previous unrolling entirely.
+    func testParseBitstreamTransferringFromBreakpointWithSameDelayedEvents() {
+        var bitstream1 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream1.append(physicalBits: randomWords[0], count: 32)
+        bitstream1.append(physicalBits: randomWords[1], count: 32)
+        bitstream1.append(.debugStart)
+        
+        let parsed1 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream1)
+        
+        var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream2.append(physicalBits: randomWords[2], count: 32)
+        bitstream2.append(physicalBits: randomWords[3], count: 32)
+        bitstream2.append(.debugStart)
+
+        var parsed2 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream2)
+        
+        let controlBlocksBase = parsed2.controlBlocks.count
+        let dataBase = parsed2.data.count
+        
+        try! parsed2.parseBitstream(bitstream2, transferringFrom: parsed1.breakpoints[0])
+        
+        XCTAssertEqual(parsed2.controlBlocks.count, controlBlocksBase + 1)
+        XCTAssertEqual(parsed2.data.count, dataBase + 1)
+        
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase], startControlBlock(dataAt: dataBase, next: 5))
+        XCTAssertEqual(parsed2.data[dataBase], 1)
+    }
+    
+    /// Test that when transferring from one to another, the range is taken into account.
+    ///
+    /// Unlike in the usual loop unrolling case, we can't guarantee that the range is consistent at all points in the stream. So if we take the transfer case above, but change the range of the last value, we shouldn't be able to simply re-use the unrolled loop as the range would now be wrong.
+    func testParseBitstreamTransferringFromBreakpointWithSameDelayedEventsButDifferentRange() {
+        var bitstream1 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream1.append(physicalBits: randomWords[0], count: 32)
+        bitstream1.append(physicalBits: randomWords[1], count: 24)
+        bitstream1.append(.debugStart)
+        
+        let parsed1 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream1)
+        
+        var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream2.append(physicalBits: randomWords[2], count: 32)
+        bitstream2.append(physicalBits: randomWords[3], count: 32)
+        bitstream2.append(.debugStart)
+        
+        var parsed2 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream2)
+        
+        let controlBlocksBase = parsed2.controlBlocks.count
+        let dataBase = parsed2.data.count
+        
+        try! parsed2.parseBitstream(bitstream2, transferringFrom: parsed1.breakpoints[0])
+        
+        XCTAssertEqual(parsed2.controlBlocks.count, controlBlocksBase + 6)
+        XCTAssertEqual(parsed2.data.count, dataBase + 9)
+        
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase], startControlBlock(dataAt: dataBase, next: controlBlocksBase + 1))
+        XCTAssertEqual(parsed2.data[dataBase], 1)
+        
+        // The data is unrolled with a range change, since it's not consistent.
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase + 1], dataControlBlock(dataAt: dataBase + 1, length: 1, next: controlBlocksBase + 2))
+        XCTAssertEqual(parsed2.data[dataBase + 1], randomWords[2])
+        
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase + 2], rangeControlBlock(rangeAt: dataBase + 2, next: controlBlocksBase + 3))
+        XCTAssertEqual(parsed2.data[dataBase + 2], 32)
+        
+        // Since there's still a pending GPIO event, and a pending data for it, we can't jump back to the first block; we have to keep unrolling.
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase + 3], dataControlBlock(dataAt: dataBase + 3, length: 1, next: controlBlocksBase + 4))
+        XCTAssertEqual(parsed2.data[dataBase + 3], randomWords[3])
+        
+        // Then the GPIO is cleared.
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase + 4], gpioControlBlock(dataAt: dataBase + 4, next: controlBlocksBase + 5))
+        XCTAssertEqual(parsed2.data[dataBase + 4], 1 << 19)
+        XCTAssertEqual(parsed2.data[dataBase + 5], 0)
+        XCTAssertEqual(parsed2.data[dataBase + 6], 0)
+        XCTAssertEqual(parsed2.data[dataBase + 7], 0)
+        
+        // End of the unrolled loop.
+        // This can now loop back to the beginning of the unrolled loop (since the event is still pending in our copy).
+        XCTAssertEqual(parsed2.controlBlocks[controlBlocksBase + 5], endControlBlock(dataAt: dataBase + 8, next: 5))
+        XCTAssertEqual(parsed2.data[dataBase + 8], -1)
+    }
+
+
     // MARK: Errors
     
     /// Test that an empty bitstream throws an error.
@@ -1087,6 +1472,41 @@ class QueuedBitstreamTests : XCTestCase {
         }
     }
     
+    /// Test that a bitstream with nothing prior to a breakpoint throws an error.
+    func testParseBitstreamWithNothingBeforeBreakpoint() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(.breakpoint)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+
+        do {
+            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            XCTFail("Parsing should not have been successful")
+        } catch QueuedBitstreamError.breakpointAtStart {
+            // Pass
+        } catch {
+            XCTFail("Unexpected error thrown: \(error)")
+        }
+    }
+    
+    /// Test that a bitstream with no data prior to a breakpoint throws an error.
+    func testParseBitstreamWithoutDataBeforeBreakpoint() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(.debugStart)
+        bitstream.append(.breakpoint)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        
+        do {
+            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            XCTFail("Parsing should not have been successful")
+        } catch QueuedBitstreamError.breakpointAtStart {
+            // Pass
+        } catch {
+            XCTFail("Unexpected error thrown: \(error)")
+        }
+    }
+
     
     // MARK: Functional tests
     
@@ -1481,10 +1901,27 @@ extension QueuedBitstreamTests {
             ("testParseBitstreamGPIOEventUnrollsToRepeatingSection", testParseBitstreamGPIOEventUnrollsToRepeatingSection),
             ("testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection", testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection),
             
+            ("testParseBitstreamWithBreakpointAtEnd", testParseBitstreamWithBreakpointAtEnd),
+            ("testParseBitstreamWithBreakpointAtEndAfterRange", testParseBitstreamWithBreakpointAtEndAfterRange),
+            ("testParseBitstreamWithBreakpointAtEndAfterDelayedEvents", testParseBitstreamWithBreakpointAtEndAfterDelayedEvents),
+            ("testParseBitstreamWithBreakpointAtMultipleEndsAfterDelayedEvents", testParseBitstreamWithBreakpointAtMultipleEndsAfterDelayedEvents),
+            ("testParseBitstreamWithBreakpoint", testParseBitstreamWithBreakpoint),
+            ("testParseBitstreamWithBreakpointAfterRange", testParseBitstreamWithBreakpointAfterRange),
+            ("testParseBitstreamWithBreakpointAfterDelayedEvent", testParseBitstreamWithBreakpointAfterDelayedEvent),
+            ("testParseBitstreamTransferringFromBreakpoint", testParseBitstreamTransferringFromBreakpoint),
+            ("testParseBitstreamTransferringFromBreakpointWithDelayedEvents", testParseBitstreamTransferringFromBreakpointWithDelayedEvents),
+            ("testParseBitstreamTransferringFromBreakpointWithSameDelayedEvents", testParseBitstreamTransferringFromBreakpointWithSameDelayedEvents),
+            ("testParseBitstreamTransferringFromBreakpointWithSameDelayedEventsButDifferentRange", testParseBitstreamTransferringFromBreakpointWithSameDelayedEventsButDifferentRange),
+            
             ("testParseEmptyBitstream", testParseEmptyBitstream),
             ("testParseBitstreamWithoutData", testParseBitstreamWithoutData),
             ("testParseBitstreamWithEmptyRepeatingSection", testParseBitstreamWithEmptyRepeatingSection),
             ("testParseBitstreamWithoutDataInRepeatingSection", testParseBitstreamWithoutDataInRepeatingSection),
+            ("testParseBitstreamWithNothingBeforeBreakpoint", testParseBitstreamWithNothingBeforeBreakpoint),
+            ("testParseBitstreamWithoutDataBeforeBreakpoint", testParseBitstreamWithoutDataBeforeBreakpoint),
+            
+            ("testParseBitstreamOperationsMode", testParseBitstreamOperationsMode),
+            ("testParseBitstreamOperationsModeWithDebug", testParseBitstreamOperationsModeWithDebug),
             
             ("testBitstreamDuration", testBitstreamDuration),
             

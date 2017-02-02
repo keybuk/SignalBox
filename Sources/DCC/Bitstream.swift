@@ -419,6 +419,8 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
                 description += "  ↓ Debug\n"
             case .loopStart:
                 description += "  ↬ Loop start\n"
+            case .breakpoint:
+                description += "  ◆ Breakpoint\n"
             }
         }
         
@@ -429,7 +431,8 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
 
 
 /// Event than can occur within the DCC bitstream.
-public enum BitstreamEvent : Equatable {
+public enum BitstreamEvent : Hashable {
+
     /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than the Bitstream `wordSize`.
     case data(word: Int, size: Int)
     
@@ -445,8 +448,30 @@ public enum BitstreamEvent : Equatable {
     /// The debug packet period should end aligned with the start of the next `.data`.
     case debugEnd
     
-    /// The repeating part of the bitstream begins with the start of the next `.data`.
+    /// The bitstream should repeat from this point rather than the beginning.
     case loopStart
+    
+    /// The bitstream may be broken early at this point after the first full transmission.
+    case breakpoint
+    
+    public var hashValue: Int {
+        switch self {
+        case let .data(word, size):
+            return 0 ^ word ^ size
+        case .railComCutoutStart:
+            return 1
+        case .railComCutoutEnd:
+            return 2
+        case .debugStart:
+            return 3
+        case .debugEnd:
+            return 4
+        case .loopStart:
+            return 5
+        case .breakpoint:
+            return 6
+        }
+    }
     
     public static func ==(lhs: BitstreamEvent, rhs: BitstreamEvent) -> Bool {
         switch (lhs, rhs) {
