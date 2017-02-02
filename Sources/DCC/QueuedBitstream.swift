@@ -486,12 +486,24 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         return uncachedData[0] < 0
     }
     
-    public func transfer(toBusAddress busAddress: Int) {
+    public mutating func transfer(from previousBitstream: QueuedBitstream, into bitstream: Bitstream) throws -> [Int] {
+        var transferOffsets: [Int] = []
+        for breakpoint in previousBitstream.breakpoints {
+            let transferOffset = controlBlocks.count
+            try parseBitstream(bitstream, transferringFrom: breakpoint)
+            transferOffsets.append(transferOffset)
+        }
+        
+        return transferOffsets
+    }
+    
+    public func transfer(to nextBitstream: QueuedBitstream, at transferOffsets: [Int]) {
         guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
-        
+
         let uncachedControlBlocks = memory.pointer.assumingMemoryBound(to: DMAControlBlock.self)
-        
-        uncachedControlBlocks[controlBlocks.count - 1].nextControlBlockAddress = busAddress
+        for (breakpoint, transferOffset) in zip(breakpoints, transferOffsets) {
+            uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = nextBitstream.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffset
+        }
     }
     
     /// A textual representation of this instance, suitable for debugging.
@@ -506,6 +518,8 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         if let memory = memory {
             controlBlocksBase = memory.busAddress
             dataBase = memory.busAddress + MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
+            
+            description += "  committed at " + String(UInt(bitPattern: memory.busAddress), radix: 16) + "\n"
         } else {
             controlBlocksBase = 0
             dataBase = 0

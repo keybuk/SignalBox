@@ -70,6 +70,7 @@ startupBitstream.append(.loopStart)
 for _ in 0..<10 {
     startupBitstream.appendPreamble()
     startupBitstream.append(packet: .idle)
+    startupBitstream.append(.breakpoint)
 }
 
 print("One bit has length \(startupBitstream.oneBitLength)b, and duration \(Float(startupBitstream.oneBitLength) * startupBitstream.bitDuration)µs")

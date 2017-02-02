@@ -157,27 +157,41 @@ public class Driver {
     public func queue(bitstream: Bitstream, completionHandler: (() -> Void)? = nil) throws {
         var queuedBitstream = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
         queuedBitstream.completionHandler = completionHandler
-
-        try queuedBitstream.commit()
-        print("Bitstream duration \(queuedBitstream.duration)µs")
-        print("Bus  " + String(UInt(bitPattern: queuedBitstream.busAddress), radix: 16))
-        print("Phys " + String(UInt(bitPattern: queuedBitstream.busAddress & ~raspberryPi.uncachedAliasBusAddress), radix: 16))
         
         // Append the new bitstream to the queue, informing the previous item in the queue to transfer to it, or beginning the new item.
-        dispatchQueue.sync {
-            let previousBitstream = bitstreamQueue.last
-            bitstreamQueue.append(queuedBitstream)
-            
-            if let previousBitstream = previousBitstream {
-                previousBitstream.transfer(toBusAddress: queuedBitstream.busAddress)
+        try dispatchQueue.sync {
+            let removeFirst: Bool
+            if let previousBitstream = bitstreamQueue.last {
+                debugPrint(previousBitstream)
+
+                let transferOffsets = try queuedBitstream.transfer(from: previousBitstream, into: bitstream)
+                try queuedBitstream.commit()
+                
+                if previousBitstream.isRepeating {
+                    previousBitstream.transfer(to: queuedBitstream, at: transferOffsets)
+                } else {
+                    print("Delay transfer")
+                    dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: checkBitstreamCanTransfer(from: previousBitstream, to: queuedBitstream, at: transferOffsets))
+                }
+                
+                removeFirst = true
             } else {
+                try queuedBitstream.commit()
+
                 var dma = raspberryPi.dma(channel: Driver.dmaChannel)
                 dma.controlBlockAddress = queuedBitstream.busAddress
                 dma.controlStatus.insert(.active)
+                
+                removeFirst = false
             }
 
+            bitstreamQueue.append(queuedBitstream)
+            print("Bitstream duration \(queuedBitstream.duration)µs")
+            print("Bus  " + String(UInt(bitPattern: queuedBitstream.busAddress), radix: 16))
+            print("Phys " + String(UInt(bitPattern: queuedBitstream.busAddress & ~raspberryPi.uncachedAliasBusAddress), radix: 16))
+
             // Schedule a repeating check for the new bitstream beginning transmission.
-            dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: checkBitstreamIsTransmitting(queuedBitstream, removeFirst: previousBitstream != nil))
+            dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: checkBitstreamIsTransmitting(queuedBitstream, removeFirst: removeFirst))
         }
     }
     
@@ -234,6 +248,17 @@ public class Driver {
             if let completionHandler = queuedBitstream.completionHandler {
                 completionHandler()
             }
+        }
+    }
+    
+    func checkBitstreamCanTransfer(from previousBitstream: QueuedBitstream, to queuedBitstream: QueuedBitstream, at transferOffsets: [Int]) -> (() -> Void) {
+        return {
+            guard self.isRunning else { return }
+            guard previousBitstream.isRepeating else {
+                self.dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: self.checkBitstreamCanTransfer(from: previousBitstream, to: queuedBitstream, at: transferOffsets))
+                return
+            }
+            previousBitstream.transfer(to: queuedBitstream, at: transferOffsets)
         }
     }
     
