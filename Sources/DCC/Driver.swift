@@ -155,27 +155,24 @@ public class Driver {
     /// - Throws:
     ///   Errors from `DriverError`, `MailboxError`, and `RaspberryPiError` on failure.
     public func queue(bitstream: Bitstream, completionHandler: (() -> Void)? = nil) throws {
-        var queuedBitstream = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
-        queuedBitstream.completionHandler = completionHandler
+        var queuedBitstream = QueuedBitstream(raspberryPi: raspberryPi)
         
         // Append the new bitstream to the queue, informing the previous item in the queue to transfer to it, or beginning the new item.
         try dispatchQueue.sync {
             let removeFirst: Bool
             if let previousBitstream = bitstreamQueue.last {
-                debugPrint(previousBitstream)
-
                 let transferOffsets = try queuedBitstream.transfer(from: previousBitstream, into: bitstream)
                 try queuedBitstream.commit()
                 
                 if previousBitstream.isRepeating {
                     previousBitstream.transfer(to: queuedBitstream, at: transferOffsets)
                 } else {
-                    print("Delay transfer")
                     dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: checkBitstreamCanTransfer(from: previousBitstream, to: queuedBitstream, at: transferOffsets))
                 }
                 
                 removeFirst = true
             } else {
+                try queuedBitstream.parseBitstream(bitstream)
                 try queuedBitstream.commit()
 
                 var dma = raspberryPi.dma(channel: Driver.dmaChannel)
@@ -186,10 +183,12 @@ public class Driver {
             }
 
             bitstreamQueue.append(queuedBitstream)
-            print("Bitstream duration \(queuedBitstream.duration)µs")
+            print("Bitstream duration \(bitstream.duration)µs")
             print("Bus  " + String(UInt(bitPattern: queuedBitstream.busAddress), radix: 16))
             print("Phys " + String(UInt(bitPattern: queuedBitstream.busAddress & ~raspberryPi.uncachedAliasBusAddress), radix: 16))
-
+            debugPrint(queuedBitstream)
+            print()
+            
             // Schedule a repeating check for the new bitstream beginning transmission.
             dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: checkBitstreamIsTransmitting(queuedBitstream, removeFirst: removeFirst))
         }
@@ -223,7 +222,7 @@ public class Driver {
                 self.bitstreamQueue.remove(at: 0)
             }
             
-            self.dispatchQueue.asyncAfter(deadline: .now() + .microseconds(Int(queuedBitstream.duration)), execute: self.checkBitstreamIsRepeating(queuedBitstream))
+            //self.dispatchQueue.asyncAfter(deadline: .now() + .microseconds(Int(queuedBitstream.duration)), execute: self.checkBitstreamIsRepeating(queuedBitstream))
         }
     }
     
@@ -245,9 +244,9 @@ public class Driver {
                 return
             }
             
-            if let completionHandler = queuedBitstream.completionHandler {
-                completionHandler()
-            }
+            //if let completionHandler = queuedBitstream.completionHandler {
+            //    completionHandler()
+            //}
         }
     }
     

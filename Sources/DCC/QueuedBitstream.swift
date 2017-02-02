@@ -31,16 +31,9 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     /// Raspberry Pi hardware information.
     public let raspberryPi: RaspberryPi
     
-    /// Duration in microseconds of the bitstream.
-    ///
-    /// This is the expected duration between the start and end control blocks, and does not include any loop unrolling that the queued bitstream has performed.
-    ///
-    /// Copied from the `Bitstream` passed in initialization.
-    public let duration: Float
-    
     /// Size of words.
     ///
-    /// Copied from the `Bitstream` passed in initialization.
+    /// Generally the platform's word size, but can be overriden at initialization for testing purposes.
     let wordSize: Int
     
     /// DMA Control Blocks parsed from the bitstream.
@@ -56,24 +49,13 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     /// Breakpoints that were present in the bitstream.
     public private(set) var breakpoints: [Breakpoint] = []
     
-    /// Optional completion handler associated with the bitstream.
-    public var completionHandler: (() -> Void)?
-    
-    /// Parse a bitstream.
-    ///
-    /// - Parameters:
-    ///   - raspberryPi: Raspberry Pi hardware information.
-    ///   - bitstream: the `Bitstream` to be parsed.
-    ///
-    /// - Throws:
-    ///   `containsNoData` if `bitstream` is missing data records, which may include within a repeating section. Recommended recovery is to add preamble bits and try again.
-    public init(raspberryPi: RaspberryPi, bitstream: Bitstream) throws {
+    init(raspberryPi: RaspberryPi, wordSize: Int) {
         self.raspberryPi = raspberryPi
-        
-        duration = bitstream.duration
-        wordSize = bitstream.wordSize
-        
-        try parseBitstream(bitstream)
+        self.wordSize = wordSize
+    }
+    
+    public init(raspberryPi: RaspberryPi) {
+        self.init(raspberryPi: raspberryPi, wordSize: MemoryLayout<Int>.size * 8)
     }
     
     /// Adds a DMA Control Block for the start of a bitstream.
@@ -293,9 +275,12 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     ///   - bitstream: the `Bitstream` to be parsed.
     ///   - breakpoint: optional `Breakpoint` information from another queued bitstream to be resumed from.
     ///
+    /// - Returns: offset of control block that begins the bitstream.
+    ///
     /// - Throws:
     ///   `DriverError.bitstreamContainsNoData` if `bitstream` is missing data records, which may include within a repeating section. Recommended recovery is to add preamble bits and try again.
-    public mutating func parseBitstream(_ bitstream: Bitstream, transferringFrom breakpoint: Breakpoint? = nil) throws {
+    @discardableResult
+    public mutating func parseBitstream(_ bitstream: Bitstream, transferringFrom breakpoint: Breakpoint? = nil) throws -> Int {
         guard self.memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
 
         // Keep track of the current range register value, since we don't know what it was prior to this bitstream beginning, use zero so that the first data event will always set it correctly.
@@ -314,7 +299,8 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         // Usually we loop through the entire bitstream, but if the bitstream contains a repeating section marker, we only loop through the latter part on subsequent iterations.
         var restartFromIndex = bitstream.startIndex
         
-        // Write out the start control block.
+        // Write out the start control block, and record the offset where we placed it.
+        let startControlBlockOffset = controlBlocks.count
         addControlBlockForStart()
         
         repeat {
@@ -412,6 +398,8 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         } while loopControlBlockOffset == nil
         
         setNextControlBlock(loopControlBlockOffset!)
+        
+        return startControlBlockOffset
     }
     
     /// Memory region containing copy of bitstream in uncached memory.
@@ -489,8 +477,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     public mutating func transfer(from previousBitstream: QueuedBitstream, into bitstream: Bitstream) throws -> [Int] {
         var transferOffsets: [Int] = []
         for breakpoint in previousBitstream.breakpoints {
-            let transferOffset = controlBlocks.count
-            try parseBitstream(bitstream, transferringFrom: breakpoint)
+            let transferOffset = try parseBitstream(bitstream, transferringFrom: breakpoint)
             transferOffsets.append(transferOffset)
         }
         

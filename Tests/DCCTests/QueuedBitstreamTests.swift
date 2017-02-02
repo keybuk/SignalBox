@@ -130,7 +130,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 4)
         XCTAssertEqual(parsed.data.count, 5)
@@ -158,7 +159,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 5)
         XCTAssertEqual(parsed.data.count, 6)
@@ -189,7 +191,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 24)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 7)
@@ -224,7 +227,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 5)
         XCTAssertEqual(parsed.data.count, 7)
@@ -257,7 +261,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 24)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 8)
@@ -285,6 +290,37 @@ class QueuedBitstreamTests : XCTestCase {
     }
     
     
+    // MARK: Return value
+    
+    /// Test that the return value for the first call is zero.
+    func testParseBitstreamReturnValue() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        let offset = try! parsed.parseBitstream(bitstream)
+        
+        XCTAssertEqual(offset, 0)
+    }
+    
+    /// Test that the return value for a second call is the previous count of control blocks.
+    func testParseBitstreamSecondCallReturnValue() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
+        let expectedOffset = parsed.controlBlocks.count
+        
+        let offset = try! parsed.parseBitstream(bitstream)
+        
+        XCTAssertEqual(offset, expectedOffset)
+    }
+
+    
+    
     // MARK: GPIO Events
     
     /// Test that a GPIO event is output two PWM words after its actual position in the bitstream using a GPIO control block.
@@ -295,7 +331,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 11)
@@ -334,7 +371,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 11)
@@ -373,7 +411,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 11)
@@ -412,7 +451,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 11)
@@ -460,7 +500,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(physicalBits: randomWords[3], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 16)
@@ -508,7 +549,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(physicalBits: randomWords[3], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 7)
         XCTAssertEqual(parsed.data.count, 12)
@@ -552,7 +594,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(.debugStart)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 7)
         XCTAssertEqual(parsed.data.count, 12)
@@ -597,7 +640,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(.debugStart)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 9)
         XCTAssertEqual(parsed.data.count, 16)
@@ -652,7 +696,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(.debugStart)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 9)
         XCTAssertEqual(parsed.data.count, 17)
@@ -707,7 +752,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(.debugStart)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 9)
         XCTAssertEqual(parsed.data.count, 15)
@@ -759,7 +805,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(.debugStart)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 8)
         XCTAssertEqual(parsed.data.count, 13)
@@ -806,7 +853,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(.debugStart)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 9)
         XCTAssertEqual(parsed.data.count, 13)
@@ -864,7 +912,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[3], count: 32)
         
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 6)
         XCTAssertEqual(parsed.data.count, 8)
@@ -905,7 +954,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(.debugStart)
         bitstream.append(physicalBits: randomWords[4], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 12)
         XCTAssertEqual(parsed.data.count, 23)
@@ -976,7 +1026,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(physicalBits: randomWords[3], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 9)
         XCTAssertEqual(parsed.data.count, 13)
@@ -1029,7 +1080,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
 
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
 
         XCTAssertEqual(parsed.breakpoints.count, 1)
         
@@ -1053,7 +1105,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 24)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.breakpoints.count, 1)
         
@@ -1080,7 +1133,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(.debugEnd)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.breakpoints.count, 1)
         
@@ -1105,7 +1159,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(.debugEnd)
 
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.breakpoints.count, 2)
         
@@ -1145,7 +1200,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(.breakpoint)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.breakpoints.count, 2)
 
@@ -1182,7 +1238,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(.breakpoint)
         bitstream.append(physicalBits: randomWords[2], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.breakpoints.count, 2)
         
@@ -1221,7 +1278,8 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[2], count: 32)
         bitstream.append(physicalBits: randomWords[3], count: 32)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.breakpoints.count, 2)
         
@@ -1256,13 +1314,15 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream1.append(physicalBits: randomWords[0], count: 32)
         bitstream1.append(physicalBits: randomWords[1], count: 32)
 
-        let parsed1 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream1)
+        var parsed1 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream1.wordSize)
+        try! parsed1.parseBitstream(bitstream1)
 
         var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream2.append(physicalBits: randomWords[2], count: 32)
         bitstream2.append(physicalBits: randomWords[3], count: 32)
         
-        var parsed2 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream2)
+        var parsed2 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream2.wordSize)
+        try! parsed2.parseBitstream(bitstream2)
         
         let controlBlocksBase = parsed2.controlBlocks.count
         let dataBase = parsed2.data.count
@@ -1285,13 +1345,15 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream1.append(physicalBits: randomWords[1], count: 32)
         bitstream1.append(.debugStart)
         
-        let parsed1 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream1)
+        var parsed1 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream1.wordSize)
+        try! parsed1.parseBitstream(bitstream1)
         
         var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream2.append(physicalBits: randomWords[2], count: 32)
         bitstream2.append(physicalBits: randomWords[3], count: 32)
         
-        var parsed2 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream2)
+        var parsed2 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream2.wordSize)
+        try! parsed2.parseBitstream(bitstream2)
         
         let controlBlocksBase = parsed2.controlBlocks.count
         let dataBase = parsed2.data.count
@@ -1331,14 +1393,16 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream1.append(physicalBits: randomWords[1], count: 32)
         bitstream1.append(.debugStart)
         
-        let parsed1 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream1)
+        var parsed1 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream1.wordSize)
+        try! parsed1.parseBitstream(bitstream1)
         
         var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream2.append(physicalBits: randomWords[2], count: 32)
         bitstream2.append(physicalBits: randomWords[3], count: 32)
         bitstream2.append(.debugStart)
 
-        var parsed2 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream2)
+        var parsed2 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream2.wordSize)
+        try! parsed2.parseBitstream(bitstream2)
         
         let controlBlocksBase = parsed2.controlBlocks.count
         let dataBase = parsed2.data.count
@@ -1361,14 +1425,16 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream1.append(physicalBits: randomWords[1], count: 24)
         bitstream1.append(.debugStart)
         
-        let parsed1 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream1)
+        var parsed1 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream1.wordSize)
+        try! parsed1.parseBitstream(bitstream1)
         
         var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream2.append(physicalBits: randomWords[2], count: 32)
         bitstream2.append(physicalBits: randomWords[3], count: 32)
         bitstream2.append(.debugStart)
         
-        var parsed2 = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream2)
+        var parsed2 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream2.wordSize)
+        try! parsed2.parseBitstream(bitstream2)
         
         let controlBlocksBase = parsed2.controlBlocks.count
         let dataBase = parsed2.data.count
@@ -1412,8 +1478,9 @@ class QueuedBitstreamTests : XCTestCase {
     func testParseEmptyBitstream() {
         let bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
         do {
-            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            try parsed.parseBitstream(bitstream)
             XCTFail("Parsing should not have been successful")
         } catch QueuedBitstreamError.containsNoData {
             // Pass
@@ -1427,8 +1494,9 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(.debugStart)
         
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
         do {
-            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            try parsed.parseBitstream(bitstream)
             XCTFail("Parsing should not have been successful")
         } catch QueuedBitstreamError.containsNoData {
             // Pass
@@ -1444,8 +1512,9 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(.loopStart)
         
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
         do {
-            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            try parsed.parseBitstream(bitstream)
             XCTFail("Parsing should not have been successful")
         } catch QueuedBitstreamError.containsNoData {
             // Pass
@@ -1462,8 +1531,9 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(.loopStart)
         bitstream.append(.debugStart)
         
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
         do {
-            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            try parsed.parseBitstream(bitstream)
             XCTFail("Parsing should not have been successful")
         } catch QueuedBitstreamError.containsNoData {
             // Pass
@@ -1479,8 +1549,9 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
 
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
         do {
-            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            try parsed.parseBitstream(bitstream)
             XCTFail("Parsing should not have been successful")
         } catch QueuedBitstreamError.breakpointAtStart {
             // Pass
@@ -1497,8 +1568,9 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
         do {
-            let _ = try QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+            try parsed.parseBitstream(bitstream)
             XCTFail("Parsing should not have been successful")
         } catch QueuedBitstreamError.breakpointAtStart {
             // Pass
@@ -1515,7 +1587,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(operationsModePacket: .speed28Step(address: 3, direction: .forward, speed: 14))
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 15)
         XCTAssertEqual(parsed.data.count, 45)
@@ -1609,7 +1682,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(operationsModePacket: .speed28Step(address: 3, direction: .forward, speed: 14), debug: true)
         
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         
         XCTAssertEqual(parsed.controlBlocks.count, 21)
         XCTAssertEqual(parsed.data.count, 41)
@@ -1708,19 +1782,6 @@ class QueuedBitstreamTests : XCTestCase {
     }
     
     
-    // MARK: Properties
-    
-    /// Test that the bitstream duration is copied into the queued bitstream.
-    func testBitstreamDuration() {
-        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
-        bitstream.append(physicalBits: randomWords[0], count: 32)
-        
-        let parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
-        
-        XCTAssertEqual(parsed.duration, bitstream.duration)
-    }
-    
-    
     // MARK: Commit
     
     /// Test that we can commit a parsed bitstream to uncached memory.
@@ -1730,7 +1791,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
-        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         try! parsed.commit()
         
         XCTAssertNotNil(parsed.memory)
@@ -1761,7 +1823,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
-        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         let oldControlBlocks = parsed.controlBlocks
         let dataOffset = MemoryLayout<DMAControlBlock>.stride * oldControlBlocks.count
         
@@ -1798,7 +1861,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
-        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         let oldData = parsed.data
         
         try! parsed.commit()
@@ -1816,7 +1880,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
-        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         try! parsed.commit()
         
         XCTAssertNotNil(parsed.memory)
@@ -1828,7 +1893,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
-        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         try! parsed.commit()
         
         XCTAssertFalse(parsed.isTransmitting)
@@ -1852,7 +1918,8 @@ class QueuedBitstreamTests : XCTestCase {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
-        var parsed = try! QueuedBitstream(raspberryPi: raspberryPi, bitstream: bitstream)
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
         try! parsed.commit()
         
         XCTAssertFalse(parsed.isRepeating)
@@ -1882,6 +1949,9 @@ extension QueuedBitstreamTests {
             ("testParseBitstreamSecondWordDifferentSize", testParseBitstreamSecondWordDifferentSize),
             ("testParseBitstreamThirdWordSameSize", testParseBitstreamThirdWordSameSize),
             ("testParseBitstreamThirdWordDifferentSize", testParseBitstreamThirdWordDifferentSize),
+            
+            ("testParseBitstreamReturnValue", testParseBitstreamReturnValue),
+            ("testParseBitstreamSecondCallReturnValue", testParseBitstreamSecondCallReturnValue),
             
             ("testParseBitstreamGPIOEvent", testParseBitstreamGPIOEvent),
             ("testParseBitstreamMultipleGPIOSetEvent", testParseBitstreamMultipleGPIOSetEvent),
@@ -1922,8 +1992,6 @@ extension QueuedBitstreamTests {
             
             ("testParseBitstreamOperationsMode", testParseBitstreamOperationsMode),
             ("testParseBitstreamOperationsModeWithDebug", testParseBitstreamOperationsModeWithDebug),
-            
-            ("testBitstreamDuration", testBitstreamDuration),
             
             ("testCommitConcatenates", testCommitConcatenates),
             ("testCommitModifiesAddresses", testCommitModifiesAddresses),
