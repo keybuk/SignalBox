@@ -106,9 +106,11 @@ loop: while true {
         bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: true, f3: false, f4: false), debug: false)
         bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: true, f3: false, f4: false), debug: false)
         bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: true, f3: false, f4: false), debug: false)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: true, f3: false, f4: false), debug: false)
         try! driver.queue(bitstream: bitstream)
 
         bitstream = Bitstream(bitDuration: driver.bitDuration)
+        bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: false, f3: false, f4: false), debug: false)
         bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: false, f3: false, f4: false), debug: false)
         bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: false, f3: false, f4: false), debug: false)
         bitstream.append(operationsModePacket: .function0To4(address: 3, headlight: true, f1: false, f2: false, f3: false, f4: false), debug: false)
