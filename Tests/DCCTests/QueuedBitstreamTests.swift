@@ -1938,6 +1938,163 @@ class QueuedBitstreamTests : XCTestCase {
         XCTAssertTrue(parsed.isRepeating)
     }
     
+    
+    // MARK: Transferring
+    
+    /// Test that we can generate a queued bitstream from a bitstream, when transferring from another.
+    ///
+    /// Since parseBitstream is already tested, just make sure a list of transfer offsets is returned and matches the number of breakpoints, and that each is a start control block.
+    func testTransferFromInto() {
+        var bitstream1 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream1.append(physicalBits: randomWords[0], count: 32)
+        bitstream1.append(.breakpoint)
+        bitstream1.append(physicalBits: randomWords[1], count: 32)
+
+        var parsed1 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream1.wordSize)
+        try! parsed1.parseBitstream(bitstream1)
+        try! parsed1.commit()
+        
+        var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream2.append(physicalBits: randomWords[2], count: 32)
+        bitstream2.append(physicalBits: randomWords[3], count: 32)
+
+        var parsed2 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream2.wordSize)
+        let transferOffsets = try! parsed2.transfer(from: parsed1, into: bitstream2)
+        
+        XCTAssertEqual(transferOffsets.count, 2)
+        
+        XCTAssertGreaterThan(parsed2.controlBlocks.count, transferOffsets[0])
+        XCTAssertEqual(parsed2.controlBlocks[transferOffsets[0]].destinationAddress, 0)
+        var dataIndex = parsed2.controlBlocks[transferOffsets[0]].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed2.data[dataIndex], 1)
+
+        XCTAssertGreaterThan(parsed2.controlBlocks.count, transferOffsets[1])
+        XCTAssertEqual(parsed2.controlBlocks[transferOffsets[1]].destinationAddress, 0)
+        dataIndex = parsed2.controlBlocks[transferOffsets[1]].sourceAddress / MemoryLayout<Int>.stride
+        XCTAssertEqual(parsed2.data[dataIndex], 1)
+    }
+    
+    /// Test that we can transfer from one queued bitstream to another before it's repeating.
+    ///
+    /// Only the end control block breakpoint should be changed.
+    func testTransferToAtBeforeRepeating() {
+        var bitstream1 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream1.append(physicalBits: randomWords[0], count: 32)
+        bitstream1.append(.breakpoint)
+        bitstream1.append(physicalBits: randomWords[1], count: 32)
+        
+        var parsed1 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream1.wordSize)
+        try! parsed1.parseBitstream(bitstream1)
+        try! parsed1.commit()
+        
+        var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream2.append(physicalBits: randomWords[2], count: 32)
+        bitstream2.append(physicalBits: randomWords[3], count: 32)
+        
+        var parsed2 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream2.wordSize)
+        let transferOffsets = try! parsed2.transfer(from: parsed1, into: bitstream2)
+
+        try! parsed2.commit()
+        parsed1.transfer(to: parsed2, at: transferOffsets)
+        
+        let uncachedControlBlocks = parsed1.memory!.pointer.assumingMemoryBound(to: DMAControlBlock.self)
+
+        // The nextControlBlockAddress of the first breakpoint (data/range) should not be changed.
+        XCTAssertNotEqual(uncachedControlBlocks[parsed1.breakpoints[0].controlBlockOffset].nextControlBlockAddress, parsed2.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffsets[0])
+        
+        // The nextControlBlockAddress of the second breakpoint (end control block) should be changed.
+        XCTAssertEqual(uncachedControlBlocks[parsed1.breakpoints[1].controlBlockOffset].nextControlBlockAddress, parsed2.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffsets[1])
+    }
+    
+    /// Test that we can transfer from one queued bitstream to another after it's repeating.
+    ///
+    /// Both breakpoints should be changed.
+    func testTransferToAtAfterRepeating() {
+        var bitstream1 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream1.append(physicalBits: randomWords[0], count: 32)
+        bitstream1.append(.breakpoint)
+        bitstream1.append(physicalBits: randomWords[1], count: 32)
+        
+        var parsed1 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream1.wordSize)
+        try! parsed1.parseBitstream(bitstream1)
+        try! parsed1.commit()
+        
+        var bitstream2 = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream2.append(physicalBits: randomWords[2], count: 32)
+        bitstream2.append(physicalBits: randomWords[3], count: 32)
+        
+        var parsed2 = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream2.wordSize)
+        let transferOffsets = try! parsed2.transfer(from: parsed1, into: bitstream2)
+        
+        try! parsed2.commit()
+        
+        let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * parsed1.controlBlocks.count
+        let uncachedData = parsed1.memory!.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: Int.self)
+        
+        // Mark the queued bitstream as repeating before we do the transfer.
+        uncachedData[0] = -1
+        
+        parsed1.transfer(to: parsed2, at: transferOffsets)
+
+        let uncachedControlBlocks = parsed1.memory!.pointer.assumingMemoryBound(to: DMAControlBlock.self)
+        
+        // The nextControlBlockAddress of both breakpoints should be changed.
+        XCTAssertEqual(uncachedControlBlocks[parsed1.breakpoints[0].controlBlockOffset].nextControlBlockAddress, parsed2.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffsets[0])
+        XCTAssertEqual(uncachedControlBlocks[parsed1.breakpoints[1].controlBlockOffset].nextControlBlockAddress, parsed2.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffsets[1])
+    }
+
+    /// Test that we can stop a queued bitstream before it's repeating.
+    ///
+    /// Only the end control block breakpoint should be changed.
+    func testStopBeforeRepeating() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(.breakpoint)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
+        try! parsed.commit()
+
+        parsed.stop()
+        
+        let uncachedControlBlocks = parsed.memory!.pointer.assumingMemoryBound(to: DMAControlBlock.self)
+        
+        // The nextControlBlockAddress of the first breakpoint (data/range) should not be changed.
+        XCTAssertNotEqual(uncachedControlBlocks[parsed.breakpoints[0].controlBlockOffset].nextControlBlockAddress, DMAControlBlock.stopAddress)
+        
+        // The nextControlBlockAddress of the second breakpoint (end control block) should be changed.
+        XCTAssertEqual(uncachedControlBlocks[parsed.breakpoints[1].controlBlockOffset].nextControlBlockAddress, DMAControlBlock.stopAddress)
+    }
+
+    /// Test that we can stop a queued bitstream after it's repeating.
+    ///
+    /// Both breakpoints should be changed.
+    func testStopAfterRepeating() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(.breakpoint)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream)
+        try! parsed.commit()
+
+        let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * parsed.controlBlocks.count
+        let uncachedData = parsed.memory!.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: Int.self)
+        
+        // Mark the queued bitstream as repeating before we stop.
+        uncachedData[0] = -1
+
+        parsed.stop()
+        
+        let uncachedControlBlocks = parsed.memory!.pointer.assumingMemoryBound(to: DMAControlBlock.self)
+        
+        // The nextControlBlockAddress of both breakpoints should be changed.
+        XCTAssertEqual(uncachedControlBlocks[parsed.breakpoints[0].controlBlockOffset].nextControlBlockAddress, DMAControlBlock.stopAddress)
+        XCTAssertEqual(uncachedControlBlocks[parsed.breakpoints[1].controlBlockOffset].nextControlBlockAddress, DMAControlBlock.stopAddress)
+    }
+
 }
 
 extension QueuedBitstreamTests {
@@ -2000,6 +2157,12 @@ extension QueuedBitstreamTests {
             ("testBusAddress", testBusAddress),
             ("testIsTransmitting", testIsTransmitting),
             ("testIsRepeating", testIsRepeating),
+            
+            ("testTransferFromInto", testTransferFromInto),
+            ("testTransferToAtBeforeRepeating", testTransferToAtBeforeRepeating),
+            ("testTransferToAtAfterRepeating", testTransferToAtAfterRepeating),
+            ("testStopBeforeRepeating", testStopBeforeRepeating),
+            ("testStopAfterRepeating", testStopAfterRepeating),
             ]
     }()
     

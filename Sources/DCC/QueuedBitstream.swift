@@ -281,7 +281,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     ///   `DriverError.bitstreamContainsNoData` if `bitstream` is missing data records, which may include within a repeating section. Recommended recovery is to add preamble bits and try again.
     @discardableResult
     public mutating func parseBitstream(_ bitstream: Bitstream, transferringFrom breakpoint: Breakpoint? = nil) throws -> Int {
-        guard self.memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
+        guard memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
 
         // Keep track of the current range register value, since we don't know what it was prior to this bitstream beginning, use zero so that the first data event will always set it correctly.
         var range = breakpoint.map({ $0.range }) ?? 0
@@ -474,7 +474,24 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         return uncachedData[0] < 0
     }
     
+    /// Parse a bitstream for transferring from another.
+    ///
+    /// Calls `parseBitstream` repeatedly for each breakpoint present in `previousBitstream` and returns a list of transfer offsets corresponding to each breakpoint.
+    ///
+    /// This is destination part of the process that generates the destination points for the transfer. A full transfer also involves the previous bitstream. for example:
+    ///
+    ///     let transferOffsets = try nextBitstream.transfer(from: previousBitstream, into: bitstream)
+    ///     try nextBitstream.commit()
+    ///     previousBitstream.transfer(to: nextBitstream, at: transferOffsets)
+    ///
+    /// - Parameters:
+    ///   - previousBitstream: queued bitstream to transfer from.
+    ///   - bitstream: bitstream to parse.
+    ///
+    /// - Returns: list of transfer offsets into the new queued bitstream.
     public mutating func transfer(from previousBitstream: QueuedBitstream, into bitstream: Bitstream) throws -> [Int] {
+        guard memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
+
         var transferOffsets: [Int] = []
         for breakpoint in previousBitstream.breakpoints {
             let transferOffset = try parseBitstream(bitstream, transferringFrom: breakpoint)
@@ -484,21 +501,71 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         return transferOffsets
     }
     
+    /// Transfer control to a new queued bitstream.
+    ///
+    /// Modifies the next block addresses of the uncached copies of the control blocks to transfer control to the new bitstream, with each breakpoint transferred to the corresponding new offset in `transferOffsets`. Note that the uncached copy in `controlBlocks` is not modified.
+    ///
+    /// The bitstream will only be transferred once at least one full transmission has occurred.
+    ///
+    /// This is destination part of the process that generates the destination points for the transfer. A full transfer also involves the previous bitstream. for example:
+    ///
+    ///     let transferOffsets = try nextBitstream.transfer(from: previousBitstream, into: bitstream)
+    ///     try nextBitstream.commit()
+    ///     previousBitstream.transfer(to: nextBitstream, at: transferOffsets)
+    ///
+    /// - Parameters:
+    ///   - nextBitstream: queued bitstream to transfer control to.
+    ///   - transferOffsets: list of control block offsets corresponding to each breakpoint.
     public func transfer(to nextBitstream: QueuedBitstream, at transferOffsets: [Int]) {
         guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
+        assert(breakpoints.count == transferOffsets.count, "Number of transfer offsets must be same as number of breakpoints")
 
         let uncachedControlBlocks = memory.pointer.assumingMemoryBound(to: DMAControlBlock.self)
+        let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
+
+        // Set the nextControlBlockAddress for each end control block to the associated new transfer offset.
+        // We can do this at any time, since these mark the point at which we would be repeating our transmission, and it's always okay to send just one full copy.
         for (breakpoint, transferOffset) in zip(breakpoints, transferOffsets) {
-            uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = nextBitstream.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffset
+            if uncachedControlBlocks[breakpoint.controlBlockOffset].destinationAddress == busAddress + controlBlocksSize {
+                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = nextBitstream.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffset
+            }
+        }
+        
+        // Only change the nextBlockAddress for the rest of the breakpoints if we're already repeating the transmission, since we know we've sent at least one full copy at this point.
+        // There's no race between these two blocks:
+        // - if we were already repeating, we just cost a little extra time setting the end blocks first.
+        // - if we were not repeating, and are still not, we'll transfer at the end control block and transmit exactly one full copy.
+        // - if we were not repeating, but are now, and we just missed writing the address, we'll just transfer at the next breakpoint with a slight extra transmission.
+        // - if we were not repeating, but are now, and we caught it at an end control block, we transmit exactly one full copy and just cost a little time setting these blocks which aren't going to be used.
+        if isRepeating {
+            for (breakpoint, transferOffset) in zip(breakpoints, transferOffsets) {
+                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = nextBitstream.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffset
+            }
         }
     }
     
+    /// Stop transmitting this bitstream.
+    ///
+    /// Modifies the next block addresses of the uncached copies of the control blocks to the stop address. Note that the uncached copy in `controlBlocks` is not modified.
+    ///
+    /// The bitstream will only be stopped once at least one full transmission has occurred.
     public func stop() {
         guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
-        let uncachedControlBlocks = memory.pointer.assumingMemoryBound(to: DMAControlBlock.self)
 
+        let uncachedControlBlocks = memory.pointer.assumingMemoryBound(to: DMAControlBlock.self)
+        let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
+
+        // Stop at the end control blocks first, then the rest if we're repeating, to ensure at least one full transmission before stopping. See notes in `transfer(to:at:)` for why we do this, and that it's safe.
         for breakpoint in breakpoints {
-            uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = DMAControlBlock.stopAddress
+            if uncachedControlBlocks[breakpoint.controlBlockOffset].destinationAddress == busAddress + controlBlocksSize {
+                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = DMAControlBlock.stopAddress
+            }
+        }
+        
+        if isRepeating {
+            for breakpoint in breakpoints {
+                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = DMAControlBlock.stopAddress
+            }
         }
     }
     
@@ -585,7 +652,7 @@ public struct Breakpoint : Hashable {
 
     /// Offset of the control block that can have its `nextControlBlockAddress` changed.
     public let controlBlockOffset: Int
-
+    
     /// PWM Range in effect at this point in the stream.
     let range: Int
 
