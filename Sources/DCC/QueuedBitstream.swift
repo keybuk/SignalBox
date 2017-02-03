@@ -169,11 +169,12 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     /// Adjusts the last control block's `nextControlBlockAddress`.
     ///
     /// - Parameters:
-    ///   - next: offset of control block to change to.
-    mutating func setNextControlBlock(_ next: Int) {
+    ///   - next: offset of control block to change to; if `nil`, the stop address is used instead.
+    mutating func setNextControlBlock(_ next: Int?) {
         assert(!controlBlocks.isEmpty, "Cannot be called without control blocks.")
 
-        controlBlocks[controlBlocks.index(before: controlBlocks.endIndex)].nextControlBlockAddress = MemoryLayout<DMAControlBlock>.stride * next
+        // Since we never repeat back to the start control block, we can use the value zero as a placeholder for the stop address.
+        controlBlocks[controlBlocks.index(before: controlBlocks.endIndex)].nextControlBlockAddress = MemoryLayout<DMAControlBlock>.stride * (next ?? 0)
     }
     
     /// Offsets of control block written out for the bitstream.
@@ -274,13 +275,14 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     /// - Parameters:
     ///   - bitstream: the `Bitstream` to be parsed.
     ///   - breakpoint: optional `Breakpoint` information from another queued bitstream to be resumed from.
+    ///   - stopAfterTransmitting: when `true`, the loop will not be unrolled and the end block will have a zero `nextControlBlockAddress`.
     ///
     /// - Returns: offset of control block that begins the bitstream.
     ///
     /// - Throws:
     ///   `DriverError.bitstreamContainsNoData` if `bitstream` is missing data records, which may include within a repeating section. Recommended recovery is to add preamble bits and try again.
     @discardableResult
-    public mutating func parseBitstream(_ bitstream: Bitstream, transferringFrom breakpoint: Breakpoint? = nil) throws -> Int {
+    public mutating func parseBitstream(_ bitstream: Bitstream, transferringFrom breakpoint: Breakpoint? = nil, stopAfterTransmitting: Bool = false) throws -> Int {
         guard memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
 
         // Keep track of the current range register value, since we don't know what it was prior to this bitstream beginning, use zero so that the first data event will always set it correctly.
@@ -390,6 +392,9 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
             if appendEnd {
                 addControlBlockForEnd()
                 breakpoints.append(Breakpoint(controlBlockOffset: controlBlocks.count - 1, range: range, delayedEvents: delayedEvents))
+                if stopAfterTransmitting {
+                    break
+                }
 
                 appendEnd = false
             }
@@ -397,7 +402,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
             guard foundData else { throw QueuedBitstreamError.containsNoData }
         } while loopControlBlockOffset == nil
         
-        setNextControlBlock(loopControlBlockOffset!)
+        setNextControlBlock(loopControlBlockOffset)
         
         return startControlBlockOffset
     }
@@ -428,7 +433,11 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
             if controlBlocks[index].destinationAddress < raspberryPi.peripheralBusAddress {
                 controlBlocks[index].destinationAddress += memory.busAddress + controlBlocksSize
             }
-            controlBlocks[index].nextControlBlockAddress += memory.busAddress
+            if controlBlocks[index].nextControlBlockAddress > 0 {
+                controlBlocks[index].nextControlBlockAddress += memory.busAddress
+            } else {
+                controlBlocks[index].nextControlBlockAddress = DMAControlBlock.stopAddress
+            }
         }
         
         memory.pointer.bindMemory(to: DMAControlBlock.self, capacity: controlBlocks.count).initialize(from: controlBlocks)
@@ -487,14 +496,15 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     /// - Parameters:
     ///   - previousBitstream: queued bitstream to transfer from.
     ///   - bitstream: bitstream to parse.
+    ///   - stopAfterTransmitting: when `true`, the loops will not be unrolled and the end blocks will have a zero `nextControlBlockAddress`.
     ///
     /// - Returns: list of transfer offsets into the new queued bitstream.
-    public mutating func transfer(from previousBitstream: QueuedBitstream, into bitstream: Bitstream) throws -> [Int] {
+    public mutating func transfer(from previousBitstream: QueuedBitstream, into bitstream: Bitstream, stopAfterTransmitting: Bool = false) throws -> [Int] {
         guard memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
 
         var transferOffsets: [Int] = []
         for breakpoint in previousBitstream.breakpoints {
-            let transferOffset = try parseBitstream(bitstream, transferringFrom: breakpoint)
+            let transferOffset = try parseBitstream(bitstream, transferringFrom: breakpoint, stopAfterTransmitting: stopAfterTransmitting)
             transferOffsets.append(transferOffset)
         }
         
@@ -544,31 +554,6 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         }
     }
     
-    /// Stop transmitting this bitstream.
-    ///
-    /// Modifies the next block addresses of the uncached copies of the control blocks to the stop address. Note that the uncached copy in `controlBlocks` is not modified.
-    ///
-    /// The bitstream will only be stopped once at least one full transmission has occurred.
-    public func stop() {
-        guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
-
-        let uncachedControlBlocks = memory.pointer.assumingMemoryBound(to: DMAControlBlock.self)
-        let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
-
-        // Stop at the end control blocks first, then the rest if we're repeating, to ensure at least one full transmission before stopping. See notes in `transfer(to:at:)` for why we do this, and that it's safe.
-        for breakpoint in breakpoints {
-            if uncachedControlBlocks[breakpoint.controlBlockOffset].destinationAddress == busAddress + controlBlocksSize {
-                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = DMAControlBlock.stopAddress
-            }
-        }
-        
-        if isRepeating {
-            for breakpoint in breakpoints {
-                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = DMAControlBlock.stopAddress
-            }
-        }
-    }
-    
     /// A textual representation of this instance, suitable for debugging.
     ///
     /// The string is generated by parsing the `controlBlocks` and `data` members.
@@ -592,7 +577,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
             let dataIndex = (controlBlock.sourceAddress - dataBase) / MemoryLayout<Int>.stride
             let dataSize = controlBlock.transferLength / MemoryLayout<Int>.stride
             
-            let next = (controlBlock.nextControlBlockAddress - controlBlocksBase) / MemoryLayout<DMAControlBlock>.stride
+            let next = controlBlock.nextControlBlockAddress == 0 ? "⏚" : "\((controlBlock.nextControlBlockAddress - controlBlocksBase) / MemoryLayout<DMAControlBlock>.stride)"
             let bp = breakpoints.filter({ $0.controlBlockOffset == offset }).isEmpty ? "" : " ◆"
 
             switch controlBlock.destinationAddress {

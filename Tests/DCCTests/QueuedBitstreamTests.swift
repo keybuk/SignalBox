@@ -897,6 +897,69 @@ class QueuedBitstreamTests : XCTestCase {
         XCTAssertEqual(parsed.data[12], -1)
     }
     
+    /// Test that a loop is not repeated, and the last value set to zero, if stopAfterTransmitting is set to true.
+    func testParseBitstreamStopAfterTransmitting() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream, stopAfterTransmitting: true)
+        
+        XCTAssertEqual(parsed.controlBlocks.count, 5)
+        XCTAssertEqual(parsed.data.count, 6)
+        
+        XCTAssertEqual(parsed.data[0], 0)
+        
+        XCTAssertEqual(parsed.controlBlocks[0], startControlBlock(dataAt: 1, next: 1))
+        XCTAssertEqual(parsed.data[1], 1)
+        
+        XCTAssertEqual(parsed.controlBlocks[1], dataControlBlock(dataAt: 2, length: 1, next: 2))
+        XCTAssertEqual(parsed.data[2], randomWords[0])
+        
+        XCTAssertEqual(parsed.controlBlocks[2], rangeControlBlock(rangeAt: 3, next: 3))
+        XCTAssertEqual(parsed.data[3], 32)
+        
+        XCTAssertEqual(parsed.controlBlocks[3], dataControlBlock(dataAt: 4, length: 1, next: 4))
+        XCTAssertEqual(parsed.data[4], randomWords[1])
+        
+        XCTAssertEqual(parsed.controlBlocks[4], endControlBlock(dataAt: 5, next: 0))
+        XCTAssertEqual(parsed.data[5], -1)
+    }
+    
+    /// Test that a loop is not unrolled even if there are delayed events, if stopAfterTransmitting is set to true.
+    ///
+    /// The breakpoint will have the delayedEvents.
+    func testParseBitstreamStopAfterTransmittingDoesntUnroll() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        bitstream.append(physicalBits: randomWords[1], count: 32)
+        bitstream.append(.debugStart)
+
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream, stopAfterTransmitting: true)
+        
+        XCTAssertEqual(parsed.controlBlocks.count, 5)
+        XCTAssertEqual(parsed.data.count, 6)
+        
+        XCTAssertEqual(parsed.data[0], 0)
+        
+        XCTAssertEqual(parsed.controlBlocks[0], startControlBlock(dataAt: 1, next: 1))
+        XCTAssertEqual(parsed.data[1], 1)
+        
+        XCTAssertEqual(parsed.controlBlocks[1], dataControlBlock(dataAt: 2, length: 1, next: 2))
+        XCTAssertEqual(parsed.data[2], randomWords[0])
+        
+        XCTAssertEqual(parsed.controlBlocks[2], rangeControlBlock(rangeAt: 3, next: 3))
+        XCTAssertEqual(parsed.data[3], 32)
+        
+        XCTAssertEqual(parsed.controlBlocks[3], dataControlBlock(dataAt: 4, length: 1, next: 4))
+        XCTAssertEqual(parsed.data[4], randomWords[1])
+        
+        XCTAssertEqual(parsed.controlBlocks[4], endControlBlock(dataAt: 5, next: 0))
+        XCTAssertEqual(parsed.data[5], -1)
+    }
+
     
     // MARK: Repeating Sections
     
@@ -1872,6 +1935,23 @@ class QueuedBitstreamTests : XCTestCase {
         XCTAssertEqual(parsed.data, oldData)
     }
     
+    /// Test that commit() works when the end control block address is the stop address.
+    func testCommitWithStopAddress() {
+        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
+        bitstream.append(physicalBits: randomWords[0], count: 32)
+        
+        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
+        try! parsed.parseBitstream(bitstream, stopAfterTransmitting: true)
+        let oldControlBlocks = parsed.controlBlocks
+        
+        try! parsed.commit()
+        
+        XCTAssertNotNil(parsed.memory)
+        
+        XCTAssertEqual(parsed.controlBlocks.count, oldControlBlocks.count)
+        XCTAssertEqual(parsed.controlBlocks[3].nextControlBlockAddress, DMAControlBlock.stopAddress)
+    }
+    
     
     // MARK: Post-commit details.
     
@@ -2043,58 +2123,6 @@ class QueuedBitstreamTests : XCTestCase {
         XCTAssertEqual(uncachedControlBlocks[parsed1.breakpoints[1].controlBlockOffset].nextControlBlockAddress, parsed2.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffsets[1])
     }
 
-    /// Test that we can stop a queued bitstream before it's repeating.
-    ///
-    /// Only the end control block breakpoint should be changed.
-    func testStopBeforeRepeating() {
-        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
-        bitstream.append(physicalBits: randomWords[0], count: 32)
-        bitstream.append(.breakpoint)
-        bitstream.append(physicalBits: randomWords[1], count: 32)
-        
-        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
-        try! parsed.parseBitstream(bitstream)
-        try! parsed.commit()
-
-        parsed.stop()
-        
-        let uncachedControlBlocks = parsed.memory!.pointer.assumingMemoryBound(to: DMAControlBlock.self)
-        
-        // The nextControlBlockAddress of the first breakpoint (data/range) should not be changed.
-        XCTAssertNotEqual(uncachedControlBlocks[parsed.breakpoints[0].controlBlockOffset].nextControlBlockAddress, DMAControlBlock.stopAddress)
-        
-        // The nextControlBlockAddress of the second breakpoint (end control block) should be changed.
-        XCTAssertEqual(uncachedControlBlocks[parsed.breakpoints[1].controlBlockOffset].nextControlBlockAddress, DMAControlBlock.stopAddress)
-    }
-
-    /// Test that we can stop a queued bitstream after it's repeating.
-    ///
-    /// Both breakpoints should be changed.
-    func testStopAfterRepeating() {
-        var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
-        bitstream.append(physicalBits: randomWords[0], count: 32)
-        bitstream.append(.breakpoint)
-        bitstream.append(physicalBits: randomWords[1], count: 32)
-        
-        var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
-        try! parsed.parseBitstream(bitstream)
-        try! parsed.commit()
-
-        let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * parsed.controlBlocks.count
-        let uncachedData = parsed.memory!.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: Int.self)
-        
-        // Mark the queued bitstream as repeating before we stop.
-        uncachedData[0] = -1
-
-        parsed.stop()
-        
-        let uncachedControlBlocks = parsed.memory!.pointer.assumingMemoryBound(to: DMAControlBlock.self)
-        
-        // The nextControlBlockAddress of both breakpoints should be changed.
-        XCTAssertEqual(uncachedControlBlocks[parsed.breakpoints[0].controlBlockOffset].nextControlBlockAddress, DMAControlBlock.stopAddress)
-        XCTAssertEqual(uncachedControlBlocks[parsed.breakpoints[1].controlBlockOffset].nextControlBlockAddress, DMAControlBlock.stopAddress)
-    }
-
 }
 
 extension QueuedBitstreamTests {
@@ -2123,7 +2151,9 @@ extension QueuedBitstreamTests {
             ("testParseBitstreamGPIOEventUnrollsLoopTwice", testParseBitstreamGPIOEventUnrollsLoopTwice),
             ("testParseBitstreamGPIOEventUnrollsLoopTwiceNotToStart", testParseBitstreamGPIOEventUnrollsLoopTwiceNotToStart),
             ("testParseBitstreamGPIOEventUnrollsLoopRepeatingData", testParseBitstreamGPIOEventUnrollsLoopRepeatingData),
-            
+            ("testParseBitstreamStopAfterTransmitting", testParseBitstreamStopAfterTransmitting),
+            ("testParseBitstreamStopAfterTransmittingDoesntUnroll", testParseBitstreamStopAfterTransmittingDoesntUnroll),
+        
             ("testParseBitstreamWithRepeatingSection", testParseBitstreamWithRepeatingSection),
             ("testParseBitstreamGPIOEventUnrollsToRepeatingSection", testParseBitstreamGPIOEventUnrollsToRepeatingSection),
             ("testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection", testParseBitstreamGPIOEventUnrollsWhenAcrossRepeatingSection),
@@ -2153,6 +2183,7 @@ extension QueuedBitstreamTests {
             ("testCommitConcatenates", testCommitConcatenates),
             ("testCommitModifiesAddresses", testCommitModifiesAddresses),
             ("testCommitDoesNotModifyData", testCommitDoesNotModifyData),
+            ("testCommitWithStopAddress", testCommitWithStopAddress),
             
             ("testBusAddress", testBusAddress),
             ("testIsTransmitting", testIsTransmitting),
@@ -2161,8 +2192,6 @@ extension QueuedBitstreamTests {
             ("testTransferFromInto", testTransferFromInto),
             ("testTransferToAtBeforeRepeating", testTransferToAtBeforeRepeating),
             ("testTransferToAtAfterRepeating", testTransferToAtAfterRepeating),
-            ("testStopBeforeRepeating", testStopBeforeRepeating),
-            ("testStopAfterRepeating", testStopAfterRepeating),
             ]
     }()
     
