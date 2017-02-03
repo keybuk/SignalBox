@@ -45,14 +45,14 @@ public class Driver {
         
         divisor = Int(Driver.desiredBitDuration * 19.2)
         bitDuration = Float(divisor) / 19.2
+        
+        print("DMA Driver: divisor \(divisor), bit duration \(bitDuration)µs")
     }
     
     /// Initialize hardware.
     ///
     /// Sets up the PWM, GPIO and DMA hardware and prepares for a bitstream to be queued. The DMA Engine will not be activated until the first bitstream is queued with `queue(bitstream:)`.
     public func startup() {
-        print("DMA Driver startup: divisor \(divisor), bit duration \(bitDuration)µs")
-
         // Disable both PWM channels, and reset the error state.
         var pwm = raspberryPi.pwm()
         pwm.dmaConfiguration.remove(.enabled)
@@ -131,8 +131,11 @@ public class Driver {
         dma.controlStatus.insert(.abort)
 
         // Clear the bitstream queue.
+        // This will free the uncached memory associated with each bitstream; this is done with a barrier on the queue to cancel any pending tasks that might be also holding onto references.
         isRunning = false
-        bitstreamQueue.removeAll()
+        dispatchQueue.sync(flags: .barrier) {
+            bitstreamQueue.removeAll()
+        }
         
         // Restore the DCC GPIO to output, and clear all pins.
         var gpio = raspberryPi.gpio(number: Driver.dccGpio)
@@ -295,7 +298,7 @@ public class Driver {
         }
         
         var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-
+        
         if dma.controlStatus.contains(.errorDetected) {
             print("DMA Error Detected:")
         }
