@@ -61,7 +61,6 @@ var driver = Driver(raspberryPi: raspberryPi)
 driver.startup()
 
 var startupBitstream = Bitstream(bitDuration: driver.bitDuration)
-startupBitstream.append(.railComCutoutEnd)
 for _ in 0..<20 {
     startupBitstream.appendPreamble()
     startupBitstream.append(packet: .softReset(address: .broadcast))
@@ -139,4 +138,11 @@ loop: while true {
     packet = nil
 }
 
-driver.shutdown()
+// This is a bit scrappy now, but we'll be in a main loop eventually, so this will all make sense.
+try driver.stop {
+    driver.shutdown()
+    exit(0)
+}
+
+sleep(30)
+abort()

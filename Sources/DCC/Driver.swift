@@ -41,12 +41,19 @@ public class Driver {
     /// Dispatch queue for `bitstreamQueue`.
     let dispatchQueue: DispatchQueue
 
+    /// Dispatch group for `dispatchQueue`.
+    ///
+    /// Items are placed into `dispatchQueue` using `asyncAfter()`, in order to synchronize those on shutdown, items are entered into this dispatch group and removed afterwards.
+    let dispatchGroup: DispatchGroup
+    
     /// Indicates whether the Driver is currently running.
     public internal(set) var isRunning = false
 
     public init(raspberryPi: RaspberryPi) {
         self.raspberryPi = raspberryPi
-        self.dispatchQueue = DispatchQueue(label: "com.netsplit.DCC.Driver")
+        
+        dispatchQueue = DispatchQueue(label: "com.netsplit.DCC.Driver")
+        dispatchGroup = DispatchGroup()
         
         divisor = Int(Driver.desiredBitDuration * 19.2)
         bitDuration = Float(divisor) / 19.2
@@ -103,14 +110,6 @@ public class Driver {
         // Set the DMA Engine priority levels.
         dma.controlStatus = [ .priorityLevel(8), .panicPriorityLevel(8) ]
         
-        // Prime the FIFO, completely filling it. This ensures our attempts to align GPIO and PWM data are successful.
-        print("Priming FIFO", terminator: "")
-        while !pwm.status.contains(.fifoFull) {
-            print(".", terminator: "")
-            pwm.fifoInput = 0
-        }
-        print("")
-        
         isRunning = true
         DispatchQueue.global().asyncAfter(deadline: .now() + Driver.watchdogInterval, execute: watchdog)
     }
@@ -135,10 +134,10 @@ public class Driver {
         dma.controlStatus.remove(.active)
         dma.controlStatus.insert(.abort)
 
-        // Clear the bitstream queue.
-        // This will free the uncached memory associated with each bitstream; this is done with a barrier on the queue to cancel any pending tasks that might be also holding onto references.
+        // Clear the bitstream queue to free the uncached memory associated with each bitstream, also cancel any pending tasks and wait for them to ensure blocks aren't holding references as well.
         isRunning = false
-        dispatchQueue.sync(flags: .barrier) {
+        dispatchGroup.wait()
+        dispatchQueue.sync() {
             bitstreamQueue.removeAll()
         }
         
@@ -154,52 +153,109 @@ public class Driver {
         gpio.value = false
     }
     
+    /// Indicates whether the next queued bitstream will require powering on.
+    ///
+    /// This is set to `false` when a `powerOnBitstream` is queued, and `true` when a `powerOffBitstream` is queued.
+    var requiresPowerOn = true
+    
     /// Queue bitstream.
     ///
     /// - Parameters:
     ///   - bitstream: DCC Bitstream to be queued.
+    ///   - repeating: when `false` the bitstream will not be repeated.
     ///   - completionHandler: Optional block to be run once `bitstream` has been transmitted at least once.
     ///
     /// - Throws:
     ///   Errors from `DriverError`, `MailboxError`, and `RaspberryPiError` on failure.
-    public func queue(bitstream: Bitstream, completionHandler: (() -> Void)? = nil) throws {
-        var queuedBitstream = QueuedBitstream(raspberryPi: raspberryPi)
-        
-        // Append the new bitstream to the queue, informing the previous item in the queue to transfer to it, or beginning the new item.
+    public func queue(bitstream: Bitstream, repeating: Bool = true, completionHandler: (() -> Void)? = nil) throws {
+        print("Bitstream duration \(bitstream.duration)µs")
         try dispatchQueue.sync {
-            let removeFirst: Bool
-            if let previousBitstream = bitstreamQueue.last {
-                let transferOffsets = try queuedBitstream.transfer(from: previousBitstream, into: bitstream)
-                try queuedBitstream.commit()
-                
-                if previousBitstream.isRepeating {
-                    previousBitstream.transfer(to: queuedBitstream, at: transferOffsets)
-                } else {
-                    dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: checkBitstreamCanTransfer(from: previousBitstream, to: queuedBitstream, at: transferOffsets))
+            var dma = raspberryPi.dma(channel: Driver.dmaChannel)
+            let dmaActive = dma.controlStatus.contains(.active)
+
+            var activateBitstream: QueuedBitstream? = nil
+            if requiresPowerOn {
+                activateBitstream = try queue(bitstream: powerOnBitstream, repeating: false, removePreviousBitstream: !bitstreamQueue.isEmpty, removeThisBitstream: false)
+                requiresPowerOn = false
+            }
+            
+            try queue(bitstream: bitstream, repeating: repeating, removePreviousBitstream: true, removeThisBitstream: false, completionHandler: completionHandler)
+            
+            if !repeating {
+                requiresPowerOn = true
+                try queue(bitstream: powerOffBitstream, repeating: false, removePreviousBitstream: true, removeThisBitstream: true)
+            }
+            
+            // Activate the DMA if this is the first bitstream in the queue.
+            if !dmaActive {
+                dma.controlBlockAddress = activateBitstream!.busAddress
+                dma.controlStatus.insert(.active)
+            }
+        }
+    }
+    
+    /// Queue a single bitstream.
+    ///
+    /// Internal function used by `queue(bitstream:)` to queue a single bitstream, this must be run on `dispatchQueue`.
+    ///
+    /// - Parameters:
+    ///   - bitstream: bitstream to be queued.
+    ///   - repeating: when `false` the bitstream will not be repeated.
+    ///   - removePreviousBitstream: when `true` the previous bitstream in the queue should be removed, this should be set for all but the first bitstream in the queue.
+    ///   - removeThisBitstream: when `true` this bitstream will be removed from the queue, this should be set for only the last bitstream in the queue and will be ignored if the DMA Channel is still active.
+    ///   - completionHandler: Optional block to be run once `bitstream` has been transmitted at least once.
+    ///
+    /// - Returns: copy of the bitstream queued.
+    ///
+    /// - Throws:
+    ///   Errors from `DriverError`, `MailboxError`, and `RaspberryPiError` on failure.
+    @discardableResult
+    func queue(bitstream: Bitstream, repeating: Bool, removePreviousBitstream: Bool, removeThisBitstream: Bool, completionHandler: (() -> Void)? = nil) throws -> QueuedBitstream {
+        if #available(OSX 10.12, *) {
+            dispatchPrecondition(condition: .onQueue(dispatchQueue))
+        }
+
+        // Generate the new bitstream based on transferring from the breakpoints of the last one.
+        var queuedBitstream = QueuedBitstream(raspberryPi: raspberryPi)
+        if let previousBitstream = bitstreamQueue.last {
+            let transferOffsets = try queuedBitstream.transfer(from: previousBitstream, into: bitstream, repeating: repeating)
+            try queuedBitstream.commit()
+            previousBitstream.transfer(to: queuedBitstream, at: transferOffsets)
+        } else {
+            try queuedBitstream.parseBitstream(bitstream, repeating: repeating)
+            try queuedBitstream.commit()
+        }
+        
+        // Once the new bitstream is transmitting, remove the first one from the queue... strictly speaking this isn't necessarily the one we were transmitting just now, but it doesn't matter as long as this is called the right number of times by all the queued blocks—we'll ultimately end up with just queuedBitstream in the queue.
+        whenTransmitting(queuedBitstream) {
+            if removePreviousBitstream {
+                self.bitstreamQueue.remove(at: 0)
+            }
+            
+            // Wait for the transmission of the bistream to be complete; the extra delay here isn't necessary but it saves on unnecessary repeated checking since we actually know off-hand what the duration should be.
+            self.whenRepeating(queuedBitstream, after: .microseconds(Int(bitstream.duration))) {
+                if removeThisBitstream {
+                    // We only remove ourselves if the DMA Channel has gone inactive; if it's still active, that means our next control block address was changed to point at another bitstream, which will remove us in its own whenTransmitting above.
+                    var dma = self.raspberryPi.dma(channel: Driver.dmaChannel)
+                    if !dma.controlStatus.contains(.active) {
+                        self.bitstreamQueue.remove(at: 0)
+                        assert(self.bitstreamQueue.isEmpty, "Bitstream queue should be empty")
+                    }
                 }
                 
-                removeFirst = true
-            } else {
-                try queuedBitstream.parseBitstream(bitstream)
-                try queuedBitstream.commit()
-
-                var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-                dma.controlBlockAddress = queuedBitstream.busAddress
-                dma.controlStatus.insert(.active)
-                
-                removeFirst = false
+                // If there's a completion handler, run it.
+                if let completionHandler = completionHandler {
+                    DispatchQueue.global().async(execute: completionHandler)
+                }
             }
-
-            bitstreamQueue.append(queuedBitstream)
-            print("Bitstream duration \(bitstream.duration)µs")
-            print("Bus  " + String(UInt(bitPattern: queuedBitstream.busAddress), radix: 16))
-            print("Phys " + String(UInt(bitPattern: queuedBitstream.busAddress & ~raspberryPi.uncachedAliasBusAddress), radix: 16))
-            debugPrint(queuedBitstream)
-            print()
-            
-            // Schedule a repeating check for the new bitstream beginning transmission.
-            dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: checkBitstreamIsTransmitting(queuedBitstream, removeFirst: removeFirst))
         }
+
+        // Append the bitstream to the queue. This has to come last since it's a value type and we want the queued copy to include the parsing.
+        bitstreamQueue.append(queuedBitstream)
+        debugPrint(queuedBitstream)
+        print()
+        
+        return queuedBitstream
     }
     
     /// Interval between bitstream state checks.
@@ -207,71 +263,108 @@ public class Driver {
     /// We use a repeated dispatch block of this interval, rather than a loop/sleep, to allow interleaving of checks for multiple queued bitstreams.
     static let bitstreamCheckInterval: DispatchTimeInterval = .milliseconds(1)
 
-    /// Returns block to check whether a bitstream is transmitting yet.
+    /// Executes a block once a queued bitstream is transmitting.
     ///
-    /// Once a bitstream begins transmission, we remove the first item from the queue since that is no longer repeating, and then we delay the expected duration of the bitstream before checking whether transmission has complete.
-    ///
-    /// This method returns a block that is intended to be run on `dispatchQueue`. The block self-reschedules itself at `bitstreamCheckInterval` while the condition is false.
+    /// This must be called on `dispatchQueue`. May execute immediately, otherwise schedules regular checks.
     ///
     /// - Parameters:
-    ///   - queuedBitstream: Queued bitstream to check, captured separately to avoid queue position issues.
-    ///   - removeFirst: `true` if the first item in the queue should be removed.
-    ///
-    /// - Returns: block to perform the check.
-    func checkBitstreamIsTransmitting(_ queuedBitstream: QueuedBitstream, removeFirst: Bool) -> (() -> Void) {
-        return {
-            guard self.isRunning else { return }
-            guard queuedBitstream.isTransmitting else {
-                self.dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: self.checkBitstreamIsTransmitting(queuedBitstream, removeFirst: removeFirst))
-                return
-            }
-            
-            if removeFirst {
-                self.bitstreamQueue.remove(at: 0)
-            }
-            
-            //self.dispatchQueue.asyncAfter(deadline: .now() + .microseconds(Int(queuedBitstream.duration)), execute: self.checkBitstreamIsRepeating(queuedBitstream))
+    ///   - queuedBitstream: bitstream to wait for transmission to begin.
+    ///   - work: block to execute.
+    func whenTransmitting(_ queuedBitstream: QueuedBitstream, execute work: @escaping () -> Void) {
+        if #available(OSX 10.12, *) {
+            dispatchPrecondition(condition: .onQueue(dispatchQueue))
         }
+
+        // Bail out if the Driver is no longer running. Otherwise if the bitstream isn't transmitting yet, schedule another call to ourselves after an interval; continuing the capture of queuedBitstream and self.
+        guard isRunning else { return }
+        guard queuedBitstream.isTransmitting else {
+            dispatchGroup.enter()
+            dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval) {
+                self.whenTransmitting(queuedBitstream, execute: work)
+                self.dispatchGroup.leave()
+            }
+            return
+        }
+        
+        work()
     }
     
-    /// Returns block to check whether a bitstream is repeating yet.
+    /// Executes a block once a queued bitstream has begun repeating.
     ///
-    /// Once a bitstream begins repeating, we call the optional `completionHandler` attached to it.
-    ///
-    /// This method returns a block that is intended to be run on `dispatchQueue`. The block self-reschedules itself at `bitstreamCheckInterval` while the condition is false.
+    /// This must be called on `dispatchQueue`. May execute immediately, otherwise schedules a check after `delay`, and then at regular intervals afterwards.
     ///
     /// - Parameters:
-    ///   - queuedBitstream: Queued bitstream to check, captured separately to avoid queue position issues.
-    ///
-    /// - Returns: block to perform the check.
-    func checkBitstreamIsRepeating(_ queuedBitstream: QueuedBitstream) -> (() -> Void) {
-        return {
-            guard self.isRunning else { return }
-            guard queuedBitstream.isRepeating else {
-                self.dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: self.checkBitstreamIsRepeating(queuedBitstream))
-                return
-            }
-            
-            //if let completionHandler = queuedBitstream.completionHandler {
-            //    completionHandler()
-            //}
+    ///   - queuedBitstream: bitstream to wait for transmission to repeat.
+    ///   - delay: initial delay to wait if not already repeating, only used for first check.
+    ///   - work: block to execute.
+    func whenRepeating(_ queuedBitstream: QueuedBitstream, after delay: DispatchTimeInterval = Driver.bitstreamCheckInterval, execute work: @escaping () -> Void) {
+        if #available(OSX 10.12, *) {
+            dispatchPrecondition(condition: .onQueue(dispatchQueue))
         }
+
+        // Bail out if the Driver is no longer running. Otherwise if the bitstream isn't repeating yet, schedule another call to ourselves after an interval; continuing the capture of queuedBitstream and self.
+        guard isRunning else { return }
+        guard queuedBitstream.isRepeating else {
+            dispatchGroup.enter()
+            dispatchQueue.asyncAfter(deadline: .now() + delay) {
+                self.whenRepeating(queuedBitstream, execute: work)
+                self.dispatchGroup.leave()
+            }
+            return
+        }
+        
+        work()
     }
     
-    func checkBitstreamCanTransfer(from previousBitstream: QueuedBitstream, to queuedBitstream: QueuedBitstream, at transferOffsets: [Int]) -> (() -> Void) {
-        return {
-            guard self.isRunning else { return }
-            guard previousBitstream.isRepeating else {
-                self.dispatchQueue.asyncAfter(deadline: .now() + Driver.bitstreamCheckInterval, execute: self.checkBitstreamCanTransfer(from: previousBitstream, to: queuedBitstream, at: transferOffsets))
-                return
+    /// Returns a bitstream that will power on the tracks and prime the FIFO so that future PWM and GPIO events will be aligned.
+    var powerOnBitstream: Bitstream {
+        var bitstream = Bitstream(bitDuration: bitDuration)
+
+        for _ in 0..<Driver.eventDelay {
+            bitstream.append(.data(word: 0, size: bitstream.wordSize))
+        }
+
+        bitstream.append(.railComCutoutEnd)
+        
+        return bitstream
+    }
+    
+    /// Returns a bitstream that will power off the tracks and leave the queue in a clean state.
+    var powerOffBitstream: Bitstream {
+        var bitstream = Bitstream(bitDuration: bitDuration)
+        
+        bitstream.append(.railComCutoutStart)
+        bitstream.append(.debugEnd)
+        
+        for _ in 0..<Driver.eventDelay {
+            bitstream.append(.data(word: 0, size: bitstream.wordSize))
+        }
+        
+        return bitstream
+    }
+    
+    /// Stop the Driver gracefully.
+    ///
+    /// The currently transmitting bitstream is completed if not already repeating, and then transferred out at the next breakpoint with delayed events cleared as normal. Both the RailCom and Debug GPIO pins are cleared.
+    ///
+    /// - Parameters:
+    ///   - completionHandler: block to execute once the stop has completed.
+    public func stop(completionHandler: @escaping () -> Void) throws {
+        try dispatchQueue.sync {
+            if requiresPowerOn {
+                DispatchQueue.global().async(execute: completionHandler)
+            } else {
+                requiresPowerOn = true
+                try queue(bitstream: powerOffBitstream, repeating: false, removePreviousBitstream: true, removeThisBitstream: true, completionHandler: completionHandler)
             }
-            previousBitstream.transfer(to: queuedBitstream, at: transferOffsets)
         }
     }
+
     
     /// Interval between watchdog checks.
     static let watchdogInterval: DispatchTimeInterval = .milliseconds(10)
 
+    /// Checks for and clears PWM and DMA error states.
     func watchdog() {
         guard self.isRunning else { return }
 
