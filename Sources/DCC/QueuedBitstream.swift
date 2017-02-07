@@ -134,17 +134,17 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         for event in events {
             switch event {
             case .railComCutoutStart:
-                gpioSet[Driver.railComGpio] = false
-                gpioClear[Driver.railComGpio] = true
+                gpioSet[Driver.railComGPIO] = false
+                gpioClear[Driver.railComGPIO] = true
             case .railComCutoutEnd:
-                gpioClear[Driver.railComGpio] = false
-                gpioSet[Driver.railComGpio] = true
+                gpioClear[Driver.railComGPIO] = false
+                gpioSet[Driver.railComGPIO] = true
             case .debugStart:
-                gpioClear[Driver.debugGpio] = false
-                gpioSet[Driver.debugGpio] = true
+                gpioClear[Driver.debugGPIO] = false
+                gpioSet[Driver.debugGPIO] = true
             case .debugEnd:
-                gpioSet[Driver.debugGpio] = false
-                gpioClear[Driver.debugGpio] = true
+                gpioSet[Driver.debugGPIO] = false
+                gpioClear[Driver.debugGPIO] = true
             default:
                 fatalError("Unexpected non-GPIO event \(event)")
             }
@@ -601,17 +601,17 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
                 let clearField = GPIOBitField(field0: data[dataIndex + 2], field1: data[dataIndex + 3])
                 
                 description += "  \(offset): GPIO → \(next)\(bp)\n"
-                if setField[Driver.railComGpio] {
+                if setField[Driver.railComGPIO] {
                     description += "    ↑ RailCom\n"
                 }
-                if setField[Driver.debugGpio] {
+                if setField[Driver.debugGPIO] {
                     description += "    ↑ Debug\n"
                 }
                 
-                if clearField[Driver.railComGpio] {
+                if clearField[Driver.railComGPIO] {
                     description += "    ↓ RailCom\n"
                 }
-                if clearField[Driver.debugGpio] {
+                if clearField[Driver.debugGPIO] {
                     description += "    ↓ Debug\n"
                 }
             default:
