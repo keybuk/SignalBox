@@ -249,7 +249,7 @@ public class RaspberryPi {
 
 
 /// Region of Memory.
-public protocol MemoryRegion {
+public protocol MemoryRegion : class {
     
     /// Pointer to the region.
     var pointer: UnsafeMutableRawPointer { get }
