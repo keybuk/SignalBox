@@ -26,7 +26,7 @@ public enum QueuedBitstreamError : Error {
 /// Initialize with a `Bitstream` to generate the appropriate DMA Control Blocks and Data for use with `Driver`.
 ///
 /// The principle difficulty is that the PWM doesn't immediately begin outputting the word written after a DREQ, which requires that associated GPIO events such as the RailCom cutout and Debug period have to be delayed relative to the words they are intended to accompany. This ultimately requires in some cases that the bitstream loop be partially or even completely unrolled in order to generate a correct repeating output.
-public struct QueuedBitstream : CustomDebugStringConvertible {
+public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     
     /// Raspberry Pi hardware information.
     public let raspberryPi: RaspberryPi
@@ -625,6 +625,10 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
         }
         
         return description
+    }
+    
+    public static func ==(lhs: QueuedBitstream, rhs: QueuedBitstream) -> Bool {
+        return lhs.controlBlocks == rhs.controlBlocks && lhs.data == rhs.data && lhs.breakpoints == rhs.breakpoints
     }
     
 }
