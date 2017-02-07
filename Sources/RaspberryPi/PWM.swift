@@ -129,6 +129,7 @@ public struct PWMDMAConfiguration : OptionSet, CustomStringConvertible {
     public var description: String {
         var parts: [String] = []
 
+        if contains(.enabled) { parts.append(".enabled") }
         parts.append(".dreqThreshold(\(dreqThreshold))")
         parts.append(".panicThreshold(\(panicThreshold))")
         
