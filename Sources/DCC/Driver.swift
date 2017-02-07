@@ -26,6 +26,11 @@ public class Driver {
 
     public let raspberryPi: RaspberryPi
 
+    /// Number of DREQ signals to delay non-PWM events to synchronize with the PWM output.
+    ///
+    /// Writing to the PWM FIFO does not immediately result in output, instead the word that we write is first placed into the FIFO, and then next into the PWM's internal queue, before being output. Thus to synchronize an external event, such as a GPIO, with the PWM output we delay it by this many DREQ signals.
+    static let eventDelay = 2
+
     /// Queue of bitstreams.
     ///
     /// The first bitstream in the queue is the one that most recently begun, the last bitstream in the queue is the one that will be repeated.

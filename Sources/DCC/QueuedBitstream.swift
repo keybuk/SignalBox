@@ -213,11 +213,6 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     /// Helper structure to encapsulate an ordered queue of delayed `BitstreamEvent`.
     struct DelayedEvents : Hashable {
         
-        /// Number of DREQ signals to delay non-PWM events to synchronize with the PWM output.
-        ///
-        /// Writing to the PWM FIFO does not immediately result in output, instead the word that we write is first placed into the FIFO, and then next into the PWM's internal queue, before being output. Thus to synchronize an external event, such as a GPIO, with the PWM output we delay it by this many DREQ signals.
-        static let eventDelay = 2
-        
         /// Set of events being delayed, along with the current delay.
         var events: [(event: BitstreamEvent, delay: Int)] = []
         
@@ -226,7 +221,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         /// - Parameters:
         ///   - event: event to be added.
         mutating func addEvent(_ event: BitstreamEvent) {
-            events.append((event: event, delay: DelayedEvents.eventDelay))
+            events.append((event: event, delay: Driver.eventDelay))
         }
         
         /// Reduce the delay of all events.
