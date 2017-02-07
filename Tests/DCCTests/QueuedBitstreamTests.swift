@@ -865,14 +865,14 @@ class QueuedBitstreamTests : XCTestCase {
         XCTAssertEqual(parsed.data[12], -1)
     }
     
-    /// Test that a loop is not repeated, and the last value set to zero, if stopAfterTransmitting is set to true.
-    func testParseBitstreamStopAfterTransmitting() {
+    /// Test that a loop is not repeated, and the last value set to zero, if repeating is set to true.
+    func testParseBitstreamRepeating() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
 
         var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
-        try! parsed.parseBitstream(bitstream, stopAfterTransmitting: true)
+        try! parsed.parseBitstream(bitstream, repeating: false)
         
         XCTAssertEqual(parsed.controlBlocks.count, 5)
         XCTAssertEqual(parsed.data.count, 6)
@@ -895,17 +895,17 @@ class QueuedBitstreamTests : XCTestCase {
         XCTAssertEqual(parsed.data[5], -1)
     }
     
-    /// Test that a loop is not unrolled even if there are delayed events, if stopAfterTransmitting is set to true.
+    /// Test that a loop is not unrolled even if there are delayed events, if repeating is set to true.
     ///
     /// The breakpoint will have the delayedEvents.
-    func testParseBitstreamStopAfterTransmittingDoesntUnroll() {
+    func testParseBitstreamRepeatingDoesntUnroll() {
         var bitstream = Bitstream(bitDuration: 14.5, wordSize: 32)
         bitstream.append(physicalBits: randomWords[0], count: 32)
         bitstream.append(physicalBits: randomWords[1], count: 32)
         bitstream.append(.debugStart)
 
         var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
-        try! parsed.parseBitstream(bitstream, stopAfterTransmitting: true)
+        try! parsed.parseBitstream(bitstream, repeating: false)
         
         XCTAssertEqual(parsed.controlBlocks.count, 5)
         XCTAssertEqual(parsed.data.count, 6)
@@ -1909,7 +1909,7 @@ class QueuedBitstreamTests : XCTestCase {
         bitstream.append(physicalBits: randomWords[0], count: 32)
         
         var parsed = QueuedBitstream(raspberryPi: raspberryPi, wordSize: bitstream.wordSize)
-        try! parsed.parseBitstream(bitstream, stopAfterTransmitting: true)
+        try! parsed.parseBitstream(bitstream, repeating: false)
         let oldControlBlocks = parsed.controlBlocks
         
         try! parsed.commit()
@@ -2119,8 +2119,8 @@ extension QueuedBitstreamTests {
             ("testParseBitstreamGPIOEventUnrollsLoopTwice", testParseBitstreamGPIOEventUnrollsLoopTwice),
             ("testParseBitstreamGPIOEventUnrollsLoopTwiceNotToStart", testParseBitstreamGPIOEventUnrollsLoopTwiceNotToStart),
             ("testParseBitstreamGPIOEventUnrollsLoopRepeatingData", testParseBitstreamGPIOEventUnrollsLoopRepeatingData),
-            ("testParseBitstreamStopAfterTransmitting", testParseBitstreamStopAfterTransmitting),
-            ("testParseBitstreamStopAfterTransmittingDoesntUnroll", testParseBitstreamStopAfterTransmittingDoesntUnroll),
+            ("testParseBitstreamRepeating", testParseBitstreamRepeating),
+            ("testParseBitstreamRepeatingDoesntUnroll", testParseBitstreamRepeatingDoesntUnroll),
         
             ("testParseBitstreamWithRepeatingSection", testParseBitstreamWithRepeatingSection),
             ("testParseBitstreamGPIOEventUnrollsToRepeatingSection", testParseBitstreamGPIOEventUnrollsToRepeatingSection),

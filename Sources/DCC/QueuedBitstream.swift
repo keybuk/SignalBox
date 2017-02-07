@@ -275,14 +275,14 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     /// - Parameters:
     ///   - bitstream: the `Bitstream` to be parsed.
     ///   - breakpoint: optional `Breakpoint` information from another queued bitstream to be resumed from.
-    ///   - stopAfterTransmitting: when `true`, the loop will not be unrolled and the end block will have a zero `nextControlBlockAddress`.
+    ///   - repeating: when `false`, the loop will not be unrolled and the end block will have a zero `nextControlBlockAddress`.
     ///
     /// - Returns: offset of control block that begins the bitstream.
     ///
     /// - Throws:
     ///   `DriverError.bitstreamContainsNoData` if `bitstream` is missing data records, which may include within a repeating section. Recommended recovery is to add preamble bits and try again.
     @discardableResult
-    public mutating func parseBitstream(_ bitstream: Bitstream, transferringFrom breakpoint: Breakpoint? = nil, stopAfterTransmitting: Bool = false) throws -> Int {
+    public mutating func parseBitstream(_ bitstream: Bitstream, transferringFrom breakpoint: Breakpoint? = nil, repeating: Bool = true) throws -> Int {
         guard memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
 
         // Keep track of the current range register value, since we don't know what it was prior to this bitstream beginning, use zero so that the first data event will always set it correctly.
@@ -392,7 +392,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
             if appendEnd {
                 addControlBlockForEnd()
                 breakpoints.append(Breakpoint(controlBlockOffset: controlBlocks.count - 1, range: range, delayedEvents: delayedEvents))
-                if stopAfterTransmitting {
+                if !repeating {
                     break
                 }
 
@@ -496,15 +496,15 @@ public struct QueuedBitstream : CustomDebugStringConvertible {
     /// - Parameters:
     ///   - previousBitstream: queued bitstream to transfer from.
     ///   - bitstream: bitstream to parse.
-    ///   - stopAfterTransmitting: when `true`, the loops will not be unrolled and the end blocks will have a zero `nextControlBlockAddress`.
+    ///   - repeating: when `false`, the loops will not be unrolled and the end blocks will have a zero `nextControlBlockAddress`.
     ///
     /// - Returns: list of transfer offsets into the new queued bitstream.
-    public mutating func transfer(from previousBitstream: QueuedBitstream, into bitstream: Bitstream, stopAfterTransmitting: Bool = false) throws -> [Int] {
+    public mutating func transfer(from previousBitstream: QueuedBitstream, into bitstream: Bitstream, repeating: Bool = true) throws -> [Int] {
         guard memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
 
         var transferOffsets: [Int] = []
         for breakpoint in previousBitstream.breakpoints {
-            let transferOffset = try parseBitstream(bitstream, transferringFrom: breakpoint, stopAfterTransmitting: stopAfterTransmitting)
+            let transferOffset = try parseBitstream(bitstream, transferringFrom: breakpoint, repeating: repeating)
             transferOffsets.append(transferOffset)
         }
         
