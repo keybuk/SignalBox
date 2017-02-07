@@ -39,6 +39,16 @@ class DriverTests : XCTestCase {
         uncachedData[0] = -1
     }
     
+    func pauseForTransmitting(driver: Driver) {
+        Thread.sleep(forTimeInterval: 0.1)
+        driver.dispatchQueue.sync { }
+    }
+    
+    func waitForRepeating(driver: Driver) {
+        XCTAssertEqual(driver.dispatchGroup.wait(timeout: .now() + .seconds(1)), .success)
+        driver.dispatchQueue.sync { }
+    }
+    
     
     // MARK: Queue testing.
     
@@ -101,15 +111,15 @@ class DriverTests : XCTestCase {
             completionSemaphore.signal()
         }
         
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
         XCTAssertFalse(completionHandlerRun)
 
-        markRepeating(driver.bitstreamQueue[0])
-        markRepeating(driver.bitstreamQueue[1])
-        XCTAssertEqual(driver.dispatchGroup.wait(timeout: .now() + .seconds(1)), .success)
-        XCTAssertEqual(completionSemaphore.wait(timeout: .now() + .seconds(1)), .success)
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markRepeating(driver.bitstreamQueue[1])
+        }
+        waitForRepeating(driver: driver)
         
+        XCTAssertEqual(completionSemaphore.wait(timeout: .now() + .seconds(1)), .success)
         XCTAssertTrue(completionHandlerRun)
         
         driver.isRunning = false
@@ -130,10 +140,11 @@ class DriverTests : XCTestCase {
 
         try! driver.queue(bitstream: bitstream1)
         
-        markRepeating(driver.bitstreamQueue[0])
-        markTransmitting(driver.bitstreamQueue[1])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markTransmitting(driver.bitstreamQueue[1])
+        }
+        pauseForTransmitting(driver: driver)
 
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
 
@@ -178,9 +189,11 @@ class DriverTests : XCTestCase {
         
         try! driver.queue(bitstream: bitstream1)
         
-        markRepeating(driver.bitstreamQueue[0])
-        markRepeating(driver.bitstreamQueue[1])
-        XCTAssertEqual(driver.dispatchGroup.wait(timeout: .now() + .seconds(1)), .success)
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markRepeating(driver.bitstreamQueue[1])
+        }
+        waitForRepeating(driver: driver)
         
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
         
@@ -225,10 +238,11 @@ class DriverTests : XCTestCase {
         let queuedBitstream = driver.bitstreamQueue[1]
         
         // Mark the start bitstream repeating, and the queued bitstream as transmitting.
-        markRepeating(driver.bitstreamQueue[0])
-        markTransmitting(queuedBitstream)
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markTransmitting(queuedBitstream)
+        }
+        pauseForTransmitting(driver: driver)
         
         // The startup bitstream should have been removed from the queue and its memory freed.
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
@@ -252,10 +266,11 @@ class DriverTests : XCTestCase {
         XCTAssertEqual(driver.bitstreamQueue.count, 2)
         
         // Mark the start bitstream repeating, and the queued bitstream as transmitting.
-        markRepeating(driver.bitstreamQueue[0])
-        markTransmitting(driver.bitstreamQueue[1])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markTransmitting(driver.bitstreamQueue[1])
+        }
+        pauseForTransmitting(driver: driver)
         
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
         
@@ -271,10 +286,11 @@ class DriverTests : XCTestCase {
         let queuedBitstream = driver.bitstreamQueue[1]
         
         // Mark the previous bitstream repeating, and the queued bitstream as transmitting.
-        markRepeating(driver.bitstreamQueue[0])
-        markTransmitting(queuedBitstream)
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markTransmitting(queuedBitstream)
+        }
+        pauseForTransmitting(driver: driver)
 
         // The previous bitstream should have been removed from the queue and its memory freed.
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
@@ -339,10 +355,11 @@ class DriverTests : XCTestCase {
         weak var stopMemory = driver.bitstreamQueue[2].memory
 
         // Mark the start bitstream repeating, and the queued bitstream as transmitting.
-        markRepeating(driver.bitstreamQueue[0])
-        markTransmitting(driver.bitstreamQueue[1])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markTransmitting(driver.bitstreamQueue[1])
+        }
+        pauseForTransmitting(driver: driver)
         
         // The startup bitstream should have been removed from the queue, with the queued and stop ones remaining and still not freed.
         XCTAssertEqual(driver.bitstreamQueue.count, 2)
@@ -350,22 +367,25 @@ class DriverTests : XCTestCase {
         XCTAssertNotNil(stopMemory)
         
         // Now mark the queued bitstream as repeating, and the stop bitstream as transmitting.
-        markRepeating(driver.bitstreamQueue[0])
-        markTransmitting(driver.bitstreamQueue[1])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markTransmitting(driver.bitstreamQueue[1])
+        }
+        pauseForTransmitting(driver: driver)
 
         // The queued bitstream should now have been removed from the queue as well, with only the stop one remaining and still not freed.
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
         XCTAssertNil(queuedMemory)
         XCTAssertNotNil(stopMemory)
-
-        // Mark DMA inactive, amnd the stop bitstream as transmitted/repeating. It should remove itself from the queue, and free its memory.
-        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        dma.controlStatus.remove(.active)
         
-        markRepeating(driver.bitstreamQueue[0])
-        XCTAssertEqual(driver.dispatchGroup.wait(timeout: .now() + .seconds(1)), .success)
+        driver.dispatchQueue.sync {
+            // Mark DMA inactive, amnd the stop bitstream as transmitted/repeating. It should remove itself from the queue, and free its memory.
+            var dma = raspberryPi.dma(channel: Driver.dmaChannel)
+            dma.controlStatus.remove(.active)
+
+            markRepeating(driver.bitstreamQueue[0])
+        }
+        waitForRepeating(driver: driver)
 
         XCTAssertEqual(driver.bitstreamQueue.count, 0)
         XCTAssertNil(stopMemory)
@@ -390,11 +410,12 @@ class DriverTests : XCTestCase {
         let stopBitstream = driver.bitstreamQueue[2]
 
         // Skip to the stop bitstream being transmitting and the others repeating.
-        markRepeating(driver.bitstreamQueue[0])
-        markRepeating(driver.bitstreamQueue[1])
-        markTransmitting(driver.bitstreamQueue[2])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markRepeating(driver.bitstreamQueue[1])
+            markTransmitting(driver.bitstreamQueue[2])
+        }
+        pauseForTransmitting(driver: driver)
 
         // Queue another bitstream. The stop bitstream should be first in the queue, and the new bitstream after it.
         var bitstream2 = Bitstream(bitDuration: driver.bitDuration, wordSize: 32)
@@ -436,11 +457,12 @@ class DriverTests : XCTestCase {
         weak var stopMemory = driver.bitstreamQueue[2].memory
         
         // Skip to the stop bitstream being transmitting and the others repeating.
-        markRepeating(driver.bitstreamQueue[0])
-        markRepeating(driver.bitstreamQueue[1])
-        markTransmitting(driver.bitstreamQueue[2])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markRepeating(driver.bitstreamQueue[1])
+            markTransmitting(driver.bitstreamQueue[2])
+        }
+        pauseForTransmitting(driver: driver)
         
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
         XCTAssertNotNil(stopMemory)
@@ -456,10 +478,11 @@ class DriverTests : XCTestCase {
         let startBitstream = driver.bitstreamQueue[1]
 
         // Now mark the previous stop bitstream as repeating (ended), and the new one as transmitting.
-        markRepeating(driver.bitstreamQueue[0])
-        markTransmitting(driver.bitstreamQueue[1])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markTransmitting(driver.bitstreamQueue[1])
+        }
+        pauseForTransmitting(driver: driver)
 
         // Make sure the new one is still in the queue, but the old one is freed.
         XCTAssertEqual(driver.bitstreamQueue.count, 2)
@@ -486,15 +509,18 @@ class DriverTests : XCTestCase {
         let stopBitstream = driver.bitstreamQueue[2]
         
         // Skip to the stop bitstream being transmitting and the others repeating.
-        markRepeating(driver.bitstreamQueue[0])
-        markRepeating(driver.bitstreamQueue[1])
-        markTransmitting(driver.bitstreamQueue[2])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markRepeating(driver.bitstreamQueue[1])
+            markTransmitting(driver.bitstreamQueue[2])
+        }
+        pauseForTransmitting(driver: driver)
         
-        // Remove the active bit, simulating the difference between it being processed and our code noticing.
         var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        dma.controlStatus.remove(.active)
+        let _ = driver.dispatchQueue.sync {
+            // Remove the active bit, simulating the difference between it being processed and our code noticing.
+            dma.controlStatus.remove(.active)
+        }
         
         // Queue another bitstream. The stop bitstream should be first in the queue, and the new bitstream after it.
         var bitstream2 = Bitstream(bitDuration: driver.bitDuration, wordSize: 32)
@@ -530,18 +556,21 @@ class DriverTests : XCTestCase {
         weak var stopMemory = driver.bitstreamQueue[2].memory
         
         // Skip to the stop bitstream being transmitting and the others repeating.
-        markRepeating(driver.bitstreamQueue[0])
-        markRepeating(driver.bitstreamQueue[1])
-        markTransmitting(driver.bitstreamQueue[2])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markRepeating(driver.bitstreamQueue[1])
+            markTransmitting(driver.bitstreamQueue[2])
+        }
+        pauseForTransmitting(driver: driver)
         
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
         XCTAssertNotNil(stopMemory)
         
-        // Remove the active bit, simulating the difference between it being processed and our code noticing.
-        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        dma.controlStatus.remove(.active)
+        driver.dispatchQueue.sync {
+            // Remove the active bit, simulating the difference between it being processed and our code noticing.
+            var dma = raspberryPi.dma(channel: Driver.dmaChannel)
+            dma.controlStatus.remove(.active)
+        }
         
         // Queue another bitstream
         var bitstream2 = Bitstream(bitDuration: driver.bitDuration, wordSize: 32)
@@ -554,10 +583,11 @@ class DriverTests : XCTestCase {
         let startBitstream = driver.bitstreamQueue[1]
         
         // Now mark the previous stop bitstream as repeating (ended), simulating us catching up and noticing, and the new one as transmitting.
-        markRepeating(driver.bitstreamQueue[0])
-        markTransmitting(driver.bitstreamQueue[1])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markTransmitting(driver.bitstreamQueue[1])
+        }
+        pauseForTransmitting(driver: driver)
         
         // Make sure the new one is still in the queue, but the old one is freed.
         XCTAssertEqual(driver.bitstreamQueue.count, 2)
@@ -620,6 +650,7 @@ class DriverTests : XCTestCase {
         
         try! driver.queue(bitstream: bitstream)
         
+        // The completion handler is asynchronous after the completion, so use a semaphore to wait for it.
         try! driver.stop { }
         
         XCTAssertEqual(driver.bitstreamQueue.count, 3)
@@ -627,23 +658,26 @@ class DriverTests : XCTestCase {
         weak var stopMemory = driver.bitstreamQueue[2].memory
         
         // Fast forward to the stop bitstream transmitting.
-        markRepeating(driver.bitstreamQueue[0])
-        markRepeating(driver.bitstreamQueue[1])
-        markTransmitting(driver.bitstreamQueue[2])
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
+        driver.dispatchQueue.sync {
+            markRepeating(driver.bitstreamQueue[0])
+            markRepeating(driver.bitstreamQueue[1])
+            markTransmitting(driver.bitstreamQueue[2])
+        }
+        pauseForTransmitting(driver: driver)
         
         // Stop should not yet be freed.
         XCTAssertEqual(driver.bitstreamQueue.count, 1)
         XCTAssertNotNil(stopMemory)
         
-        // Mark DMA inactive, amnd the stop bitstream as transmitted/repeating. It should remove itself from the queue, and free its memory.
-        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        dma.controlStatus.remove(.active)
+        driver.dispatchQueue.sync {
+            // Mark DMA inactive, amnd the stop bitstream as transmitted/repeating. It should remove itself from the queue, and free its memory.
+            var dma = raspberryPi.dma(channel: Driver.dmaChannel)
+            dma.controlStatus.remove(.active)
         
-        markRepeating(driver.bitstreamQueue[0])
-        XCTAssertEqual(driver.dispatchGroup.wait(timeout: .now() + .seconds(1)), .success)
-        
+            markRepeating(driver.bitstreamQueue[0])
+        }
+        waitForRepeating(driver: driver)
+
         XCTAssertEqual(driver.bitstreamQueue.count, 0)
         XCTAssertNil(stopMemory)
         
@@ -669,21 +703,18 @@ class DriverTests : XCTestCase {
             completionSemaphore.signal()
         }
         
-        Thread.sleep(forTimeInterval: 0.1)
-        driver.dispatchQueue.sync { }
-        XCTAssertFalse(completionHandlerRun)
-
-        // Mark DMA inactive, amnd the stop bitstream as transmitted/repeating.
-        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        dma.controlStatus.remove(.active)
-
-        markRepeating(driver.bitstreamQueue[0])
-        markRepeating(driver.bitstreamQueue[1])
-        markRepeating(driver.bitstreamQueue[2])
-        XCTAssertEqual(driver.dispatchGroup.wait(timeout: .now() + .seconds(1)), .success)
+        driver.dispatchQueue.sync {
+            // Mark DMA inactive, and the stop bitstream as transmitted/repeating.
+            var dma = raspberryPi.dma(channel: Driver.dmaChannel)
+            dma.controlStatus.remove(.active)
+            
+            markRepeating(driver.bitstreamQueue[0])
+            markRepeating(driver.bitstreamQueue[1])
+            markRepeating(driver.bitstreamQueue[2])
+        }
+        waitForRepeating(driver: driver)
         
         XCTAssertEqual(completionSemaphore.wait(timeout: .now() + .seconds(1)), .success)
-        
         XCTAssertTrue(completionHandlerRun)
         
         driver.isRunning = false
@@ -705,8 +736,8 @@ class DriverTests : XCTestCase {
         }
         
         XCTAssertEqual(driver.bitstreamQueue.count, 0)
-        XCTAssertEqual(completionSemaphore.wait(timeout: .now() + .seconds(1)), .success)
         
+        XCTAssertEqual(completionSemaphore.wait(timeout: .now() + .seconds(1)), .success)
         XCTAssertTrue(completionHandlerRun)
         
         driver.isRunning = false

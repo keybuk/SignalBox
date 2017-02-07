@@ -239,7 +239,6 @@ public class Driver {
                     var dma = self.raspberryPi.dma(channel: Driver.dmaChannel)
                     if !dma.controlStatus.contains(.active) {
                         self.bitstreamQueue.remove(at: 0)
-                        assert(self.bitstreamQueue.isEmpty, "Bitstream queue should be empty")
                     }
                 }
                 
