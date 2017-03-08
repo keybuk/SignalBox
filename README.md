@@ -3,6 +3,8 @@ Project to build a DCC computer control system that will allow completely autono
 
 For hardware a Raspberry Pi is used as the "command station" component, with both the Booster and RailCom components based on custom boards managed by Arduino/AVR microcontrollers.
 
+[See the Wiki](https://github.com/keybuk/SignalBox/wiki) for more information and documentation.
+
 ## Why not use JMRI or Arduino DCC++?
 
 For the same reason that some modellers enjoy kit or scratch-building their models or scenery instead of using ready-to-run items.
