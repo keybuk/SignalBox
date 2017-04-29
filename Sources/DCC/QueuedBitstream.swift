@@ -435,8 +435,8 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
             }
         }
         
-        memory.pointer.bindMemory(to: DMAControlBlock.self, capacity: controlBlocks.count).initialize(from: controlBlocks)
-        memory.pointer.advanced(by: controlBlocksSize).bindMemory(to: Int.self, capacity: data.count).initialize(from: data)
+        memory.pointer.initializeMemory(as: DMAControlBlock.self, from: controlBlocks, count: controlBlocks.count)
+        memory.pointer.advanced(by: controlBlocksSize).initializeMemory(as: Int.self, from: data, count: data.count)
         
         self.memory = memory
         self.controlBlockOffsets.removeAll()
