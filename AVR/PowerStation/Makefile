@@ -2,9 +2,9 @@ AVRPROG = usbtiny
 AVRCHIP = atmega328p
 
 
-all: test1.hex
+all: powerstation.hex
 
-test1.elf: test1.o uart.o
+powerstation.elf: powerstation.o uart.o
 	avr-gcc -mmcu=atmega328p -Wl,-u,vfprintf -lprintf_flt -lm -o $@ $^
 
 .elf.hex:
@@ -16,9 +16,9 @@ test1.elf: test1.o uart.o
 	avr-gcc -Os -DF_CPU=16000000UL -mmcu=atmega328p -o $@ -c $<
 
 clean:
-	-rm test1.hex test1.elf test1.o uart.o
+	-rm powerstation.hex powerstation.elf powerstation.o uart.o
 
-flash: test1.hex
+flash: powerstation.hex
 	avrdude -c $(AVRPROG) -p $(AVRCHIP) -U flash:w:$<
 
 .PHONY: all clean flash
