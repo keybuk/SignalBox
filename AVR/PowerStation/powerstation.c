@@ -13,7 +13,7 @@
 
 #include <stdio.h>
 
-#include "uart.h"
+#include "lcd.h"
 
 
 // Reason for engaging the brake pin.
@@ -28,6 +28,29 @@ volatile int brake;
 // v is the next value to be written, v_fill is true once values is filled.
 #define VALUES 8
 volatile int values[VALUES], v, v_fill;
+
+// Magic constant multiplier to convert ADC values into Output Amps.
+// Derived from:
+//   Vmin = 0.0 (at v = 0)
+//   Vmax = 5.0 (at v = 1024)
+//
+//                     v - Vmin
+//   V = Vmin + Vmax * --------
+//                       1024
+//
+//                377
+//   I = Iout * -------
+//              1000000
+//
+//   R = 2200
+//
+//   V = IR
+//
+//        v              377
+//   5 * ---- = Iout * ------- * 2200
+//       1024          1000000
+//
+const float value_mult = 5.0 * 1 / 1024.0 * 1000000.0 / 377.0 * 1.0 / 2200.0;
 
 
 // INT0 Interrupt.
@@ -109,56 +132,29 @@ int main()
   // Ready to roll; re-enable interrupts.
   sei();
 
-  uart_init(UART_BAUD_SELECT(9600, F_CPU));
-  uart_puts("DCC PowerStation\r\n");
+  lcd_init(LCD_DISP_ON);
+  lcd_clrscr();
+  lcd_puts("DCC PowerStation");
 
   for (;;) {
-    char buffer[80];
-    int value = 0;
-    float amps;
-
+    long value = 0;
     for (int i = 0; i < v_fill ? VALUES : v; ++i)
       value += values[i];
     if (v_fill || v)
       value /= v_fill ? VALUES : v;
 
-    // value is 0=0, 1024=5.0
+    float amps = value * value_mult;
 
-    // Vmax = 4.9764
-    // Imax = 6 * 0.000377 = 0.002262
-    // R = 2200
-
-    // V = IR
-    
-    //          va
-    // V = 5 * ----
-    //         1024
-
-    //      va
-    // 5 * ---- = IR
-    //     1024
-
-    //      va
-    // 5 * ---- = I * 2200
-    //     1024
-
-    //      va.     1
-    // 5 * ---- * ---- = I
-    //     1024   2200
-
-    //        1
-    // I * -------- = Iout
-    //     0.000377
-
-    amps = 5.0 * value / 1024.0 * 1.0 / 2200.0 * 1.0 / 0.000377;
-
+    char buffer[17];
     if (brake & _BV(NO_SIGNAL))
-      uart_puts("No signal - ");
-    if (brake & _BV(OVERLOAD))
-      uart_puts("Overload - ");
+      sprintf(buffer, "No Signal %5.2fA", amps);
+    else if (brake & _BV(OVERLOAD))
+      sprintf(buffer, "Overload  %5.2fA", amps);
+    else
+      sprintf(buffer, "          %5.2fA", amps);
 
-    sprintf(buffer, "value = %d  %.2fA\r\n", value, amps);
-    uart_puts(buffer);
+    lcd_gotoxy(0, 1);
+    lcd_puts(buffer);
     _delay_ms(500);
   }
 }
