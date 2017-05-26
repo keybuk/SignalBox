@@ -2,3 +2,6 @@
 /.build
 /Packages
 /*.xcodeproj
+AVR/PowerStation/*.o
+AVR/PowerStation/*.elf
+AVR/PowerStation/*.hex
