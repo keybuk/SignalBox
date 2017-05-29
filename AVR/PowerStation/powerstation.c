@@ -14,6 +14,7 @@
 #include <stdio.h>
 
 #include "lcd.h"
+#include "uart.h"
 
 
 // Reason for engaging the brake pin.
@@ -126,11 +127,15 @@ int main()
 
   // Configure the ADC in free-running mode, reading from ADC0, generating
   // interrupts on new data, and with a clock pre-scalar of 128.
+  ADMUX = _BV(REFS0);
   ADCSRA = _BV(ADEN) | _BV(ADSC) | _BV(ADATE) | _BV(ADIE) |
            _BV(ADPS2) | _BV(ADPS1) | _BV(ADPS0);
 
   // Ready to roll; re-enable interrupts.
   sei();
+
+  uart_init(UART_BAUD_SELECT(9600, F_CPU));
+  uart_puts("Running\r\n");
 
   lcd_init(LCD_DISP_ON);
   lcd_clrscr();
@@ -138,10 +143,23 @@ int main()
 
   for (;;) {
     long value = 0;
-    for (int i = 0; i < v_fill ? VALUES : v; ++i)
+    int vmax = 0;
+    for (int i = 0; i < (v_fill ? VALUES : v); ++i) {
       value += values[i];
-    if (v_fill || v)
+      vmax = (values[i] < vmax) ? vmax : values[i];
+    }
+    if (v_fill || v) {
       value /= v_fill ? VALUES : v;
+
+      char line[80];
+      sprintf(line, "Brake: %c%c. Last value %d, avg: %d, max: %d\r\n",
+        brake & _BV(NO_SIGNAL) ? 'S' : '-',
+        brake & _BV(OVERLOAD) ? 'O' : '-',
+        values[v ? v - 1 : VALUES - 1],
+        value,
+        vmax);
+      uart_puts(line);
+    }
 
     float amps = value * value_mult;
 
