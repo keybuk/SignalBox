@@ -13,8 +13,12 @@
 
 #include <stdio.h>
 
+#if WITH_LCD
 #include "lcd.h"
+#endif
+#if WITH_UART
 #include "uart.h"
+#endif
 
 
 // Reason for engaging the brake pin.
@@ -134,13 +138,17 @@ int main()
   // Ready to roll; re-enable interrupts.
   sei();
 
+#if WITH_UART
   uart_init(UART_BAUD_SELECT(9600, F_CPU));
   uart_puts("Running\r\n");
+#endif
 
+#if WITH_LCD
   lcd_init(LCD_DISP_ON);
   lcd_clrscr();
   lcd_puts("DCC PowerStation");
-
+#endif
+  
   for (;;) {
     long value = 0;
     int vmax = 0;
@@ -151,6 +159,7 @@ int main()
     if (v_fill || v) {
       value /= v_fill ? VALUES : v;
 
+#if WITH_UART
       char line[80];
       sprintf(line, "Brake: %c%c. Last value %d, avg: %d, max: %d\r\n",
         brake & _BV(NO_SIGNAL) ? 'S' : '-',
@@ -159,8 +168,10 @@ int main()
         value,
         vmax);
       uart_puts(line);
+#endif
     }
 
+#if WITH_LCD
     float amps = value * value_mult;
 
     char buffer[17];
@@ -173,6 +184,7 @@ int main()
 
     lcd_gotoxy(0, 1);
     lcd_puts(buffer);
+#endif
     _delay_ms(500);
   }
 }
