@@ -161,7 +161,7 @@ int main()
 
 #if WITH_UART
       char line[80];
-      sprintf(line, "Brake: %c%c. Last value %d, avg: %d, max: %d\r\n",
+      sprintf(line, "Brake: %c%c. Last value %d, avg: %ld, max: %d\r\n",
         brake & _BV(NO_SIGNAL) ? 'S' : '-',
         brake & _BV(OVERLOAD) ? 'O' : '-',
         values[v ? v - 1 : VALUES - 1],
