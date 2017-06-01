@@ -23,7 +23,7 @@
 volatile int brake;
 
 // Overload threshold.
-#define THRESHOLD 1000
+#define THRESHOLD 512
 
 // Store more than one recent analog value so we can display an average.
 // v is the next value to be written, v_fill is true once values is filled.
