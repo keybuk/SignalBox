@@ -158,6 +158,7 @@ int main()
     }
     if (v_fill || v) {
       value /= v_fill ? VALUES : v;
+    float amps = vmax * value_mult;
 
 #if WITH_UART
       char line[80];
@@ -172,8 +173,6 @@ int main()
     }
 
 #if WITH_LCD
-    float amps = value * value_mult;
-
     char buffer[17];
     if (brake & _BV(NO_SIGNAL))
       sprintf(buffer, "No Signal %5.2fA", amps);
