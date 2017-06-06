@@ -6,8 +6,8 @@
 //
 //
 
-#include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/io.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -161,10 +161,6 @@ int main()
 			bit = 0;
 		} else {
 			// On an invalid bit length, attempt to resynchronize the phase.
-			char line[80];
-			sprintf(line, "Invalid bit length: %lu\r\n", length);
-			uart_puts(line);
-
 			phase = UNKNOWN;
 			last_bit = -1;
 			goto next_edge;
@@ -196,10 +192,6 @@ int main()
 			// Bits must match between phases; if they don't, we've probably
 			// gone out of phase, so resynchronize again.
 			if (last_bit != bit) {
-				char line[80];
-				sprintf(line, "Bit length didn't match in B: %d != %d\r\n", bit, last_bit);
-				uart_puts(line);
-
 				phase = UNKNOWN;
 				last_bit = -1;
 				goto next_edge;
@@ -209,10 +201,6 @@ int main()
 			// treat it the same as if we had non-matching bits and
 			// resynchronize the phase.
 			if (bit && DELTA(length, last_length) > 8) {
-				char line[80];
-				sprintf(line, "Invalid delta: %lu - %lu\r\n", length, last_length);
-				uart_puts(line);
-
 				phase = UNKNOWN;
 				last_bit = -1;
 				goto next_edge;
@@ -290,12 +278,11 @@ int main()
 		}
 
 next_edge:
-		// Make sure no edge has occurred while we were processing.
+		// Make sure no edge has occurred while we were processing. If one did
+		// then either the signal is changing too fast, in which case it's not
+		// DCC anymore; or we're taking too long to process it, in which case
+		// it's better to start again than try to catch up.
 		if (edge) {
-			char line[80];
-			sprintf(line, "Edge occurred during processing\r\n");
-			uart_puts(line);
-
 			phase = UNKNOWN;
 			last_bit = -1;
 		}
