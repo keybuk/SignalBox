@@ -1,27 +1,12 @@
 AVRPROG = usbtiny
 AVRCHIP = atmega328p
 
-FLAGS = -DF_CPU=16000000UL -DWITH_UART=1
+FLAGS = -DF_CPU=16000000UL
 
 all: detector.hex
 
-DEPS =
-HEADERS =
-ifneq (,$(findstring -DWITH_UART=1,$(FLAGS)))
-DEPS += uart.o
-HEADERS += uart.h
 
-uart.o: uart.h
-endif
-ifneq (,$(findstring -DWITH_LCD=1,$(FLAGS)))
-DEPS += lcd.o
-HEADERS += lcd.h
-
-lcd.o: lcd.h
-endif
-
-
-detector.elf: detector.o $(DEPS)
+detector.elf: detector.o uart.o
 	avr-gcc -mmcu=atmega328p -Wl,-u,vfprintf -lprintf_flt -lm -o $@ $^
 
 .elf.hex:
@@ -29,13 +14,14 @@ detector.elf: detector.o $(DEPS)
 
 .SUFFIXES: .hex .elf
 
-detector.o: $(HEADERS)
+detector.o: uart.h
+uart.o: uart.h
 
 .c.o:
 	avr-gcc -Os $(FLAGS) -mmcu=atmega328p -o $@ -c $<
 
 clean:
-	-rm detector.hex detector.elf detector.o lcd.o uart.o
+	-rm detector.hex detector.elf detector.o uart.o
 
 flash: detector.hex
 	avrdude -c $(AVRPROG) -p $(AVRCHIP) -U flash:w:$<
