@@ -163,6 +163,9 @@ int main()
 			// On an invalid bit length, attempt to resynchronize the phase.
 			phase = UNKNOWN;
 			last_bit = -1;
+			uart_puts("\a!L");
+			uart_putc(' ' + length);
+			uart_puts("\r\n");
 			goto next_edge;
 		}
 
@@ -194,6 +197,9 @@ int main()
 			if (last_bit != bit) {
 				phase = UNKNOWN;
 				last_bit = -1;
+				uart_puts("\a!M");
+				uart_putc(bit ? '1' : '0');
+				uart_puts("\r\n");
 				goto next_edge;
 			}
 
@@ -203,6 +209,9 @@ int main()
 			if (bit && DELTA(length, last_length) > 8) {
 				phase = UNKNOWN;
 				last_bit = -1;
+				uart_puts("\a!D");
+				uart_putc(' ' + DELTA(length, last_length));
+				uart_puts("\r\n");
 				goto next_edge;
 			}
 
@@ -268,7 +277,7 @@ int main()
 		if (bit) {
 			// Last byte in the instruction is always the error check byte.
 			if (byte != check_byte) {
-				uart_puts(" ERR\r\n");
+				uart_puts(" \aERR\r\n");
 			} else {
 				uart_puts(" OK\r\n");
 			}
@@ -285,6 +294,7 @@ next_edge:
 		if (edge) {
 			phase = UNKNOWN;
 			last_bit = -1;
+			uart_puts("\a!E\r\n");
 		}
 	}
 }
