@@ -1,5 +1,5 @@
 //
-//  detector.c
+//  decoder.c
 //  SignalBox
 //
 //  Created by Scott James Remnant on 06/05/17.
