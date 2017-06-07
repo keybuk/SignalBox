@@ -11,9 +11,9 @@ ifneq (,$(findstring -DWITH_LCD=1,$(FLAGS)))
 	DEPS += lcd.o
 endif
 
-all: powerstation.hex
+all: booster.hex
 
-powerstation.elf: powerstation.o $(DEPS)
+booster.elf: booster.o $(DEPS)
 	avr-gcc -mmcu=atmega328p -Wl,-u,vfprintf -lprintf_flt -lm -o $@ $^
 
 .elf.hex:
@@ -23,15 +23,15 @@ powerstation.elf: powerstation.o $(DEPS)
 
 uart.o: uart.h
 lcd.o: lcd.h
-powerstation.o: uart.h lcd.h
+booster.o: uart.h lcd.h
 
 .c.o:
 	avr-gcc -Os $(FLAGS) -mmcu=atmega328p -o $@ -c $<
 
 clean:
-	-rm powerstation.hex powerstation.elf powerstation.o lcd.o uart.o
+	-rm booster.hex booster.elf booster.o lcd.o uart.o
 
-flash: powerstation.hex
+flash: booster.hex
 	avrdude -c $(AVRPROG) -p $(AVRCHIP) -U flash:w:$<
 
 .PHONY: all clean flash
