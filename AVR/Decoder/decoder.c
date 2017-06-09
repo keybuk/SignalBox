@@ -199,7 +199,6 @@ int main()
                 if (bit) {
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
-                    continue;
                 } else {
                     check_byte = 0;
                     bitmask = 1 << 7;
@@ -214,35 +213,29 @@ int main()
                 state = PACKET_B;
                 break;
             case PACKET_B:
-                // Bits must match between phases; if they don't, we've probably
-                // gone out of phase, so resynchronize again.
                 if (last_bit != bit) {
+                    // Bits must match between phases; if they don't, we've probably
+                    // gone out of phase, so resynchronize again.
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                     
                     uart_puts("\a!M");
                     uart_putc(bit ? '1' : '0');
                     uart_puts("\r\n");
-                    break;
-                }
-                
-                // Double-check the delta of one-bit phases, if we go out of spec,
-                // treat it the same as if we had non-matching bits and
-                // resynchronize the phase.
-                if (bit && DELTA(length, last_length) > 8) {
+                } else if (bit && DELTA(length, last_length) > 8) {
+                    // Double-check the delta of one-bit phases, if we go out of spec,
+                    // treat it the same as if we had non-matching bits and
+                    // resynchronize the phase.
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                     
                     uart_puts("\a!D");
                     uart_putc(' ' + DELTA(length, last_length));
                     uart_puts("\r\n");
-                    break;
-                }
-                
-                // Within the packet there are eight bits to a byte, followed by
-                // a zero-bit or a one-bit that determines whether more bytes
-                // follow, or a preamble.
-                if (bitmask) {
+                } else if (bitmask) {
+                    // Within the packet there are eight bits to a byte, followed by
+                    // a zero-bit or a one-bit that determines whether more bytes
+                    // follow, or a preamble.
                     if (bit) {
                         byte |= bitmask;
                     } else {
@@ -260,18 +253,18 @@ int main()
                     state = PACKET_A;
                     
                     uart_putc(' ');
-                } else if (byte == check_byte) {
-                    // Check byte matches the error check byte in the stream.
-                    // Now we've reached the end of a packet, and go back into
-                    // dumb preamble seeking mode.
-                    uart_puts(" OK\r\n");
+                } else if (byte != check_byte) {
+                    // Check byte doesn't match, but we otherwise kept sychronisation.
+                    // Assume we can carry on.
+                    uart_puts(" \aERR\r\n");
                     
                     state = SEEKING_PREAMBLE;
                     preamble_half_bits = 0;
                 } else {
-                    // Check byte doesn't match, but we otherwise kept sychronisation.
-                    // Assume we can carry on.
-                    uart_puts(" \aERR\r\n");
+                    // Check byte matches the error check byte in the stream.
+                    // Now we've reached the end of a packet, and go back into
+                    // dumb preamble seeking mode.
+                    uart_puts(" OK\r\n");
                     
                     state = SEEKING_PREAMBLE;
                     preamble_half_bits = 0;
