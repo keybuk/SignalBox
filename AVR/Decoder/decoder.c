@@ -88,46 +88,49 @@ ISR(INT0_vect)
 
 // Main Loop
 // ---------
-// There are three basic passes to analyzing the incoming DCC signal.
+// There are two basic passes to analyzing the incoming DCC signal.
 //
-// The first is to determine the phase. When we start to receive incoming
-// bits, we do not yet know where the boundary between each bits high and low
-// part occurs; a stream of zero-bits or one-bits looks the same when you're
-// in phase and out of phase. To synchronize we look for the point at which
-// the period length changes:
+// The first is to determine the phase; when we start to receive incoming
+// half-bits, we do not yet know whether the signal is in high-low or
+// low-high order, and thus do not know whether an edge is a boundary
+// between bits, or between a single bit's high and low parts.
+//
+// To synchronize we need to look for a point at which the period length
+// changes between that of a one-bit and a zero-bit:
 //
 //                   :
-//   _   _   _   _    __    __   _   _ 
+//   _   _   _   _    __    __   _   _
 // _| |_| |_| |_| |__|  |__|  |_| |_| |
 //                   :
 //         length change means we
 //         must be now in Phase A
 //
-// The second pass is packet and byte extraction. Initially that means locating
-// a preamble, ignoring bits until we find a sequence of one-bits of the right
-// length. Once found, the packet structure can then be followed logically and
-// byte and packet boundaries followed provided the input conforms to
-// specification.
+// Since the preamble that marks the start of a packet is a train of
+// one-bits followed by a zero-bit, we can combine both phase synchronization
+// and preamble detection into one pass. A suitably long sequence of one-bits
+// followed by the first period of a zero-bit gives us both the phase of the
+// signal and the start of a packet.
 //
-//    ?    preamble.   byte     byte.    byte
+//
+// The second pass is packet and byte extraction. Due to the different byte
+// and packet end bits, the packet structure can be followed logically and
+// byte and packet boundaries followed provided the input conforms to
+// specification. The final byte is always a check byte, which we compare
+// against an accumulated xor of the previous bytes in the packet.
+//
+//    ?    preamble.   byte     byte  check byte
 //        +--------+ +------+ +------+ +------+
 // 1101000111111111101010101001111000000101101011111...
 //                  :        :        :        :
 //                  +--byte end bits--+    packet end bit
 //
-// The third and final pass is taking the bytes within the packet and
-// determining the DCC instructions contained within.
 
 #define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
 
-#define START 0
-#define SYNCING 1
-#define A 2
-#define B 3
-
 #define SEEKING_PREAMBLE 0
-#define PREAMBLE 1
-#define PACKET 2
+#define PACKET_START 1
+#define PACKET_A 2
+#define PACKET_B 3
 
 int main()
 {
@@ -139,7 +142,7 @@ int main()
 	uart_puts("Running\r\n");
 
 	unsigned long last_length;
-	int phase = START, state, last_bit, preamble_length;
+	int state = SEEKING_PREAMBLE, preamble_half_bits = 0, last_bit;
 	uint8_t bitmask, byte, check_byte;
 	for (;;) {
 		// Wait for an edge from the input ISR, and copy its length.
@@ -160,148 +163,135 @@ int main()
 		} else if (length >= 84 && length <= 10004) {
 			bit = 0;
 		} else {
-			// On an invalid bit length, attempt to resynchronize the phase.
-			phase = START;
+            // On an invalid bit length, attempt to resynchronize; don't worry
+            // about checking for missing edges here, since the length could
+            // be short enough.
+            preamble_half_bits = 0;
+            state = SEEKING_PREAMBLE;
             
 			uart_puts("\a!L");
 			uart_putc(' ' + length);
 			uart_puts("\r\n");
-			goto next_edge;
+			continue;
 		}
-
-		// Each bit has two phases; we first need to train ourselves where
-		// the phase-change occurs, and then consume the bit in each phase.
-		switch (phase) {
-            case START:
-                // This is the first bit we've seen, so just record it and
-                // then synchronize later.
-                last_bit = bit;
-                phase = SYNCING;
-                goto next_edge;
-            case SYNCING:
-                // Wait for a transition between bit lengths before we start
-                // processing bits.
-                if (last_bit != bit) {
-                    phase = A;
-                    state = SEEKING_PREAMBLE;
-                    preamble_length = 0;
+        
+        // Each bit has two periods, how we react to each depends on whether we've
+        // detected the end of the preamble (and thus sychronized the phase), and
+        // which phase that is.
+        switch (state) {
+            case SEEKING_PREAMBLE:
+                // When we're looking for a preamble, we're looking for the first
+                // stretch of at least 10 full one-bits, terminated by a full
+                // zero-bit.
+                if (bit) {
+                    ++preamble_half_bits;
+                } else if (preamble_half_bits >= 20) {
+                    // End of preamble found, the next state is to consume the
+                    // second half of the zero bit.
+                    state = PACKET_START;
                 } else {
-                    last_bit = bit;
-                    goto next_edge;
+                    preamble_half_bits = 0;
                 }
-                // Possibly fall-through.
-            case A:
-                // Save the bit, length, and move to the next phase in next cycle.
+                
+                // Don't worry about missing edges yet.
+                continue;
+            case PACKET_START:
+                // If we see anything other than a zero half-bit here it means
+                // we misdetected a period as a zero that shouldn't be, so return
+                // back to seeking the preamble.
+                if (bit) {
+                    preamble_half_bits = 0;
+                    state = SEEKING_PREAMBLE;
+                    continue;
+                } else {
+                    check_byte = 0;
+                    bitmask = 1 << 7;
+                    state = PACKET_A;
+                }
+                break;
+            case PACKET_A:
+                // First period in a bit, save which bit it was and the length,
+                // so we can double-check in the second phase next cycle.
                 last_bit = bit;
                 last_length = length;
-                phase = B;
-                goto next_edge;
-            case B:
+                state = PACKET_B;
+                break;
+            case PACKET_B:
                 // Bits must match between phases; if they don't, we've probably
                 // gone out of phase, so resynchronize again.
                 if (last_bit != bit) {
-                    last_bit = bit;
-                    phase = SYNCING;
+                    preamble_half_bits = 0;
+                    state = SEEKING_PREAMBLE;
                     
                     uart_puts("\a!M");
                     uart_putc(bit ? '1' : '0');
                     uart_puts("\r\n");
-                    goto next_edge;
+                    break;
                 }
-
+                
                 // Double-check the delta of one-bit phases, if we go out of spec,
                 // treat it the same as if we had non-matching bits and
                 // resynchronize the phase.
                 if (bit && DELTA(length, last_length) > 8) {
-                    phase = START;
+                    preamble_half_bits = 0;
+                    state = SEEKING_PREAMBLE;
                     
                     uart_puts("\a!D");
                     uart_putc(' ' + DELTA(length, last_length));
                     uart_puts("\r\n");
-                    goto next_edge;
+                    break;
                 }
-
-                // Back to phase A in next cycle, we won't need the last_bit or
-                // last_length for that.
-                phase = A;
-                break;
-		}
-
-		// Once we reach here, `bit` contains a valid bit after both phases
-		// have been seen. We can now locate the packet boundaries and perform
-		// packet extraction.
-		switch (state) {
-        case SEEKING_PREAMBLE:
-            // When we're looking for a preamble, we're looking for the first
-            // stretch of at lest 10 one-bits.
-            if (bit) {
-                ++preamble_length;
-            } else if (preamble_length >= 10) {
-                // End of preamble found.
-                state = PACKET;
-                bitmask = 1 << 7;
-                check_byte = 0;
-            } else {
-                preamble_length = 0;
-            }
-            goto next_edge;
-        case PREAMBLE:
-            // In subsequent packets, we know where we are so we just handle
-            // the preamble train as a check.
-            if (!bit) {
-                state = PACKET;
-                bitmask = 1 << 7;
-                check_byte = 0;
-            }
-            goto next_edge;
-        case PACKET:
-            // Within the packet there are eight bits to a byte, followed by
-            // a zero-bit or a one-bit that determines whether more bytes
-            // follow, or a preamble.
-            if (bitmask) {
-                if (bit) {
-                    byte |= bitmask;
-                } else {
-                    byte &= ~bitmask;
-                }
-                bitmask >>= 1;
                 
-                uart_putc(bit ? '1' : '0');
-                goto next_edge;
-            } else {
-                if (!bit) {
+                // Within the packet there are eight bits to a byte, followed by
+                // a zero-bit or a one-bit that determines whether more bytes
+                // follow, or a preamble.
+                if (bitmask) {
+                    if (bit) {
+                        byte |= bitmask;
+                    } else {
+                        byte &= ~bitmask;
+                    }
+                    bitmask >>= 1;
+                    state = PACKET_A;
+                    
+                    uart_putc(bit ? '1' : '0');
+                } else if (!bit) {
                     // Zero-bit goes between bytes, accumulate the check byte
                     // and prepare for the next.
                     check_byte ^= byte;
                     bitmask = 1 << 7;
+                    state = PACKET_A;
                     
                     uart_putc(' ');
                 } else if (byte == check_byte) {
                     // Check byte matches the error check byte in the stream.
+                    // Now we've reached the end of a packet, and go back into
+                    // dumb preamble seeking mode.
                     uart_puts(" OK\r\n");
                     
-                    state = PREAMBLE;
+                    state = SEEKING_PREAMBLE;
+                    preamble_half_bits = 0;
                 } else {
                     // Check byte doesn't match, but we otherwise kept sychronisation.
                     // Assume we can carry on.
                     uart_puts(" \aERR\r\n");
                     
-                    state = PREAMBLE;
+                    state = SEEKING_PREAMBLE;
+                    preamble_half_bits = 0;
                 }
-            }
-            break;
-		}
-
-		// Once we reach here, we have a full `byte` that we can analyze.
-
-next_edge:
+                
+                break;
+        }
+        
 		// Make sure no edge has occurred while we were processing. If one did
 		// then either the signal is changing too fast, in which case it's not
 		// DCC anymore; or we're taking too long to process it, in which case
 		// it's better to start again than try to catch up.
 		if (edge) {
-			phase = START;
-			uart_puts("\a!E\r\n");
+            state = SEEKING_PREAMBLE;
+            preamble_half_bits = 0;
+            
+            uart_puts("\a!E\r\n");
 		}
 	}
 }
