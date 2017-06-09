@@ -71,7 +71,7 @@ ISR(INT0_vect)
 {
 	unsigned long ovf, micros;
 	uint8_t tcnt;
-
+    
 	ovf = timer0_ovf_count;
 	tcnt = TCNT0;
 
@@ -145,15 +145,16 @@ int main()
 	int state = SEEKING_PREAMBLE, preamble_half_bits = 0, last_bit;
 	uint8_t bitmask, byte, check_byte;
 	for (;;) {
-		// Wait for an edge from the input ISR, and copy its length.
 		unsigned long length;
-		if (!edge) continue;
-
-		cli();
-		length = delta;
-		edge = 0;
-		sei();
-
+        
+        // Wait for an edge from the input ISR, and copy its length.
+        while (!edge)
+            ;
+        cli();
+        length = delta;
+        edge = 0;
+        sei();
+        
 		// The specification says to allow 52-64µs for a one-bit, and
 		// 90-10,000µs for a zero-bit; since our timer resolution is only 4µs
 		// we allow +/- that on top.
@@ -163,9 +164,7 @@ int main()
 		} else if (length >= 84 && length <= 10004) {
 			bit = 0;
 		} else {
-            // On an invalid bit length, attempt to resynchronize; don't worry
-            // about checking for missing edges here, since the length could
-            // be short enough.
+            // On an invalid bit length, attempt to resynchronize.
             preamble_half_bits = 0;
             state = SEEKING_PREAMBLE;
             
@@ -192,9 +191,7 @@ int main()
                 } else {
                     preamble_half_bits = 0;
                 }
-                
-                // Don't worry about missing edges yet.
-                continue;
+                break;
             case PACKET_START:
                 // If we see anything other than a zero half-bit here it means
                 // we misdetected a period as a zero that shouldn't be, so return
@@ -282,16 +279,5 @@ int main()
                 
                 break;
         }
-        
-		// Make sure no edge has occurred while we were processing. If one did
-		// then either the signal is changing too fast, in which case it's not
-		// DCC anymore; or we're taking too long to process it, in which case
-		// it's better to start again than try to catch up.
-		if (edge) {
-            state = SEEKING_PREAMBLE;
-            preamble_half_bits = 0;
-            
-            uart_puts("\a!E\r\n");
-		}
 	}
 }
