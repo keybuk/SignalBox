@@ -15,8 +15,37 @@
 #include "uart.h"
 
 
-// Input Signal Timing
-// -------------------
+static inline void init() {
+    // To analyze the DCC signal we need a timer on which we can count,
+    // with reasonable precision, microseconds. Set up TIMER0 for 4µs
+    // ticks (64 prescale) which is reasonable enough.
+    TCCR0A = _BV(WGM01) | _BV(WGM00);
+    TCCR0B = _BV(CS01) | _BV(CS00);
+    TIMSK0 = _BV(TOIE0);
+    
+    // Configure D2 (INT0) and D3 (INT1) for input, disable the pull-ups.
+    DDRD &= ~(_BV(DDD2) | _BV(DDD3));
+    PORTD &= ~(_BV(PORTD2) | _BV(PORTD3));
+    
+    // Configure INT0 and INT3 to generate interrupts for any logical change.
+    EICRA |= _BV(ISC00) | _BV(ISC10);
+    EIMSK |= _BV(INT0) | _BV(INT1);
+    
+    // Configure USART for 250kbps (0x03) 8n1 operation, enable the
+    // interrupt for receiving (but leaving reciving itself disabled until
+    // a cutout) and enable transmitting (but again leave it disabled until
+    // we have something to transmit).
+    UCSR0B = _BV(RXCIE0) | _BV(TXEN0);
+    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
+    UBRR0H = 0;
+    UBRR0L = 0x03;
+}
+
+
+// MARK: DCC Signal Input
+
+// DCC Signal Timing
+// -----------------
 // The DCC signal is a a series of high/low periods where the length of the
 // high and low parts indicate whether it's a zero-bit or a one-bit. Either
 // the high or low can come first, depending on the wiring:
@@ -32,23 +61,6 @@
 // INT0 is fired on the edges, and makes this calculation, comparing it to the
 // previous edge time, and storing the result in `delta`. The `edge` flag is
 // set on each new edge.
-
-static inline void init() {
-	// To analyze the DCC signal we need a timer on which we can count,
-	// with reasonable precision, microseconds. Set up TIMER0 for 4µs
-	// ticks (64 prescale) which is reasonable enough.
-	TCCR0A = _BV(WGM01) | _BV(WGM00);
-	TCCR0B = _BV(CS01) | _BV(CS00);
-	TIMSK0 = _BV(TOIE0);
-
-	// Configure D2 (INT0) for input, disable the pull-up.
-	DDRD &= ~_BV(DDD2);
-	PORTD &= ~_BV(PORTD2);
-
-	// Configure INT0 to generate an interrupt for any logical change.
-	EICRA |= _BV(ISC00);
-	EIMSK |= _BV(INT0);
-} 
 
 volatile unsigned long timer0_ovf_count;
 
@@ -85,6 +97,73 @@ ISR(INT0_vect)
 	last_micros = micros;
 }
 
+
+// MARK: RailCom Input
+
+// RailCom Input
+// -------------
+// The booster generates the RailCom cutout, a gap in the DCC signal where
+// no power is present on the track, during which the decoder can transmit
+// its own signal.
+//
+//    _   _              _   _
+//  _| |_| '-++--++++-._| |_| |_
+//
+// An external window comparator is used to detect the cutout, since it's
+// electrically indistinguishable from a long low logical period to the
+// AVR. The output from this comparator is input onto INT1, on which we
+// use an interrupt to detect the edges, and retrieve the value within
+// to determine whether the cutout is beginning or ending.
+//
+// The signal from the decoder is electrically compatible with UART, so
+// we use the ATmega328P's own USART to decode the signal, and receive an
+// interrupt for each byte we receive.
+//
+// Whether receiving data is enabled is toggled by the INT1 interrupt so
+// that noise outside of the cutout is ignored.
+
+volatile uint8_t cutout;
+volatile uint8_t rx;
+
+// INT1 Interrupt.
+// Fires when the input signal on INT1 (D3) changes.
+//
+// Check the value of the pin to determine whether we're in the cutout or
+// not. Toggle whether RX is enabled on the USART accordingly.
+ISR(INT1_vect)
+{
+    cutout = PIND & _BV(PD3) ? 1 : 0;
+    
+    if (cutout) {
+        UCSR0B |= _BV(RXEN0);
+    } else {
+        UCSR0B &= ~_BV(RXEN0);
+        if (rx) {
+            uart_putc('\r');
+            uart_putc('\n');
+            rx = 0;
+        }
+    }
+}
+
+// USART RX Complete Interrupt
+// Fires when a newly received byte is available in UDR0.
+//
+// Collate RailCom response bytes.
+ISR(USART_RX_vect) {
+    uint8_t status, data;
+    
+    status = UCSR0A;
+    data = UDR0;
+    rx = 1;
+    
+    uart_putc(((data >> 4) > 9 ? '7' : '0') + (data >> 4));
+    uart_putc(((data & 0xf) > 9 ? '7' : '0') + (data & 0xf));
+    uart_putc(' ');
+}
+
+
+// MARK: Main Loop
 
 // Main Loop
 // ---------
@@ -134,11 +213,10 @@ ISR(INT0_vect)
 
 int main()
 {
-	cli();
+    cli();
 	init();
-	sei();
-
-	uart_init(UART_BAUD_SELECT(115200, F_CPU));
+    sei();
+    
 	uart_puts("Running\r\n");
 
 	unsigned long last_length;
@@ -168,9 +246,11 @@ int main()
             preamble_half_bits = 0;
             state = SEEKING_PREAMBLE;
             
-			uart_puts("\a!L");
-			uart_putc(' ' + length);
-			uart_puts("\r\n");
+            if (!cutout) {
+                uart_puts("\a!L");
+                uart_putc(' ' + length);
+                uart_puts("\r\n");
+            }
 			continue;
 		}
         
@@ -219,9 +299,11 @@ int main()
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                     
-                    uart_puts("\a!M");
-                    uart_putc(bit ? '1' : '0');
-                    uart_puts("\r\n");
+                    if (!cutout) {
+                        uart_puts("\a!M");
+                        uart_putc(bit ? '1' : '0');
+                        uart_puts("\r\n");
+                    }
                 } else if (bit && DELTA(length, last_length) > 8) {
                     // Double-check the delta of one-bit phases, if we go out of spec,
                     // treat it the same as if we had non-matching bits and
@@ -229,9 +311,11 @@ int main()
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                     
-                    uart_puts("\a!D");
-                    uart_putc(' ' + DELTA(length, last_length));
-                    uart_puts("\r\n");
+                    if (!cutout) {
+                        uart_puts("\a!D");
+                        uart_putc(' ' + DELTA(length, last_length));
+                        uart_puts("\r\n");
+                    }
                 } else if (bitmask) {
                     // Within the packet there are eight bits to a byte, followed by
                     // a zero-bit or a one-bit that determines whether more bytes
@@ -244,7 +328,7 @@ int main()
                     bitmask >>= 1;
                     state = PACKET_A;
                     
-                    uart_putc(bit ? '1' : '0');
+//                    uart_putc(bit ? '1' : '0');
                 } else if (!bit) {
                     // Zero-bit goes between bytes, accumulate the check byte
                     // and prepare for the next.
@@ -252,19 +336,20 @@ int main()
                     bitmask = 1 << 7;
                     state = PACKET_A;
                     
-                    uart_putc(' ');
+//                    uart_putc(' ');
                 } else if (byte != check_byte) {
                     // Check byte doesn't match, but we otherwise kept sychronisation.
                     // Assume we can carry on.
-                    uart_puts(" \aERR\r\n");
+//                    uart_puts(" \aERR\r\n");
                     
+                    uart_putc('E');
                     state = SEEKING_PREAMBLE;
                     preamble_half_bits = 0;
                 } else {
                     // Check byte matches the error check byte in the stream.
                     // Now we've reached the end of a packet, and go back into
                     // dumb preamble seeking mode.
-                    uart_puts(" OK\r\n");
+//                    uart_puts(" OK\r\n");
                     
                     state = SEEKING_PREAMBLE;
                     preamble_half_bits = 0;
