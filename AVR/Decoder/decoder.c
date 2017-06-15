@@ -69,7 +69,7 @@ volatile unsigned long timer0_ovf_count;
 // Keep count of overflows, store in `timer0_ovf_count`.
 ISR(TIMER0_OVF_vect)
 {
-	++timer0_ovf_count;
+    ++timer0_ovf_count;
 }
 
 volatile unsigned long last_micros, delta;
@@ -81,20 +81,20 @@ volatile uint8_t edge;
 // Tracks the deltas between edges using TIMER0.
 ISR(INT0_vect)
 {
-	unsigned long ovf, micros;
-	uint8_t tcnt;
+    unsigned long ovf, micros;
+    uint8_t tcnt;
     
-	ovf = timer0_ovf_count;
-	tcnt = TCNT0;
-
-	// Check if the timer has overflowed without ticking.
-	if ((TIFR0 & _BV(TOV0)) && (tcnt != 0xff))
-		++ovf;
-
-	micros = (ovf << 10) | (tcnt << 2);
-	delta = micros - last_micros;
-	edge = 1;
-	last_micros = micros;
+    ovf = timer0_ovf_count;
+    tcnt = TCNT0;
+    
+    // Check if the timer has overflowed without ticking.
+    if ((TIFR0 & _BV(TOV0)) && (tcnt != 0xff))
+        ++ovf;
+    
+    micros = (ovf << 10) | (tcnt << 2);
+    delta = micros - last_micros;
+    edge = 1;
+    last_micros = micros;
 }
 
 
@@ -214,16 +214,16 @@ ISR(USART_RX_vect) {
 int main()
 {
     cli();
-	init();
+    init();
     sei();
     
-	uart_puts("Running\r\n");
-
-	unsigned long last_length;
-	int state = SEEKING_PREAMBLE, preamble_half_bits = 0, last_bit;
-	uint8_t bitmask, byte, check_byte;
-	for (;;) {
-		unsigned long length;
+    uart_puts("Running\r\n");
+    
+    unsigned long last_length;
+    int state = SEEKING_PREAMBLE, preamble_half_bits = 0, last_bit;
+    uint8_t bitmask, byte, check_byte;
+    for (;;) {
+        unsigned long length;
         
         // Wait for an edge from the input ISR, and copy its length.
         while (!edge)
@@ -233,15 +233,15 @@ int main()
         edge = 0;
         sei();
         
-		// The specification says to allow 52-64µs for a one-bit, and
-		// 90-10,000µs for a zero-bit; since our timer resolution is only 4µs
-		// we allow +/- that on top.
-		int bit;
-		if (length >= 48 && length <= 68) {
-			bit = 1;
-		} else if (length >= 84 && length <= 10004) {
-			bit = 0;
-		} else {
+        // The specification says to allow 52-64µs for a one-bit, and
+        // 90-10,000µs for a zero-bit; since our timer resolution is only 4µs
+        // we allow +/- that on top.
+        int bit;
+        if (length >= 48 && length <= 68) {
+            bit = 1;
+        } else if (length >= 84 && length <= 10004) {
+            bit = 0;
+        } else {
             // On an invalid bit length, attempt to resynchronize.
             preamble_half_bits = 0;
             state = SEEKING_PREAMBLE;
@@ -251,8 +251,8 @@ int main()
                 uart_putc(' ' + length);
                 uart_puts("\r\n");
             }
-			continue;
-		}
+            continue;
+        }
         
         // Each bit has two periods, how we react to each depends on whether we've
         // detected the end of the preamble (and thus sychronized the phase), and
@@ -357,5 +357,5 @@ int main()
                 
                 break;
         }
-	}
+    }
 }
