@@ -15,6 +15,23 @@
 #include "uart.h"
 
 
+#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
+
+#define DCC       PD2
+
+// Input parser states.
+#define SEEKING_PREAMBLE 0
+#define PACKET_START     1
+#define PACKET_A         2
+#define PACKET_B         3
+
+volatile uint8_t cutout;
+
+#if DETECTOR
+#define CUTOUT    PD3
+#endif // DETECTOR
+
+
 static inline void init() {
     // To analyze the DCC signal we need a timer on which we can count,
     // with reasonable precision, microseconds. Set up TIMER0 for 4µs
@@ -85,7 +102,7 @@ ISR(INT0_vect)
     tcnt = TCNT0;
     
     // Check if the timer has overflowed without ticking.
-    if ((TIFR0 & _BV(TOV0)) && (tcnt != 0xff))
+    if (bit_is_set(TIFR0, TOV0) && (tcnt != 0xff))
         ++ovf;
     
     micros = (ovf << 10) | (tcnt << 2);
@@ -119,7 +136,7 @@ ISR(INT0_vect)
 // Whether receiving data is enabled is toggled by the INT1 interrupt so
 // that noise outside of the cutout is ignored.
 
-volatile uint8_t cutout;
+#if DETECTOR
 volatile uint8_t rx;
 
 // INT1 Interrupt.
@@ -129,7 +146,7 @@ volatile uint8_t rx;
 // not. Toggle whether RX is enabled on the USART accordingly.
 ISR(INT1_vect)
 {
-    cutout = PIND & _BV(PD3) ? 1 : 0;
+    cutout = bit_is_set(PIND, CUTOUT);
     
     if (cutout) {
         UCSR0B |= _BV(RXEN0);
@@ -154,10 +171,13 @@ ISR(USART_RX_vect) {
     data = UDR0;
     rx = 1;
     
+    // TODO: check the error flags.
+    // TODO: do something with the bytes.
     uart_putc(((data >> 4) > 9 ? '7' : '0') + (data >> 4));
     uart_putc(((data & 0xf) > 9 ? '7' : '0') + (data & 0xf));
     uart_putc(' ');
 }
+#endif // DETECTOR
 
 
 // MARK: Main Loop
@@ -200,13 +220,6 @@ ISR(USART_RX_vect) {
 //                  :        :        :        :
 //                  +--byte end bits--+    packet end bit
 //
-
-#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
-
-#define SEEKING_PREAMBLE 0
-#define PACKET_START 1
-#define PACKET_A 2
-#define PACKET_B 3
 
 int main()
 {
