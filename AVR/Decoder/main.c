@@ -314,7 +314,7 @@ int main()
                         sprintf(line, "\aBAD match %c%c\r\n", last_bit ? 'H' : 'L', bit ? 'H' : 'L');
                         uart_puts(line);
                     }
-                } else if (bit && DELTA(length, last_length) > 8) {
+                } else if (bit && DELTA(length, last_length) > 12) {
                     // Double-check the delta of one-bit phases, if we go out of spec,
                     // treat it the same as if we had non-matching bits and
                     // resynchronize the phase.
