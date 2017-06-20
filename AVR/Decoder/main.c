@@ -38,6 +38,7 @@ static inline void init() {
 }
 
 
+// MARK: -
 // MARK: DCC Signal Input
 
 // DCC Signal Timing
