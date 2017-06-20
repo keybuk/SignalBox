@@ -1,29 +1,49 @@
 AVRPROG = usbtiny
 AVRCHIP = atmega328p
 
-FLAGS = -DF_CPU=16000000UL
+CC = avr-gcc
+OBJCOPY = avr-objcopy
 
-all: decoder.hex
+CFLAGS = -Os -mmcu=$(AVRCHIP) -Wall -Wno-maybe-uninitialized
+LDFLAGS = -mmcu=$(AVRCHIP)
+DEFINES = -DF_CPU=16000000UL
+LIBS = -Wl,-u,vfprintf -lprintf_flt -lm
+
+all: booster.hex detector.hex
 
 
-decoder.elf: decoder.o uart.o
-	avr-gcc -mmcu=atmega328p -Wl,-u,vfprintf -lprintf_flt -lm -o $@ $^
+main_booster.o: main.c uart.h
+	$(CC) $(CFLAGS) $(DEFINES) -DBOOSTER -o $@ -c $<
+
+main_detector.o: main.c uart.h
+	$(CC) $(CFLAGS) $(DEFINES) -DDETECTOR -o $@ -c $<
+
+.c.o:
+	$(CC) $(CFLAGS) $(DEFINES) -o $@ -c $<
+
+
+booster.elf: main_booster.o uart.o
+	$(CC) $(LDFLAGS) $(LIBS) -o $@ $^
+
+detector.elf: main_detector.o uart.o
+	$(CC) $(LDFLAGS) $(LIBS) -o $@ $^
+
 
 .elf.hex:
-	avr-objcopy -O ihex -R .eeprom $< $@
+	$(OBJCOPY) -O ihex -R .eeprom $< $@
 
 .SUFFIXES: .hex .elf
 
-decoder.o: uart.h
-uart.o: uart.h
-
-.c.o:
-	avr-gcc -Os $(FLAGS) -mmcu=atmega328p -o $@ -c $<
 
 clean:
-	-rm decoder.hex decoder.elf decoder.o uart.o
+	-rm booster.hex booster.elf main_booster.o
+	-rm detector.hex detector.elf main_detector.o
+	-rm uart.o
 
-flash: decoder.hex
+flash_booster: booster.hex
 	avrdude -c $(AVRPROG) -p $(AVRCHIP) -U flash:w:$<
 
-.PHONY: all clean flash
+flash_detector: detector.hex
+	avrdude -c $(AVRPROG) -p $(AVRCHIP) -U flash:w:$<
+
+.PHONY: all clean flash_booster flash_detector
