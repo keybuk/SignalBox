@@ -257,9 +257,9 @@ int main()
             state = SEEKING_PREAMBLE;
             
             if (!cutout) {
-                uart_puts("\a!L");
-                uart_putc(' ' + length);
-                uart_puts("\r\n");
+                char line[80];
+                sprintf(line, "\aBAD len %luus\r\n", length);
+                uart_puts(line);
             }
             continue;
         }
@@ -310,9 +310,9 @@ int main()
                     state = SEEKING_PREAMBLE;
                     
                     if (!cutout) {
-                        uart_puts("\a!M");
-                        uart_putc(bit ? '1' : '0');
-                        uart_puts("\r\n");
+                        char line[80];
+                        sprintf(line, "\aBAD match %c%c\r\n", last_bit ? 'H' : 'L', bit ? 'H' : 'L');
+                        uart_puts(line);
                     }
                 } else if (bit && DELTA(length, last_length) > 8) {
                     // Double-check the delta of one-bit phases, if we go out of spec,
@@ -322,9 +322,9 @@ int main()
                     state = SEEKING_PREAMBLE;
                     
                     if (!cutout) {
-                        uart_puts("\a!D");
-                        uart_putc(' ' + DELTA(length, last_length));
-                        uart_puts("\r\n");
+                        char line[80];
+                        sprintf(line, "\aBAD delta %luus\r\n", DELTA(length, last_length));
+                        uart_puts(line);
                     }
                 } else if (bitmask) {
                     // Within the packet there are eight bits to a byte, followed by
@@ -338,7 +338,9 @@ int main()
                     bitmask >>= 1;
                     state = PACKET_A;
                     
-//                    uart_putc(bit ? '1' : '0');
+#if DEBUG
+                    uart_putc(bit ? '1' : '0');
+#endif
                 } else if (!bit) {
                     // Zero-bit goes between bytes, accumulate the check byte
                     // and prepare for the next.
@@ -346,23 +348,32 @@ int main()
                     bitmask = 1 << 7;
                     state = PACKET_A;
                     
-//                    uart_putc(' ');
+#if DEBUG
+                    uart_putc(' ');
+#endif
                 } else if (byte != check_byte) {
                     // Check byte doesn't match, but we otherwise kept sychronisation.
                     // Assume we can carry on.
-//                    uart_puts(" \aERR\r\n");
                     
-                    uart_putc('E');
-                    state = SEEKING_PREAMBLE;
                     preamble_half_bits = 0;
+                    state = SEEKING_PREAMBLE;
+                    
+#if DEBUG
+                    uart_puts(" \aERR\r\n");
+#else
+                    uart_puts("\aBAD check\r\n");
+#endif
                 } else {
                     // Check byte matches the error check byte in the stream.
                     // Now we've reached the end of a packet, and go back into
                     // dumb preamble seeking mode.
-//                    uart_puts(" OK\r\n");
                     
                     state = SEEKING_PREAMBLE;
                     preamble_half_bits = 0;
+                    
+#if DEBUG
+                    uart_puts(" OK\r\n");
+#endif
                 }
                 
                 break;
