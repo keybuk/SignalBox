@@ -23,10 +23,6 @@ static inline void init() {
     TCCR0B = _BV(CS01) | _BV(CS00);
     TIMSK0 = _BV(TOIE0);
     
-    // Configure D2 (INT0) and D3 (INT1) for input, disable the pull-ups.
-    DDRD &= ~(_BV(DDD2) | _BV(DDD3));
-    PORTD &= ~(_BV(PORTD2) | _BV(PORTD3));
-    
     // Configure INT0 and INT3 to generate interrupts for any logical change.
     EICRA |= _BV(ISC00) | _BV(ISC10);
     EIMSK |= _BV(INT0) | _BV(INT1);
