@@ -47,7 +47,7 @@ public struct Mailbox {
     /// Mailbox property ioctl.
     ///
     /// Expansion of `_IOWR(100, 0, char *)` from the Linux kernel headers.
-    static let mailboxPropertyIoctl: UInt = ((1 | 2) << 30) | (100 << 8) | (0 << 0) | (4 << 16)
+    static let mailboxPropertyIoctl: UInt = ((1 | 2) << 30) | (100 << 8)/* | (0 << 0)*/ | (4 << 16)
     
     /// Make a property request.
     ///
