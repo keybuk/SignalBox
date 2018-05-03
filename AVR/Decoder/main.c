@@ -10,12 +10,13 @@
 #include <avr/io.h>
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 
-#include "uart.h"
 
-
-#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
+#if BOOSTER && DETECTOR
+# error "Not enough timers to be both BOOSTER and DETECTOR"
+#endif
 
 #define DCC       PD2
 
@@ -24,25 +25,130 @@
 #define PACKET_START     1
 #define PACKET_A         2
 #define PACKET_B         3
+#define BYTE_END         4
+
+#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
 
 volatile uint8_t cutout;
+
+#if BOOSTER
+// Overload threshold of 3A, where we pull the power.
+#define HARD_OVERLOAD 512
+
+#define THERMAL   PD3
+
+#define DIRENABLE PORTC1
+#define BRAKE     PORTC2
+#define PWM       PORTC3
+
+// Brake condition bit numbers.
+#define NO_SIGNAL 0
+#define OVERLOAD  1
+#define OVERHEAT  2
+
+volatile uint8_t brake;
+#endif // BOOSTER
 
 #if DETECTOR
 #define CUTOUT    PD3
 #endif // DETECTOR
 
 
+// MARK: -
+// MARK: Debug UART Output.
+
+#define BUFFER_SIZE 256
+volatile char ubuffer[BUFFER_SIZE];
+volatile uint8_t uput, usend;
+
+static inline void uputc(char ch) {
+    ubuffer[uput++] = ch;
+    UCSR0B |= _BV(UDRIE0);
+}
+
+static inline void uputs(const char *str) {
+    while (*str)
+        uputc(*str++);
+}
+
+static inline void uprintf(const char *format, ...) {
+    char data[BUFFER_SIZE];
+    va_list args;
+    
+    va_start(args, format);
+    vsnprintf(data, BUFFER_SIZE, format, args);
+    va_end(args);
+    
+    data[BUFFER_SIZE - 1] = '\0';
+    uputs(data);
+}
+
+// USART Data Register Empty Interrupt
+// Fires when the USART is ready to transmit a byte.
+ISR(USART_UDRE_vect) {
+    if (uput != usend) {
+        UDR0 = ubuffer[usend++];
+    } else {
+        UCSR0B &= ~_BV(UDRIE0);
+    }
+}
+
+#define TIMER0_PRESCALE (_BV(CS01) | _BV(CS00))
+#define TIMER1_PRESCALE (_BV(CS11))
+#define TIMER2_PRESCALE (_BV(CS22) | _BV(CS21) | _BV(CS20))
+
+// MARK: -
+// MARK: Initialization.
+
 static inline void init() {
     // To analyze the DCC signal we need a timer on which we can count,
     // with reasonable precision, microseconds. Set up TIMER0 for 4µs
     // ticks (64 prescale) which is reasonable enough.
     TCCR0A = _BV(WGM01) | _BV(WGM00);
-    TCCR0B = _BV(CS01) | _BV(CS00);
+    TCCR0B = TIMER0_PRESCALE;
     TIMSK0 = _BV(TOIE0);
     
-    // Configure INT0 and INT3 to generate interrupts for any logical change.
-    EICRA |= _BV(ISC00) | _BV(ISC10);
-    EIMSK |= _BV(INT0) | _BV(INT1);
+    // Configure INT0 and INT1 to generate interrupts for any logical change.
+    // For the booster INT1 is the Thermal Sense Flag from the H-Bridge, for
+    // the detector it's the RailCom cutout flag.
+    EICRA |= _BV(ISC00);// | _BV(ISC10);
+    EIMSK |= _BV(INT0);// | _BV(INT1);
+    
+    DDRC |= _BV(DDC4);
+    
+#if BOOSTER
+    // The maximum value allowed for a "long zero" is 10,000µs (10ms), use
+    // this as a timeout for detecting a loss of DCC signal by configuring
+    // a timer in CTC mode, and an appropriate value of TOP (1024 prescale,
+    // TOP of 157, it's a smidge over but that's perfect). Timer reaching
+    // this indicates a timeout, and the timer can be reset by clearing TCNT2.
+    TCCR2A = _BV(WGM21);
+    OCR2A = 157;
+    TIMSK2 = _BV(OCIE2A);
+    
+    // The RailCom cutout has an initial delay of 26-32µs before the cutout
+    // begins, which then lasts 428-456µs. Use TIMER1 for this in CTC mode
+    // and a prescale of 8 so we get ample resolution to produce an accurate
+    // result. TOP is set for the length of the RailCom cutout itself, but the
+    // timer is not enabled; when it is enabled, TCNT1 is first set to the
+    // subtracted value for the initial delay, so that the first comparison
+    // event occurs earlier.
+    TCCR1B = _BV(WGM12);
+    OCR1A = 428 << 1;
+    TIMSK1 |= _BV(OCIE1A);
+    
+    // Use C1-3 as outputs for Direction, Brake and PWM respectively. Set
+    // the initial pattern to "No Signal" mode with the direction pin high.
+    DDRC |= _BV(DDC1) | _BV(DDC2) | _BV(DDC3);
+    PORTC |= _BV(DIRENABLE) | _BV(BRAKE);
+    PORTC &= ~_BV(PWM);
+    
+    // Configure the ADC in free-running mode, reading from ADC0, generating
+    // interrupts on new data, and with a clock pre-scalar of 128 (125kHz)
+    // for maximum resolution at the fastest possible speed.
+//    ADMUX = _BV(REFS0);
+//    ADCSRA = _BV(ADEN) | _BV(ADSC) | _BV(ADATE) | _BV(ADIE) | _BV(ADPS2) | _BV(ADPS1) | _BV(ADPS0);
+#endif // BOOSTER
     
     // Configure USART for 250kbps (0x03) 8n1 operation, enable the
     // interrupt for receiving (but leaving reciving itself disabled until
@@ -75,6 +181,11 @@ static inline void init() {
 // INT0 is fired on the edges, and makes this calculation, comparing it to the
 // previous edge time, and storing the result in `delta`. The `edge` flag is
 // set on each new edge.
+//
+// When operating as a Booster, we also use TIMER2 to detect a loss of input
+// signal. TCNT2 is reset on each fire of INT0, so that should TIMER2 reach
+// TOP, it means the input signal has stopped changing and we can assume its
+// loss.
 
 volatile unsigned long timer0_ovf_count;
 
@@ -89,13 +200,8 @@ ISR(TIMER0_OVF_vect)
 volatile unsigned long last_micros, delta;
 volatile uint8_t edge;
 
-// INT0 Interrupt.
-// Fires when the input signal on INT0 (D2) changes.
-//
-// Tracks the deltas between edges using TIMER0.
-ISR(INT0_vect)
-{
-    unsigned long ovf, micros;
+static inline unsigned long micros() {
+    unsigned long ovf;
     uint8_t tcnt;
     
     ovf = timer0_ovf_count;
@@ -105,11 +211,73 @@ ISR(INT0_vect)
     if (bit_is_set(TIFR0, TOV0) && (tcnt != 0xff))
         ++ovf;
     
-    micros = (ovf << 10) | (tcnt << 2);
-    delta = micros - last_micros;
-    edge = 1;
-    last_micros = micros;
+    return (ovf << 10) | (tcnt << 2);
 }
+
+#if BOOSTER
+static inline void set_pins()
+{
+#if DEBUG
+    static uint8_t old_brake = 0, old_cutout = 0;
+    if (brake == old_brake && cutout == old_cutout)
+        return;
+    
+    uprintf("B %hx:%hx  C %hd:%hd\r\n", old_brake, brake, old_cutout, cutout);
+    
+    old_brake = brake;
+    old_cutout = cutout;
+#endif
+    if (brake) {
+        // Direction has no effect during a full-off brake, so leave it alone.
+        PORTC &= ~_BV(PWM);
+        PORTC |= _BV(BRAKE);
+    } else if (cutout) {
+        // For a short-via-ground cutout we want direction low, with PWM and Brake high.
+        PORTC &= ~_BV(DIRENABLE);
+        PORTC |= _BV(PWM) | _BV(BRAKE);
+    } else {
+        // Normal operation..
+        PORTC |= _BV(PWM) | _BV(DIRENABLE);
+        PORTC &= ~_BV(BRAKE);
+    }
+}
+#endif // BOOSTER
+
+// INT0 Interrupt.
+// Fires when the input signal on INT0 (D2) changes.
+//
+// Tracks the deltas between edges using TIMER0.
+ISR(INT0_vect)
+{
+    unsigned long this_micros;
+    
+    this_micros = micros();
+    delta = this_micros - last_micros;
+    edge = 1;
+    last_micros = this_micros;
+    
+#if BOOSTER
+    TCNT2 = 0;
+    TCCR2B |= TIMER2_PRESCALE;
+    
+    brake &= ~_BV(NO_SIGNAL);
+    set_pins();
+#endif // BOOSTER
+}
+
+#if BOOSTER
+// TIMER2 Comparison Interrupt.
+// Fires when TIMER2 reaches TOP.
+//
+// Indicates a timeout waiting for the input signal to change.
+ISR(TIMER2_COMPA_vect)
+{
+    brake |= _BV(NO_SIGNAL);
+    set_pins();
+    
+    TCCR2B &= ~TIMER2_PRESCALE;
+}
+#endif // BOOSTER
 
 
 // MARK: RailCom Input
@@ -153,8 +321,8 @@ ISR(INT1_vect)
     } else {
         UCSR0B &= ~_BV(RXEN0);
         if (rx) {
-            uart_putc('\r');
-            uart_putc('\n');
+            uputc('\r');
+            uputc('\n');
             rx = 0;
         }
     }
@@ -173,11 +341,133 @@ ISR(USART_RX_vect) {
     
     // TODO: check the error flags.
     // TODO: do something with the bytes.
-    uart_putc(((data >> 4) > 9 ? '7' : '0') + (data >> 4));
-    uart_putc(((data & 0xf) > 9 ? '7' : '0') + (data & 0xf));
-    uart_putc(' ');
+    uputc(((data >> 4) > 9 ? '7' : '0') + (data >> 4));
+    uputc(((data & 0xf) > 9 ? '7' : '0') + (data & 0xf));
+    uputc(' ');
 }
 #endif // DETECTOR
+
+
+// MARK: RailCom cutout
+
+// RailCom cutout
+// --------------
+
+#if BOOSTER
+static inline void end_of_packet()
+{
+    // Begin the RailCom cutout in ~28-32µs time by setting the timer to just below
+    // the comparator. This is based purely on experimentation and external measurement
+    // since there's an inherent delay in the AVR's interrupts.
+    TCNT1 = 425 << 1;
+    TCCR1B |= TIMER1_PRESCALE;
+}
+
+// TIMER1 Comparison Interrupt.
+// Fires when TIMER1 reaches TOP.
+//
+// Indicates either the start of end of the RailCom cutout.
+ISR(TIMER1_COMPA_vect)
+{
+    cutout = !cutout;
+    set_pins();
+    
+    // Stop the timer if we're no longer in the cutout.
+    if (!cutout)
+        TCCR1B &= ~TIMER1_PRESCALE;
+}
+#else // BOOSTER
+static inline void end_of_packet() {}
+#endif // BOOSTER
+
+
+// MARK: Booster Safety
+
+// Booster Safety
+// --------------
+// To avoid situations of overload or overheat, we monitor both the
+// Current Sense and Thermal Sense outputs of the H-Bridge using the
+// ADC and INT1 respectively.
+
+#if BOOSTER
+// Store more than one recent analog value so our display has some history
+// to it. `v` is the next value to be written.
+#define VALUES 64
+volatile int values[VALUES], v;
+
+// Magic constant multiplier to convert ADC values into Output Amps.
+// Derived from:
+//   Vmin = 0.0 (at v = 0)
+//   Vmax = 5.0 (at v = 1024)
+//
+//                     v - Vmin
+//   V = Vmin + Vmax * --------
+//                       1024
+//
+//                377
+//   I = Iout * -------
+//              1000000
+//
+//   R = 2200
+//
+//   V = IR
+//
+//        v              377
+//   5 * ---- = Iout * ------- * 2200
+//       1024          1000000
+//
+const float value_mult = 5.0 * 1 / 1024.0 * 1000000.0 / 377.0 * 1.0 / 2200.0;
+
+static inline float amps()
+{
+    int vmax = 0;
+    for (int i = 0; i < v; ++i)
+        vmax = values[i] > vmax ? values[i] : vmax;
+    return vmax * value_mult;
+}
+
+// ADC Interrupt.
+// Fires when a new analog value is ready to be read.
+//
+// Reads the value, and checks it for overload before saving it for display
+// in the main loop.
+ISR(ADC_vect)
+{
+    int value = ADCL;
+    value |= (ADCH << 8);
+    
+    if (value > HARD_OVERLOAD) {
+        brake |= _BV(OVERLOAD);
+        set_pins();
+        
+        // TODO: timer.
+    } else if (brake & _BV(OVERLOAD)) {
+        // Overload cleared.
+        // TODO: count-down timer to re-enable.
+    }
+    
+    values[v++] = value;
+    v &= (VALUES - 1);
+}
+
+// INT1 Interrupt.
+// Fires when the input signal on INT1 (D3) changes.
+//
+// Check the value of the pin to determine whether the thermal sense pin has
+// been set to drain (overheat).
+ISR(INT1_vect)
+{
+    if (bit_is_set(PIND, THERMAL)) {
+        brake |= _BV(OVERHEAT);
+        set_pins();
+        
+        // TODO: timer.
+    } else if (brake & _BV(OVERHEAT)) {
+        // Thermal flag cleared.
+        // TODO: count-down tiemr to re-enable.
+    }
+}
+#endif // BOOSTER
 
 
 // MARK: Main Loop
@@ -227,7 +517,7 @@ int main()
     init();
     sei();
     
-    uart_puts("Running\r\n");
+    uputs("Running\r\n");
     
     unsigned long last_length;
     int state = SEEKING_PREAMBLE, preamble_half_bits = 0, last_bit;
@@ -256,11 +546,8 @@ int main()
             preamble_half_bits = 0;
             state = SEEKING_PREAMBLE;
             
-            if (!cutout) {
-                char line[80];
-                sprintf(line, "\aBAD len %luus\r\n", length);
-                uart_puts(line);
-            }
+            if (!cutout)
+                uprintf("\aBAD len %luus\r\n", length);
             continue;
         }
         
@@ -309,11 +596,8 @@ int main()
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                     
-                    if (!cutout) {
-                        char line[80];
-                        sprintf(line, "\aBAD match %c%c\r\n", last_bit ? 'H' : 'L', bit ? 'H' : 'L');
-                        uart_puts(line);
-                    }
+                    if (!cutout)
+                        uprintf("\aBAD match %c%c\r\n", last_bit ? 'H' : 'L', bit ? 'H' : 'L');
                 } else if (bit && DELTA(length, last_length) > 12) {
                     // Double-check the delta of one-bit phases, if we go out of spec,
                     // treat it the same as if we had non-matching bits and
@@ -321,11 +605,8 @@ int main()
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                     
-                    if (!cutout) {
-                        char line[80];
-                        sprintf(line, "\aBAD delta %luus\r\n", DELTA(length, last_length));
-                        uart_puts(line);
-                    }
+                    if (!cutout)
+                        uprintf("\aBAD delta %luus\r\n", DELTA(length, last_length));
                 } else if (bitmask) {
                     // Within the packet there are eight bits to a byte, followed by
                     // a zero-bit or a one-bit that determines whether more bytes
@@ -339,7 +620,7 @@ int main()
                     state = PACKET_A;
                     
 #if DEBUG
-                    uart_putc(bit ? '1' : '0');
+                    uputc(bit ? '1' : '0');
 #endif
                 } else if (!bit) {
                     // Zero-bit goes between bytes, accumulate the check byte
@@ -349,34 +630,38 @@ int main()
                     state = PACKET_A;
                     
 #if DEBUG
-                    uart_putc(' ');
+                    uputc(' ');
 #endif
                 } else if (byte != check_byte) {
                     // Check byte doesn't match, but we otherwise kept sychronisation.
                     // Assume we can carry on.
+                    end_of_packet();
                     
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                     
 #if DEBUG
-                    uart_puts(" \aERR\r\n");
+                    uputs(" \aERR\r\n");
 #else
-                    uart_puts("\aBAD check\r\n");
+                    uputs("\aBAD check\r\n");
 #endif
                 } else {
                     // Check byte matches the error check byte in the stream.
                     // Now we've reached the end of a packet, and go back into
                     // dumb preamble seeking mode.
+                    end_of_packet();
                     
                     state = SEEKING_PREAMBLE;
                     preamble_half_bits = 0;
                     
 #if DEBUG
-                    uart_puts(" OK\r\n");
+                    uputs(" OK\r\n");
 #endif
                 }
                 
                 break;
         }
+        
+        PINC |= _BV(PC4);
     }
 }
