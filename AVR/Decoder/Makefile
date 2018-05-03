@@ -12,20 +12,20 @@ LIBS = -Wl,-u,vfprintf -lprintf_flt -lm
 all: booster.hex detector.hex
 
 
-main_booster.o: main.c uart.h
+main_booster.o: main.c
 	$(CC) $(CFLAGS) $(DEFINES) -DBOOSTER -o $@ -c $<
 
-main_detector.o: main.c uart.h
+main_detector.o: main.c
 	$(CC) $(CFLAGS) $(DEFINES) -DDETECTOR -o $@ -c $<
 
 .c.o:
 	$(CC) $(CFLAGS) $(DEFINES) -o $@ -c $<
 
 
-booster.elf: main_booster.o uart.o
+booster.elf: main_booster.o
 	$(CC) $(LDFLAGS) $(LIBS) -o $@ $^
 
-detector.elf: main_detector.o uart.o
+detector.elf: main_detector.o
 	$(CC) $(LDFLAGS) $(LIBS) -o $@ $^
 
 
@@ -38,7 +38,6 @@ detector.elf: main_detector.o uart.o
 clean:
 	-rm booster.hex booster.elf main_booster.o
 	-rm detector.hex detector.elf main_detector.o
-	-rm uart.o
 
 flash_booster: booster.hex
 	avrdude -c $(AVRPROG) -p $(AVRCHIP) -U flash:w:$<
