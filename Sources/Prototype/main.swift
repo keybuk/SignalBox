@@ -16,6 +16,7 @@ let locoAddress: Address = 3
 let resetPacket: Packet = .softReset(address: .broadcast)
 let idlePacket: Packet = .idle
 let startPacket: Packet = .speed28Step(address: locoAddress, direction: .forward, speed: 14)
+let fastPacket: Packet = .speed28Step(address: locoAddress, direction: .forward, speed: 28)
 let stopPacket: Packet = .stop28Step(address: locoAddress, direction: .ignore)
 
 func functionPacket(_ function: Int, value: Bool) -> Packet {
@@ -91,6 +92,8 @@ loop: while true {
         break loop
     case "start":
         packet = startPacket
+    case "fast":
+        packet = fastPacket
     case "stop":
         packet = stopPacket
     case "idle":
