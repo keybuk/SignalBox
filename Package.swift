@@ -7,6 +7,7 @@ var package = Package(
         .target(name: "RaspberryPi"),
         .target(name: "DCC", dependencies: ["RaspberryPi"]),
         .target(name: "Prototype", dependencies: ["RaspberryPi", "DCC"]),
+        .testTarget(name: "DCCTests", dependencies: ["RaspberryPi", "DCC"])
     ]
 )
 
