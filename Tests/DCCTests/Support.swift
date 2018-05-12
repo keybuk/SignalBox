@@ -16,13 +16,13 @@ class TestMemory : MemoryRegion {
     let size: Int
     
     init(size: Int) {
-        pointer = UnsafeMutableRawPointer.allocate(bytes: size, alignedTo: MemoryLayout<DMAControlBlock>.alignment)
+        pointer = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: MemoryLayout<DMAControlBlock>.alignment)
         busAddress = Int(bitPattern: pointer)
         self.size = size
     }
     
     deinit {
-        pointer.deallocate(bytes: size, alignedTo: MemoryLayout<DMAControlBlock>.alignment)
+        pointer.deallocate()
     }
     
 }
