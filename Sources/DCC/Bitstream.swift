@@ -513,7 +513,7 @@ extension String {
 
     /// Returns a new string formed from the String by inserting as many occurrences as necessary of a given pad string to the start.
     func leftPadding(toLength length: Int, withPad character: Character) -> String {
-        return String(repeating: String(character), count: length - self.characters.count) + self
+        return String(repeating: String(character), count: length - self.count) + self
     }
     
 }
