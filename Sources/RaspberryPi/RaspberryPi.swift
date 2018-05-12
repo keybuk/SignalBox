@@ -10,12 +10,12 @@
 import Glibc
 
 // Definition is missing from Glibc, this one taken from Darwin.
-let MAP_FAILED = UnsafeMutableRawPointer(bitPattern: -1)! as UnsafeMutableRawPointer!
+public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 #else
 import Darwin
     
 // This is not defined on Darwin. Set to 0 to allow compilation to succeed.
-let O_SYNC: Int32 = 0
+public let O_SYNC: Int32 = 0
 #endif
 
 import Foundation
