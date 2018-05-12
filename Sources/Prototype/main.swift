@@ -123,10 +123,10 @@ loop: while true {
         bitstream.append(operationsModePacket: startPacket, debug: true)
         try! driver.queue(bitstream: bitstream)
     case _ where line.hasPrefix("fon "):
-        let function = Int(line.substring(from: line.index(line.startIndex, offsetBy: 4)))
+        let function = Int(line[line.index(line.startIndex, offsetBy: 4)...])
         packet = functionPacket(function!, value: true)
     case _ where line.hasPrefix("foff "):
-        let function = Int(line.substring(from: line.index(line.startIndex, offsetBy: 5)))
+        let function = Int(line[line.index(line.startIndex, offsetBy: 5)...])
         packet = functionPacket(function!, value: false)
     default:
         print("?")
