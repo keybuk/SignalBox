@@ -109,7 +109,7 @@ public class RaspberryPi {
         self.peripheralAddress = peripheralAddress
         self.peripheralSize = peripheralSize
         
-        self.peripherals = UnsafeMutableRawPointer.allocate(bytes: peripheralSize, alignedTo: pageSize)
+        self.peripherals = UnsafeMutableRawPointer.allocate(byteCount: peripheralSize, alignment: pageSize)
         unmapPeripheralsOnDeinit = false
     }
     
@@ -118,7 +118,7 @@ public class RaspberryPi {
             if unmapPeripheralsOnDeinit {
                 munmap(peripherals, peripheralSize)
             } else {
-                peripherals.deallocate(bytes: peripheralSize, alignedTo: pageSize)
+                peripherals.deallocate()
             }
         }
     }
