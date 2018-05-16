@@ -8,7 +8,7 @@
 
 import XCTest
 
-@testable import DCC
+@testable import OldDCC
 
 
 class BitstreamTests : XCTestCase {

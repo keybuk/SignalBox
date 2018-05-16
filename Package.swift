@@ -5,9 +5,9 @@ var package = Package(
     name: "SignalBox",
     targets: [
         .target(name: "RaspberryPi"),
-        .target(name: "DCC", dependencies: ["RaspberryPi"]),
-        .target(name: "Prototype", dependencies: ["RaspberryPi", "DCC"]),
-        .testTarget(name: "DCCTests", dependencies: ["RaspberryPi", "DCC"])
+        .target(name: "OldDCC", dependencies: ["RaspberryPi"]),
+        .target(name: "Prototype", dependencies: ["RaspberryPi", "OldDCC"]),
+        .testTarget(name: "OldDCCTests", dependencies: ["RaspberryPi", "OldDCC"])
     ]
 )
 

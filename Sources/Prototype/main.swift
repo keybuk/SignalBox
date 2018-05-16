@@ -9,7 +9,7 @@
 import Foundation
 
 import RaspberryPi
-import DCC
+import OldDCC
 
 let locoAddress: Address = 3
 

@@ -12,7 +12,7 @@ import Foundation
 import Dispatch
 
 @testable import RaspberryPi
-@testable import DCC
+@testable import OldDCC
 
 
 class DriverTests : XCTestCase {

@@ -9,7 +9,7 @@
 import XCTest
 
 @testable import RaspberryPi
-@testable import DCC
+@testable import OldDCC
 
 #if os(Linux)
 import CBSD
