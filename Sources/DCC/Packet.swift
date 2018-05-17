@@ -7,7 +7,7 @@
 
 import Foundation
 
-public protocol Packet : BitPackable {
+public protocol Packet : Packable {
     
     var bytes: [UInt8] { get }
 
@@ -15,7 +15,7 @@ public protocol Packet : BitPackable {
 
 public extension Packet {
     
-    public func add(into packer: inout BitPacker) {
+    public func add<T : Packer>(into packer: inout T) {
         let bytes = self.bytes
         for byte in bytes {
             packer.add(byte, length: 8)
@@ -36,7 +36,7 @@ public struct MultiFunctionPacket : Packet {
     public var instructions: [MultiFunctionInstruction]
     
     public var bytes: [UInt8] {
-        var packer = BitPacker()
+        var packer = BytePacker()
 
         switch address {
         case 0:
@@ -68,7 +68,7 @@ public struct MultiFunctionPacket : Packet {
     
 }
 
-public protocol MultiFunctionInstruction : BitPackable {}
+public protocol MultiFunctionInstruction : Packable {}
 
 public protocol DecoderAndConsistControlInstruction : MultiFunctionInstruction {}
 
@@ -76,7 +76,7 @@ public struct DecoderResetInstruction : DecoderAndConsistControlInstruction {
     
     var isHardReset: Bool = false
     
-    public func add(into packer: inout BitPacker) {
+    public func add<T : Packer>(into packer: inout T) {
         packer.add(0b0000, length: 4)
         packer.add(0b000, length: 3)
         packer.add(isHardReset)
@@ -86,7 +86,7 @@ public struct DecoderResetInstruction : DecoderAndConsistControlInstruction {
 
 public struct DecoderAcknowledgementRequest : DecoderAndConsistControlInstruction {
     
-    public func add(into packer: inout BitPacker) {
+    public func add<T : Packer>(into packer: inout T) {
         packer.add(0b0000, length: 4)
         packer.add(0b111, length: 3)
         packer.add(0b1, length: 1)
@@ -121,7 +121,7 @@ public struct SpeedAndDirectionInstruction : MultiFunctionInstruction {
         self.headlight = headlight
     }
     
-    public func add(into packer: inout BitPacker) {
+    public func add<T : Packer>(into packer: inout T) {
         switch direction {
         case .forward:
             packer.add(0b011, length: 3)
@@ -147,7 +147,7 @@ public struct SpeedAndDirectionInstruction : MultiFunctionInstruction {
             // FIXME: Emergency Stop is not handled.
             case 0:
                 // FIXME: Ignore-direction stop is not handled.
-                packer.add(0b0000, at: 3, length: 4)
+                packer.add(0b0000, length: 4)
             default:
                 let adjustedSpeed = speed + 3
                 packer.add(adjustedSpeed & 1, length: 1)
