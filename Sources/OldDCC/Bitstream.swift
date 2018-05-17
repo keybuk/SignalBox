@@ -6,6 +6,7 @@
 //
 //
 
+import Foundation
 
 /// Bitstream serializes logical DCC packets into a physical bitstream.
 ///
