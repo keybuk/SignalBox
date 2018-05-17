@@ -7,25 +7,25 @@
 
 import Foundation
 
-public protocol Packet {
+public protocol Packet : BitPackable {
     
     var bytes: [UInt8] { get }
-    
-    func errorDetectionByte(for bytes: [UInt8]) -> UInt8
 
 }
 
 public extension Packet {
     
-    // FIXME: this still doesn't feel right.
-    // - it's a method that takes `bytes` in as an argument, rather than a computed property
-    // - but since bytes is a computed property, we can't just use that here either
-    // - feels "generic" and not related to the value type
-    // - but I want it to be with Packet, and not elsewhere.
-    // - bytes ends up not having the error detection byte in it
-    // - but that also means we can make new Packet anywhere, and don't have to remember to add it
-    func errorDetectionByte(for bytes: [UInt8]) -> UInt8 {
-        return bytes.reduce(0, { $0 ^ $1 })
+    public func add(into packer: inout BitPacker) {
+        let bytes = self.bytes
+        for byte in bytes {
+            packer.add(byte, length: 8)
+            packer.add(0, length: 1)
+        }
+        
+        let errorDetectionByte = bytes.reduce(0, { $0 ^ $1 })
+        packer.add(errorDetectionByte, length: 8)
+        
+        packer.add(1, length: 1)
     }
     
 }
