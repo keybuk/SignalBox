@@ -139,11 +139,11 @@ public struct BitstreamTiming {
     public init(pulseWidth: Float) throws {
         self.pulseWidth = pulseWidth
         
-        oneBitLength = Int((BitstreamTiming.oneBit - 1.0) / pulseWidth) + 1
-        zeroBitLength = Int((BitstreamTiming.zeroBit - 1.0) / pulseWidth) + 1
+        oneBitLength = Int((BitstreamTiming.oneBit - 1) / pulseWidth) + 1
+        zeroBitLength = Int((BitstreamTiming.zeroBit - 1) / pulseWidth) + 1
         
-        railComDelayLength = Int((BitstreamTiming.railComDelayMin - 1.0) / pulseWidth) + 1
-        railComCutoutLength = Int((BitstreamTiming.railComMin - 1.0) / pulseWidth) + 1
+        railComDelayLength = Int((BitstreamTiming.railComDelayMin - 1) / pulseWidth) + 1
+        railComCutoutLength = Int((BitstreamTiming.railComMin - 1) / pulseWidth) + 1
         
         railComLength = (oneBitLength * 2) * ((railComCutoutLength - 1) / (oneBitLength * 2) + 1)
         

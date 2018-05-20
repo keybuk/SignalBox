@@ -79,6 +79,40 @@ class BitstreamTimingTests: XCTestCase {
     }
 
     
+    // MARK: 14.5ms tests
+    
+    /// Test that when we use a pulseWidth of 14.5ms, the length of a one bit is 4 pulses (55ms).
+    func testGoldilocksMsOneBit() {
+        let timing = try! BitstreamTiming(pulseWidth: 14.5)
+        XCTAssertEqual(timing.oneBitLength, 4)
+    }
+    
+    /// Test that when we use a pulseWidth of 14.5ms, the length of a zero bit is 7 pulses (101.5ms).
+    func testGoldilocksMsZeroBit() {
+        let timing = try! BitstreamTiming(pulseWidth: 14.5)
+        XCTAssertEqual(timing.zeroBitLength, 7)
+    }
+    
+    /// Test that when we use a pulseWidth of 14.5ms, the length of the RailCom start delay is 2 pulses (29ms).
+    func testGoldilocksMsRailComDelay() {
+        let timing = try! BitstreamTiming(pulseWidth: 14.5)
+        XCTAssertEqual(timing.railComDelayLength, 2)
+    }
+    
+    /// Test that when we use a pulseWidth of 14.5ms, the length of a RailCom cutout is 32 pulses (464ms).
+    func testGoldilocksMsRailComCutout() {
+        let timing = try! BitstreamTiming(pulseWidth: 14.5)
+        XCTAssertEqual(timing.railComCutoutLength, 32)
+    }
+    
+    /// Test that when we use a pulseWidth of 14.5ms, the total RailCom length is also 32 pulses (464ms),
+    /// because this just happens to neatly divide into one bits.
+    func testGoldilocksMsRailCom() {
+        let timing = try! BitstreamTiming(pulseWidth: 14.5)
+        XCTAssertEqual(timing.railComLength, 32)
+    }
+
+    
     // MARK: failing tests
     
     /// Test that when we try and use a pulse width of 25ms, the initializer throws an error because
@@ -87,4 +121,10 @@ class BitstreamTimingTests: XCTestCase {
         XCTAssertThrowsError(try BitstreamTiming(pulseWidth: 25))
     }
     
+    /// Test that when we try and use a pulse width of 58ms, the initializer throws an error because
+    /// this wouldn't produce an acceptable RailCom cutout delay.
+    func testFailRailComCutout() {
+        XCTAssertThrowsError(try BitstreamTiming(pulseWidth: 58))
+    }
+
 }
