@@ -96,6 +96,14 @@ public struct BitstreamTiming {
     ///   includes the delay before the start of the RailCom cutout.
     public static let railComMax: Float = 488
     
+    /// Minimum count in bits of a preamble.
+    ///
+    /// - Note:
+    ///   NMRA S-9.2 requires that the preamble consist of a minimum of 14 bits, while it permits
+    ///   lower values only for the decoder. For service mode programming, NMRA S-9.2.3 specifies a
+    ///   long preamble of 20 bits.
+    public static let preambleCountMin: Int = 14
+    
     /// Duration in microseconds of a single pulse.
     public let pulseWidth: Float
     
@@ -119,14 +127,19 @@ public struct BitstreamTiming {
     /// This bit length is measured from the end of the Packet End Bit, and thus includes the bits
     /// specified in `railComDelayLength`. It is calculated during initialization based on
     /// `pulseWidth`.
-    public let railComCutoutLength: Int
-    
-    /// Length in pulses of the entire RailCom output.
-    ///
-    /// This is the value of `railComCutoutLength` rounded up to the nearest double of
-    /// `oneBitLength`, thus allowing for the complete transmission of logical one bits by the end
-    /// of the RailCom output period.
     public let railComLength: Int
+    
+    /// Count of bits for the entire RailCom output.
+    ///
+    /// This is the value of `railComLength` divided by the double of `oneBitLength`, thus yielding
+    /// the number of complete one bits required from the end of the Packet End Bit to the start of
+    /// the preamble.
+    public let railComCount: Int
+    
+    /// Count of bits for the preamble.
+    ///
+    /// This includes sufficient bits for a complete preamble, and the RailCom cutout.
+    public let preambleCount: Int
     
     public enum Error : Swift.Error {
         
@@ -143,9 +156,11 @@ public struct BitstreamTiming {
         zeroBitLength = Int((BitstreamTiming.zeroBit - 1) / pulseWidth) + 1
         
         railComDelayLength = Int((BitstreamTiming.railComDelayMin - 1) / pulseWidth) + 1
-        railComCutoutLength = Int((BitstreamTiming.railComMin - 1) / pulseWidth) + 1
+        railComLength = Int((BitstreamTiming.railComMin - 1) / pulseWidth) + 1
         
-        railComLength = (oneBitLength * 2) * ((railComCutoutLength - 1) / (oneBitLength * 2) + 1)
+        railComCount = (railComLength - 1) / (oneBitLength * 2) + 1
+        
+        preambleCount = BitstreamTiming.preambleCountMin + railComCount
         
         // Sanity check the lengths.
         guard ((Float(oneBitLength) * pulseWidth) >= BitstreamTiming.oneBitMin) &&
@@ -160,9 +175,9 @@ public struct BitstreamTiming {
             ((Float(railComDelayLength) * pulseWidth) <= BitstreamTiming.railComDelayMax) else {
                 throw Error.conformanceError(message: "Duration of pre-RailCom cutout delay would be \(Float(railComDelayLength) * pulseWidth)µs which is outside the valid range \(BitstreamTiming.railComDelayMin)–\(BitstreamTiming.railComDelayMax)µs")
         }
-        guard ((Float(railComCutoutLength) * pulseWidth) >= BitstreamTiming.railComMin) &&
-            ((Float(railComCutoutLength) * pulseWidth) <= BitstreamTiming.railComMax) else {
-                throw Error.conformanceError(message: "Duration of RailCom cutout would be \(Float(railComCutoutLength) * pulseWidth)µs which is outside the valid range \(BitstreamTiming.railComMin)–\(BitstreamTiming.railComMax)µs")
+        guard ((Float(railComLength) * pulseWidth) >= BitstreamTiming.railComMin) &&
+            ((Float(railComLength) * pulseWidth) <= BitstreamTiming.railComMax) else {
+                throw Error.conformanceError(message: "Duration of RailCom cutout would be \(Float(railComLength) * pulseWidth)µs which is outside the valid range \(BitstreamTiming.railComMin)–\(BitstreamTiming.railComMax)µs")
         }
     }
 

@@ -32,16 +32,21 @@ class BitstreamTimingTests: XCTestCase {
     }
     
     /// Test that when we use a pulseWidth of 1ms, the length of a RailCom cutout is 454 pulses.
-    func testMicrosecondRailComCutout() {
-        let timing = try! BitstreamTiming(pulseWidth: 1)
-        XCTAssertEqual(timing.railComCutoutLength, 454)
-    }
-
-    /// Test that when we use a pulseWidth of 1ms, the total RailCom length is 464 pulses, which
-    /// is derived from the number of one bits required for it.
     func testMicrosecondRailCom() {
         let timing = try! BitstreamTiming(pulseWidth: 1)
-        XCTAssertEqual(timing.railComLength, 464)
+        XCTAssertEqual(timing.railComLength, 454)
+    }
+
+    /// Test that when we use a pulseWidth of 1ms, RailCom requires 4 one bits.
+    func testMicrosecondRailComCount() {
+        let timing = try! BitstreamTiming(pulseWidth: 1)
+        XCTAssertEqual(timing.railComCount, 4)
+    }
+
+    /// Test that when we use a pulseWidth of 1ms, a preamble requires 18 one bits.
+    func testMicrosecondPreambleCount() {
+        let timing = try! BitstreamTiming(pulseWidth: 1)
+        XCTAssertEqual(timing.preambleCount, 18)
     }
 
     
@@ -66,22 +71,27 @@ class BitstreamTimingTests: XCTestCase {
     }
     
     /// Test that when we use a pulseWidth of 10ms, the length of a RailCom cutout is 46 pulses (460ms).
-    func testTenMsRailComCutout() {
-        let timing = try! BitstreamTiming(pulseWidth: 10)
-        XCTAssertEqual(timing.railComCutoutLength, 46)
-    }
-    
-    /// Test that when we use a pulseWidth of 10ms, the total RailCom length is 48 pulses (480ms), which
-    /// is derived from the number of one bits required for it.
     func testTenMsRailCom() {
         let timing = try! BitstreamTiming(pulseWidth: 10)
-        XCTAssertEqual(timing.railComLength, 48)
+        XCTAssertEqual(timing.railComLength, 46)
+    }
+    
+    /// Test that when we use a pulseWidth of 10ms, RailCom requires 4 one bits.
+    func testTenMsRailComCount() {
+        let timing = try! BitstreamTiming(pulseWidth: 10)
+        XCTAssertEqual(timing.railComCount, 4)
+    }
+
+    /// Test that when we use a pulseWidth of 10ms, a preamble requires 18 one bits.
+    func testTenMsPreambleCount() {
+        let timing = try! BitstreamTiming(pulseWidth: 10)
+        XCTAssertEqual(timing.preambleCount, 18)
     }
 
     
     // MARK: 14.5ms tests
     
-    /// Test that when we use a pulseWidth of 14.5ms, the length of a one bit is 4 pulses (55ms).
+    /// Test that when we use a pulseWidth of 14.5ms, the length of a one bit is 4 pulses (58ms).
     func testGoldilocksMsOneBit() {
         let timing = try! BitstreamTiming(pulseWidth: 14.5)
         XCTAssertEqual(timing.oneBitLength, 4)
@@ -100,16 +110,21 @@ class BitstreamTimingTests: XCTestCase {
     }
     
     /// Test that when we use a pulseWidth of 14.5ms, the length of a RailCom cutout is 32 pulses (464ms).
-    func testGoldilocksMsRailComCutout() {
-        let timing = try! BitstreamTiming(pulseWidth: 14.5)
-        XCTAssertEqual(timing.railComCutoutLength, 32)
-    }
-    
-    /// Test that when we use a pulseWidth of 14.5ms, the total RailCom length is also 32 pulses (464ms),
-    /// because this just happens to neatly divide into one bits.
     func testGoldilocksMsRailCom() {
         let timing = try! BitstreamTiming(pulseWidth: 14.5)
         XCTAssertEqual(timing.railComLength, 32)
+    }
+    
+    /// Test that when we use a pulseWidth of 14.5ms, RailCom requires 4 one bits.
+    func testGoldilocksMsRailComCount() {
+        let timing = try! BitstreamTiming(pulseWidth: 14.5)
+        XCTAssertEqual(timing.railComCount, 4)
+    }
+    
+    /// Test that when we use a pulseWidth of 14.5ms, a preamble requires 18 one bits.
+    func testGoldilocksMsPreambleCount() {
+        let timing = try! BitstreamTiming(pulseWidth: 14.5)
+        XCTAssertEqual(timing.preambleCount, 18)
     }
 
     
@@ -123,7 +138,7 @@ class BitstreamTimingTests: XCTestCase {
     
     /// Test that when we try and use a pulse width of 58ms, the initializer throws an error because
     /// this wouldn't produce an acceptable RailCom cutout delay.
-    func testFailRailComCutout() {
+    func testFailRailComDelay() {
         XCTAssertThrowsError(try BitstreamTiming(pulseWidth: 58))
     }
 
