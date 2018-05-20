@@ -36,4 +36,10 @@ class UtilTests: XCTestCase {
         XCTAssertEqual(value.binaryString, "00101010")
     }
     
+    /// Make sure that we can get the binary representation of a negative integer.
+    func testNegativeBinaryString() {
+        let value: Int8 = -42
+        XCTAssertEqual(value.binaryString, "11010110")
+    }
+
 }
