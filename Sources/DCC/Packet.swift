@@ -158,3 +158,29 @@ public struct SpeedAndDirectionInstruction : MultiFunctionInstruction {
     }
     
 }
+
+
+public struct Preamble : Packable {
+    
+    public var timing: BitstreamTiming
+    public var withCutout: Bool
+    
+    init(timing: BitstreamTiming, withCutout: Bool = true) {
+        self.timing = timing
+        self.withCutout = withCutout
+    }
+    
+    public func add<T : Packer>(into packer: inout T) {
+        let count = withCutout ? timing.preambleCount : BitstreamTiming.preambleCountMin
+        if count <= UInt64.bitWidth {
+            let bits: UInt64 = ~(~0 << count)
+            packer.add(bits, length: count)
+        } else {
+            for _ in 0..<count {
+                packer.add(1, length: 1)
+            }
+        }
+    }
+    
+}
+
