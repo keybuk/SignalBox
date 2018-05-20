@@ -9,7 +9,6 @@ import XCTest
 
 import DCC
 
-
 class UtilTests: XCTestCase {
 
     /// Make sure that String.leftPadding works as intended.
