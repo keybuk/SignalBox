@@ -759,31 +759,3 @@ class DriverTests : XCTestCase {
     }
     
 }
-
-extension DriverTests {
-    
-    static var allTests = {
-        return [
-            ("testQueueStartBitstream", testQueueStartBitstream),
-            ("testQueueCompletionHandler", testQueueCompletionHandler),
-            ("testQueueWhileTransmitting", testQueueWhileTransmitting),
-            ("testQueueWhileRepeating", testQueueWhileRepeating),
-            ("testQueueRemovesStartOnFirstTransmitting", testQueueRemovesStartOnFirstTransmitting),
-            ("testQueueRemovesOnNextTransmitting", testQueueRemovesOnNextTransmitting),
-            ("testQueueStopBitstream", testQueueStopBitstream),
-            ("testQueueRemovesSelfOnStop", testQueueRemovesSelfOnStop),
-            ("testQueueAfterStop", testQueueAfterStop),
-            ("testQueueAfterStopDoesntDoubleRemove", testQueueAfterStopDoesntDoubleRemove),
-            ("testQueueAfterDMAInactive", testQueueAfterDMAInactive),
-            ("testQueueAfterDMAInactiveDoesntDoubleRemove", testQueueAfterDMAInactiveDoesntDoubleRemove),
-            
-            ("testStop", testStop),
-            ("testStopRemovesSelf", testStopRemovesSelf),
-            ("testStopCompletionHandler", testStopCompletionHandler),
-            ("testStopWhenStopped", testStopWhenStopped),
-            
-            ("testPowerOffBitstreamHasNoDelayedEvents", testPowerOffBitstreamHasNoDelayedEvents),
-        ]
-    }()
-
-}

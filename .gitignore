@@ -5,3 +5,4 @@
 /AVR/**/*.o
 /AVR/**/*.elf
 /AVR/**/*.hex
+/Tests/LinuxMain.swift

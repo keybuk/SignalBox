@@ -11,7 +11,7 @@ import XCTest
 @testable import OldDCC
 
 
-class BitstreamTests : XCTestCase {
+class OldBitstreamTests : XCTestCase {
     
     var wordSize: Int = 0
     
@@ -1147,97 +1147,5 @@ class BitstreamTests : XCTestCase {
 
         XCTAssertEqual(x.duration, 290.0)
     }
-
-}
-
-extension BitstreamTests {
-    
-    static var allTests = {
-        return [
-            ("testCollection", testCollection),
-            
-            ("testEvent", testEvent),
-            ("testEventMultiple", testEventMultiple),
-        
-            ("testPhysicalBitsZeroCount", testPhysicalBitsZeroCount),
-            ("testPhysicalBitsAllOnes", testPhysicalBitsAllOnes),
-            ("testPhysicalBitsAllZeros", testPhysicalBitsAllZeros),
-            ("testPhysicalBitsLeadingZero", testPhysicalBitsLeadingZero),
-            ("testPhysicalBitsTrailingZero", testPhysicalBitsTrailingZero),
-            ("testPhysicalBitsExtends", testPhysicalBitsExtends),
-            ("testPhysicalBitsExtendsAndAppends", testPhysicalBitsExtendsAndAppends),
-            ("testPhysicalBitsExtendsPerfectly", testPhysicalBitsExtendsPerfectly),
-            ("testPhysicalBitsExtendsZeroCount", testPhysicalBitsExtendsZeroCount),
-            ("testPhysicalBitsAfterNonData", testPhysicalBitsAfterNonData),
-            ("testPhysicalBitsSandwichNonData", testPhysicalBitsSandwichNonData),
-            
-            ("testRepeatingPhysicalOneBitZeroCount", testRepeatingPhysicalOneBitZeroCount),
-            ("testRepeatingPhysicalOneBit", testRepeatingPhysicalOneBit),
-            ("testRepeatingPhysicalOneBitShortWordSize", testRepeatingPhysicalOneBitShortWordSize),
-            ("testRepeatingPhysicalOneBitLongerThanWord", testRepeatingPhysicalOneBitLongerThanWord),
-            ("testRepeatingPhysicalOneBitExtends", testRepeatingPhysicalOneBitExtends),
-            ("testRepeatingPhysicalOneBitExtendsAndAppends", testRepeatingPhysicalOneBitExtendsAndAppends),
-            ("testRepeatingPhysicalOneBitExtendsPerfectly", testRepeatingPhysicalOneBitExtendsPerfectly),
-            ("testRepeatingPhysicalOneBitExtendsZeroCount", testRepeatingPhysicalOneBitExtendsZeroCount),
-            ("testRepeatingPhysicalOneBitAfterNonData", testRepeatingPhysicalOneBitAfterNonData),
-            ("testRepeatingPhysicalOneBitSandwichNonData", testRepeatingPhysicalOneBitSandwichNonData),
-            ("testRepeatingPhysicalZeroBitZeroCount", testRepeatingPhysicalZeroBitZeroCount),
-            ("testRepeatingPhysicalZeroBit", testRepeatingPhysicalZeroBit),
-            ("testRepeatingPhysicalZeroBitShortWordSize", testRepeatingPhysicalZeroBitShortWordSize),
-            ("testRepeatingPhysicalZeroBitLongerThanWord", testRepeatingPhysicalZeroBitLongerThanWord),
-            ("testRepeatingPhysicalZeroBitExtends", testRepeatingPhysicalZeroBitExtends),
-            ("testRepeatingPhysicalZeroBitExtendsAndAppends", testRepeatingPhysicalZeroBitExtendsAndAppends),
-            ("testRepeatingPhysicalZeroBitExtendsPerfectly", testRepeatingPhysicalZeroBitExtendsPerfectly),
-            ("testRepeatingPhysicalZeroBitExtendsZeroCount", testRepeatingPhysicalZeroBitExtendsZeroCount),
-            ("testRepeatingPhysicalZeroBitAfterNonData", testRepeatingPhysicalZeroBitAfterNonData),
-            ("testRepeatingPhysicalZeroBitSandwichNonData", testRepeatingPhysicalZeroBitSandwichNonData),
-            ("testRepeatingPhysicalZeroBitAfterOne", testRepeatingPhysicalZeroBitAfterOne),
-            ("testRepeatingPhysicalOneBitAfterZero", testRepeatingPhysicalOneBitAfterZero),
-            
-            ("testLogicalOneBit", testLogicalOneBit),
-            ("testLogicalOneBitDoesntFit", testLogicalOneBitDoesntFit),
-            ("testLogicalOneBitExtends", testLogicalOneBitExtends),
-            ("testLogicalOneBitExtendsAndAppends", testLogicalOneBitExtendsAndAppends),
-            ("testLogicalOneBitExtendsPerfectly", testLogicalOneBitExtendsPerfectly),
-            ("testLogicalOneBitAfterNonData", testLogicalOneBitAfterNonData),
-            ("testLogicalOneBitSandwichNonData", testLogicalOneBitSandwichNonData),
-            ("testLogicalOneBitAlternateLength", testLogicalOneBitAlternateLength),
-            ("testLogicalZeroBit", testLogicalZeroBit),
-            ("testLogicalZeroBitDoesntFit", testLogicalZeroBitDoesntFit),
-            ("testLogicalZeroBitExtends", testLogicalZeroBitExtends),
-            ("testLogicalZeroBitExtendsAndAppends", testLogicalZeroBitExtendsAndAppends),
-            ("testLogicalZeroBitExtendsPerfectly", testLogicalZeroBitExtendsPerfectly),
-            ("testLogicalZeroBitAfterNonData", testLogicalZeroBitAfterNonData),
-            ("testLogicalZeroBitSandwichNonData", testLogicalZeroBitSandwichNonData),
-            ("testLogicalZeroBitAlternateLength", testLogicalZeroBitAlternateLength),
-            
-            ("testPreamble", testPreamble),
-            ("testPreambleWithLength", testPreambleWithLength),
-            ("testPreambleExtends", testPreambleExtends),
-            ("testPreambleAlternateLength", testPreambleAlternateLength),
-            
-            ("testRailComCutout", testRailComCutout),
-            ("testRailComCutoutExtends", testRailComCutoutExtends),
-            ("testRailComCutoutWithDebug", testRailComCutoutWithDebug),
-            ("testRailComCutoutAlternateLength", testRailComCutoutAlternateLength),
-            ("testRailComCutoutAlternateLengthWithDebug", testRailComCutoutAlternateLengthWithDebug),
-            
-            ("testPacket", testPacket),
-            ("testPacketExtends", testPacketExtends),
-            ("testPacketAlternateLength", testPacketAlternateLength),
-            
-            ("testOperationsModePacket", testOperationsModePacket),
-            ("testOperationsModePacketWithDebug", testOperationsModePacketWithDebug),
-            ("testOperationsModePacketAlternateLength", testOperationsModePacketAlternateLength),
-            ("testOperationsModePacketAlternateLengthWithDebug", testOperationsModePacketAlternateLengthWithDebug),
-            
-            ("testDurationEmptyBitstream", testDurationEmptyBitstream),
-            ("testDurationSingleBit", testDurationSingleBit),
-            ("testDurationSingleData", testDurationSingleData),
-            ("testDurationSingleDataFromMulitpleAppends", testDurationSingleDataFromMulitpleAppends),
-            ("testDurationMultipleData", testDurationMultipleData),
-            ("testDurationDataBrokenByEvent", testDurationDataBrokenByEvent),
-            ]
-    }()
 
 }
