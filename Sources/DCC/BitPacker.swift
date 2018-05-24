@@ -11,7 +11,7 @@ public typealias BytePacker = BitPacker<UInt8>
 
 /// Packs fields as bit fields into an array of bytes.
 ///
-/// `BytePacker` may be used to create arrays of bytes by sourcing values of individual bits from
+/// `BitPacker` may be used to create arrays of bytes by sourcing values of individual bits from
 /// other values, packing them into the larger structure.
 ///
 /// In addition to the serial `Packer` conformance, values can be added at fields with specific

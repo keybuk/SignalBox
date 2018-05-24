@@ -16,6 +16,7 @@ import Foundation
 /// results in an output of 58 consecutive 1 bits, followed by 58 consecutive 0 bits, representing
 /// the PWM pulse of the duration expected.
 public struct Bitstream : Packer, CustomDebugStringConvertible {
+    // FIXME: As much as I like the word Bitstream, this is really the data for the PWM FiFo so needs a different name.
     
     /// Timing values used for conversion.
     public var timing: BitstreamTiming

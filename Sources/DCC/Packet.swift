@@ -162,6 +162,8 @@ public struct SpeedAndDirectionInstruction : MultiFunctionInstruction {
 
 public struct Preamble : Packable {
     
+    // FIXME: This is just a thought experiment, it might not be the best way to do preambles.
+    
     public var timing: BitstreamTiming
     public var withCutout: Bool
     
@@ -173,6 +175,7 @@ public struct Preamble : Packable {
     public func add<T : Packer>(into packer: inout T) {
         let count = withCutout ? timing.preambleCount : BitstreamTiming.preambleCountMin
         if count <= UInt64.bitWidth {
+            // FIXME: since Packer iterates the bits anyway, is this really an optimisation?
             let bits: UInt64 = ~(~0 << count)
             packer.add(bits, length: count)
         } else {

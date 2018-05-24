@@ -1,5 +1,5 @@
 //
-//  Packer.swift
+//  Packable.swift
 //  DCC
 //
 //  Created by Scott James Remnant on 5/15/18.
@@ -18,10 +18,19 @@ public protocol Packable {
     
 }
 
+extension Bool : Packable {
+    
+    // Provide conformance to `Packable` for `Bool` by adding a single bit.
+    public func add<T : Packer>(into packer: inout T) {
+        packer.add(self ? 1 : 0, length: 1)
+    }
+    
+}
+
 /// A type that can pack multiple values together into a structure.
 ///
 /// A `Packer` can accept any type which conforms to `Packable`, which is itself defined as a
-/// type that can itself into a `Packer`.
+/// type that can pack itself into a `Packer`.
 ///
 /// In addition a `Packer` can natively accept any fixed with integer value, with a specified
 /// length in bits. This is the method that implementations of `Packer` need to provide to conform.
@@ -53,14 +62,3 @@ extension Packer {
     }
     
 }
-
-extension Bool : Packable {
-
-    // Provide conformance to `Packable` for `Bool` by adding a single bit.
-    public func add<T : Packer>(into packer: inout T) {
-        packer.add(self ? 1 : 0, length: 1)
-    }
-    
-}
-
-
