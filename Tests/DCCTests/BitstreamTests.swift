@@ -32,7 +32,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that we can add a one bit to an empty bitstream.
     func testOneBit() {
-        let timing = try! BitstreamTiming(pulseWidth: pulseWidth)
+        let timing = try! PulseTiming(pulseWidth: pulseWidth)
         var bitstream = Bitstream(timing: timing)
         bitstream.add(0b1, length: 1)
         
@@ -41,7 +41,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that we can add a zero bit to an empty bitstream.
     func testZeroBit() {
-        let timing = try! BitstreamTiming(pulseWidth: pulseWidth)
+        let timing = try! PulseTiming(pulseWidth: pulseWidth)
         var bitstream = Bitstream(timing: timing)
         bitstream.add(0b0, length: 1)
         
@@ -50,7 +50,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that we can add multiple bits to a stream in one call.
     func testMultipleBits() {
-        let timing = try! BitstreamTiming(pulseWidth: pulseWidth)
+        let timing = try! PulseTiming(pulseWidth: pulseWidth)
         var bitstream = Bitstream(timing: timing)
         bitstream.add(0b10, length: 2)
         
@@ -60,7 +60,7 @@ class BitstreamTests: XCTestCase {
 
     /// Test that we can add bits by consecutive calls.
     func testConsecutiveBits() {
-        let timing = try! BitstreamTiming(pulseWidth: pulseWidth)
+        let timing = try! PulseTiming(pulseWidth: pulseWidth)
         var bitstream = Bitstream(timing: timing)
         bitstream.add(0b0, length: 1)
         bitstream.add(0b1, length: 1)
@@ -71,7 +71,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that we can add a full byte value, filling multiple words.
     func testMultipleWords() {
-        let timing = try! BitstreamTiming(pulseWidth: pulseWidth)
+        let timing = try! PulseTiming(pulseWidth: pulseWidth)
         var bitstream = Bitstream(timing: timing)
         bitstream.add(0b10101100, length: 8)
 
@@ -85,7 +85,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that the duration of a bitstream can be calculated.
     func testDuration() {
-        let timing = try! BitstreamTiming(pulseWidth: pulseWidth)
+        let timing = try! PulseTiming(pulseWidth: pulseWidth)
         var bitstream = Bitstream(timing: timing)
         bitstream.add(0b10101100, length: 8)
         
@@ -95,7 +95,7 @@ class BitstreamTests: XCTestCase {
     
     /// Test that the duration of an empty bitstream is zero.
     func testEmptyDuration() {
-        let timing = try! BitstreamTiming(pulseWidth: pulseWidth)
+        let timing = try! PulseTiming(pulseWidth: pulseWidth)
         let bitstream = Bitstream(timing: timing)
         
         XCTAssertEqual(bitstream.duration, 0)

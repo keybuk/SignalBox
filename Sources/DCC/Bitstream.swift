@@ -19,7 +19,7 @@ public struct Bitstream : Packer, CustomDebugStringConvertible {
     // FIXME: As much as I like the word Bitstream, this is really the data for the PWM FiFo so needs a different name.
     
     /// Timing values used for conversion.
-    public var timing: BitstreamTiming
+    public var timing: PulseTiming
 
     /// Packed words.
     public var words: [Int]
@@ -27,7 +27,7 @@ public struct Bitstream : Packer, CustomDebugStringConvertible {
     /// Number of bits remaining in the final word.
     public var bitsRemaining = 0
     
-    public init(timing: BitstreamTiming) {
+    public init(timing: PulseTiming) {
         self.timing = timing
         words = []
     }
