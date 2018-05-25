@@ -1,5 +1,5 @@
 //
-//  Bitstream.swift
+//  PulsePacker.swift
 //  DCC
 //
 //  Created by Scott James Remnant on 5/19/18.
@@ -7,16 +7,15 @@
 
 import Foundation
 
-/// Serialized Bitstream in pulse form.
+/// Serialized PWM input from logical bits.
 ///
-/// `Bitstream` confirms to `Packer`, and creates arrays of platform words containing the bit
-/// representation of the pulses required to output the logical bits from the values packed into it.
+/// `PulsePacker` creates arrays of platform words containing the bit representation of the pulses
+/// required to output the logical bits from the values packed into it.
 ///
-/// Put simply, when initialized with a `BitstreamTiming.pulseWidth` of 1ms, a packed 1 bit value
+/// Put simply, when initialized with a `PulseTiming.pulseWidth` of 1ms, a packed 1 bit value
 /// results in an output of 58 consecutive 1 bits, followed by 58 consecutive 0 bits, representing
 /// the PWM pulse of the duration expected.
-public struct Bitstream : Packer, CustomDebugStringConvertible {
-    // FIXME: As much as I like the word Bitstream, this is really the data for the PWM FiFo so needs a different name.
+public struct PulsePacker : Packer, CustomDebugStringConvertible {
     
     /// Timing values used for conversion.
     public var timing: PulseTiming
@@ -37,7 +36,7 @@ public struct Bitstream : Packer, CustomDebugStringConvertible {
         return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
     
-    /// Duration in microseconds of the bitstream.
+    /// Duration in microseconds of the output.
     public var duration: Float {
         let numberOfBits = words.count * Int.bitWidth - bitsRemaining
         return Float(numberOfBits) * timing.pulseWidth

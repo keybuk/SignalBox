@@ -1,5 +1,5 @@
 //
-//  BitstreamTests.swift
+//  PulsePackerTests.swift
 //  DCCTests
 //
 //  Created by Scott James Remnant on 5/19/18.
@@ -12,7 +12,7 @@ import DCC
 // Since the word size is platform specific, we don't want to test where the word boundaries lie.
 // Easiest solution is to concatenate the string values of all of the words, and chop off the last
 // part that isn't used yet.
-extension Bitstream {
+extension PulsePacker {
     
     var stringValue: String {
         let stringValue = words.map({ $0.binaryString }).joined()
@@ -22,7 +22,7 @@ extension Bitstream {
     
 }
 
-class BitstreamTests: XCTestCase {
+class PulsePackerTests: XCTestCase {
 
     /// Goldilocks value for pulse width that gives a small number of output bits while
     /// maintaining timing accuracy.
@@ -30,52 +30,52 @@ class BitstreamTests: XCTestCase {
     
     // MARK: add(:length)
 
-    /// Test that we can add a one bit to an empty bitstream.
+    /// Test that we can add a one bit to an empty packer.
     func testOneBit() {
         let timing = try! PulseTiming(pulseWidth: pulseWidth)
-        var bitstream = Bitstream(timing: timing)
-        bitstream.add(0b1, length: 1)
+        var packer = PulsePacker(timing: timing)
+        packer.add(0b1, length: 1)
         
-        XCTAssertEqual(bitstream.stringValue, "11110000")
+        XCTAssertEqual(packer.stringValue, "11110000")
     }
     
-    /// Test that we can add a zero bit to an empty bitstream.
+    /// Test that we can add a zero bit to an empty packer.
     func testZeroBit() {
         let timing = try! PulseTiming(pulseWidth: pulseWidth)
-        var bitstream = Bitstream(timing: timing)
-        bitstream.add(0b0, length: 1)
+        var packer = PulsePacker(timing: timing)
+        packer.add(0b0, length: 1)
         
-        XCTAssertEqual(bitstream.stringValue, "11111110000000")
+        XCTAssertEqual(packer.stringValue, "11111110000000")
     }
 
-    /// Test that we can add multiple bits to a stream in one call.
+    /// Test that we can add multiple bits to a packer in one call.
     func testMultipleBits() {
         let timing = try! PulseTiming(pulseWidth: pulseWidth)
-        var bitstream = Bitstream(timing: timing)
-        bitstream.add(0b10, length: 2)
+        var packer = PulsePacker(timing: timing)
+        packer.add(0b10, length: 2)
         
-        XCTAssertEqual(bitstream.stringValue,
+        XCTAssertEqual(packer.stringValue,
                        ["11110000", "11111110000000"].joined())
     }
 
     /// Test that we can add bits by consecutive calls.
     func testConsecutiveBits() {
         let timing = try! PulseTiming(pulseWidth: pulseWidth)
-        var bitstream = Bitstream(timing: timing)
-        bitstream.add(0b0, length: 1)
-        bitstream.add(0b1, length: 1)
+        var packer = PulsePacker(timing: timing)
+        packer.add(0b0, length: 1)
+        packer.add(0b1, length: 1)
 
-        XCTAssertEqual(bitstream.stringValue,
+        XCTAssertEqual(packer.stringValue,
                        ["11111110000000", "11110000"].joined())
     }
     
     /// Test that we can add a full byte value, filling multiple words.
     func testMultipleWords() {
         let timing = try! PulseTiming(pulseWidth: pulseWidth)
-        var bitstream = Bitstream(timing: timing)
-        bitstream.add(0b10101100, length: 8)
+        var packer = PulsePacker(timing: timing)
+        packer.add(0b10101100, length: 8)
 
-        XCTAssertEqual(bitstream.stringValue,
+        XCTAssertEqual(packer.stringValue,
                        ["11110000", "11111110000000", "11110000", "11111110000000",
                         "11110000", "11110000", "11111110000000", "11111110000000"].joined())
 
@@ -83,22 +83,22 @@ class BitstreamTests: XCTestCase {
     
     // MARK: duration
     
-    /// Test that the duration of a bitstream can be calculated.
+    /// Test that the duration of a packer can be calculated.
     func testDuration() {
         let timing = try! PulseTiming(pulseWidth: pulseWidth)
-        var bitstream = Bitstream(timing: timing)
-        bitstream.add(0b10101100, length: 8)
+        var packer = PulsePacker(timing: timing)
+        packer.add(0b10101100, length: 8)
         
         // 1,276ms = 88 bits × 14.5ms per bit.
-        XCTAssertEqual(bitstream.duration, 1276)
+        XCTAssertEqual(packer.duration, 1276)
     }
     
-    /// Test that the duration of an empty bitstream is zero.
+    /// Test that the duration of an empty packer is zero.
     func testEmptyDuration() {
         let timing = try! PulseTiming(pulseWidth: pulseWidth)
-        let bitstream = Bitstream(timing: timing)
+        let packer = PulsePacker(timing: timing)
         
-        XCTAssertEqual(bitstream.duration, 0)
+        XCTAssertEqual(packer.duration, 0)
     }
 
 }
