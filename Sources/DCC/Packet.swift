@@ -206,12 +206,7 @@ public struct ConsistControlInstruction : DecoderAndConsistControlInstruction {
 
 }
 
-public protocol SpeedAndDirectionInstruction : MultiFunctionInstruction {
-
-    var speed: Int { get set }
-    var direction: Direction { get set }
-
-}
+public protocol SpeedAndDirectionInstruction : MultiFunctionInstruction {}
 
 public struct SpeedAndDirection14StepInstruction : SpeedAndDirectionInstruction {
     
@@ -238,9 +233,8 @@ public struct SpeedAndDirection14StepInstruction : SpeedAndDirectionInstruction 
         packer.add(headlight)
         
         switch speed {
-        // FIXME: Emergency Stop is not handled.
         case 0:
-            packer.add(0b00000, length: 5)
+            packer.add(0b0000, length: 4)
         default:
             let adjustedSpeed = speed + 1
             packer.add(adjustedSpeed, length: 4)
@@ -249,16 +243,42 @@ public struct SpeedAndDirection14StepInstruction : SpeedAndDirectionInstruction 
     
 }
 
+public struct EmergencyStop14StepInstruction : SpeedAndDirectionInstruction {
+    
+    public var direction: Direction
+    public var headlight: Bool
+    
+    public init(direction: Direction, headlight: Bool) {
+        self.direction = direction
+        self.headlight = headlight
+    }
+    
+    public func add<T : Packer>(into packer: inout T) {
+        switch direction {
+        case .forward:
+            packer.add(0b011, length: 3)
+        case .reverse:
+            packer.add(0b010, length: 3)
+        }
+        
+        packer.add(headlight)
+        packer.add(0b00001, length: 5)
+    }
+    
+}
+
 public struct SpeedAndDirection28StepInstruction : SpeedAndDirectionInstruction {
     
     public var speed: Int
     public var direction: Direction
-    
-    public init(speed: Int, direction: Direction) {
+    public var ignoreDirection: Bool
+
+    public init(speed: Int, direction: Direction, stopIgnoringDirection ignoreDirection: Bool = false) {
         assert(speed >= 0 && speed <= 28, "Speed must be within range 0...28")
-        
+
         self.speed = speed
         self.direction = direction
+        self.ignoreDirection = ignoreDirection
     }
     
     public func add<T : Packer>(into packer: inout T) {
@@ -270,10 +290,9 @@ public struct SpeedAndDirection28StepInstruction : SpeedAndDirectionInstruction 
         }
         
         switch speed {
-        // FIXME: Emergency Stop is not handled.
         case 0:
-            // FIXME: Ignore-direction stop is not handled.
-            packer.add(0b00000, length: 5)
+            packer.add(ignoreDirection)
+            packer.add(0b0000, length: 4)
         default:
             let adjustedSpeed = speed + 3
             packer.add(adjustedSpeed, length: 1)
@@ -281,6 +300,30 @@ public struct SpeedAndDirection28StepInstruction : SpeedAndDirectionInstruction 
         }
     }
 
+}
+
+public struct EmergencyStop28StepInstruction : SpeedAndDirectionInstruction {
+    
+    public var direction: Direction
+    public var ignoreDirection: Bool
+    
+    public init(direction: Direction, ignore ignoreDirection: Bool = true) {
+        self.direction = direction
+        self.ignoreDirection = ignoreDirection
+    }
+    
+    public func add<T : Packer>(into packer: inout T) {
+        switch direction {
+        case .forward:
+            packer.add(0b011, length: 3)
+        case .reverse:
+            packer.add(0b010, length: 3)
+        }
+
+        packer.add(ignoreDirection)
+        packer.add(0b0001, length: 4)
+    }
+    
 }
 
 public protocol AdvancedOperationsInstruction : MultiFunctionInstruction {}
@@ -311,13 +354,38 @@ public struct SpeedAndDirection128StepInstruction : AdvancedOperationsInstructio
         }
         
         switch speed {
-        // FIXME: Emergency Stop is not handled.
         case 0:
             packer.add(0b0000000, length: 7)
         default:
             let adjustedSpeed = speed + 1
             packer.add(adjustedSpeed, length: 7)
         }
+    }
+    
+}
+
+public struct EmergencyStop128StepInstruction : AdvancedOperationsInstruction {
+    
+    public var direction: Direction
+    
+    public init(direction: Direction) {
+        self.direction = direction
+    }
+    
+    public func add<T : Packer>(into packer: inout T) {
+        // Advanced Operations.
+        packer.add(0b001, length: 3)
+        // 128 Speed Step Control.
+        packer.add(0b11111, length: 5)
+        
+        switch direction {
+        case .forward:
+            packer.add(0b1, length: 1)
+        case .reverse:
+            packer.add(0b0, length: 0)
+        }
+        
+        packer.add(0b0000001, length: 7)
     }
     
 }
@@ -352,9 +420,9 @@ public struct RestrictedSpeedStepInstruction : AdvancedOperationsInstruction {
         }
         
         switch speed {
-        // FIXME: Emergency Stop is not handled, and not clear whether it's meaningful.
+        // Emergency Stop is not handled, and not clear whether it's meaningful.
         case 0:
-            // FIXME: Ignore-direction stop is not handled, and not clear whether it's meaningful.
+            // Ignore-direction stop is not handled, and not clear whether it's meaningful.
             packer.add(0b00000, length: 5)
         default:
             // FIXME: I don't like that this is copied.
