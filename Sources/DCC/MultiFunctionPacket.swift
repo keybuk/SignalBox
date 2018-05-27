@@ -602,20 +602,13 @@ public struct BinaryStateControlInstruction : FeatureExpansionInstruction {
 
 public protocol ConfigurationVariableInstruction : MultiFunctionInstruction {}
 
-public enum ConfigurationVariable : Int {
-
-    case accelerationValue = 23
-    case decelerationValue = 24
-    
-}
-
 public struct ConfigurationVariableAccessShortInstruction : ConfigurationVariableInstruction {
     
     public var variable: ConfigurationVariable
     public var data: UInt8
     
     public init(variable: ConfigurationVariable, data: UInt8) {
-        assert(variable == .accelerationValue || variable == .decelerationValue, "Short form configuration variable acccess may only be used with Acceleration or Deceleration values.")
+        assert(variable == .accelerationAdjustment || variable == .decelerationAdjustment, "Short form configuration variable acccess may only be used with Acceleration or Deceleration values.")
         
         self.variable = variable
         self.data = data
@@ -626,12 +619,12 @@ public struct ConfigurationVariableAccessShortInstruction : ConfigurationVariabl
         packer.add(0b1111, length: 4)
         
         switch variable {
-        case .accelerationValue:
+        case .accelerationAdjustment:
             packer.add(0b0010, length: 4)
-        case .decelerationValue:
+        case .decelerationAdjustment:
             packer.add(0b0011, length: 4)
-//        default:
-//            fatalError("Configuration variable not suitable for short form.")
+        default:
+            fatalError("Configuration variable not suitable for short form.")
         }
         
         packer.add(data)
