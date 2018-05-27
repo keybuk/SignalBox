@@ -27,6 +27,27 @@ extension Bool : Packable {
     
 }
 
+extension FixedWidthInteger where Self : Packable {
+    
+    // Provide conformance to `Packable` for all fixed width integers by using their bitWidth.
+    public func add<T : Packer>(into packer: inout T) {
+        packer.add(self, length: bitWidth)
+    }
+
+}
+
+// Extend the fixed-width integers, but exclude Int and UInt since their width varies by platform
+// and that kind of thing introduces bugs!
+extension Int8 : Packable {}
+extension Int16 : Packable {}
+extension Int32 : Packable {}
+extension Int64 : Packable {}
+extension UInt8 : Packable {}
+extension UInt16 : Packable {}
+extension UInt32 : Packable {}
+extension UInt64 : Packable {}
+
+
 /// A type that can pack multiple values together into a structure.
 ///
 /// A `Packer` can accept any type which conforms to `Packable`, which is itself defined as a
