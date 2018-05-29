@@ -27,7 +27,7 @@ extension Bool : Packable {
     
 }
 
-extension FixedWidthInteger where Self : Packable {
+public extension FixedWidthInteger where Self : Packable {
     
     // Provide conformance to `Packable` for all fixed width integers by using their bitWidth.
     public func add<T : Packer>(into packer: inout T) {
@@ -75,7 +75,7 @@ public protocol Packer {
     
 }
 
-extension Packer {
+public extension Packer {
 
     // Provide a default implementation that uses `Packable`.
     public mutating func add(_ value: Packable) {
