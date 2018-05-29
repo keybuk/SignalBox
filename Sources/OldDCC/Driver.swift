@@ -8,7 +8,7 @@
 
 import Dispatch
 
-import RaspberryPi
+import OldRaspberryPi
 
 
 /// DMA Driver.

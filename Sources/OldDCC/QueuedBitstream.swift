@@ -6,7 +6,7 @@
 //
 //
 
-import RaspberryPi
+import OldRaspberryPi
 
 
 /// Errors that can be thrown by bitstream parsing.
