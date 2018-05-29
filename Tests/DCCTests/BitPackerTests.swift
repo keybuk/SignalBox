@@ -11,14 +11,22 @@ import DCC
 
 class BitPackerTests: XCTestCase {
     
-    /// Add a value.
-    func testAdd() {
+    /// Add a value to an unsigned type.
+    func testUnsigndType() {
         var packer = BitPacker<UInt8>()
         packer.add(0b1111, length: 4)
         
         XCTAssertEqual(packer.bytes, [ 0b11110000 ])
     }
-    
+
+    /// Add a value to a signed type.
+    func testSignedType() {
+        var packer = BitPacker<Int8>()
+        packer.add(0b1111, length: 4)
+        
+        XCTAssertEqual(packer.bytes, [ Int8(bitPattern: 0b11110000) ])
+    }
+
     /// Add a value at the top of a byte.
     func testStartOfByte() {
         var packer = BitPacker<UInt8>()
