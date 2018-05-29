@@ -8,4 +8,4 @@ sourcery --sources Tests/ \
 	--templates Tests/LinuxMain.stencil \
 	--args testimports="\
 @testable import DCCTests
-@testable import OldDCCTests"
+"

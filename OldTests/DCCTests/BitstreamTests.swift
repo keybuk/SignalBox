@@ -11,7 +11,7 @@ import XCTest
 @testable import OldDCC
 
 
-class OldBitstreamTests : XCTestCase {
+class BitstreamTests : XCTestCase {
     
     var wordSize: Int = 0
     
