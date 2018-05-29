@@ -36,7 +36,7 @@ class PulsePackerTests: XCTestCase {
         var packer = PulsePacker(timing: timing)
         packer.add(0b1, length: 1)
         
-        XCTAssertEqual(packer.stringValue, "11110000")
+        XCTAssertEqual(packer.words, [0b11110000 << packer.bitsRemaining])
     }
     
     /// Test that we can add a zero bit to an empty packer.
@@ -45,7 +45,7 @@ class PulsePackerTests: XCTestCase {
         var packer = PulsePacker(timing: timing)
         packer.add(0b0, length: 1)
         
-        XCTAssertEqual(packer.stringValue, "11111110000000")
+        XCTAssertEqual(packer.words, [0b111111_10000000 << packer.bitsRemaining])
     }
 
     /// Test that we can add multiple bits to a packer in one call.
@@ -54,8 +54,7 @@ class PulsePackerTests: XCTestCase {
         var packer = PulsePacker(timing: timing)
         packer.add(0b10, length: 2)
         
-        XCTAssertEqual(packer.stringValue,
-                       ["11110000", "11111110000000"].joined())
+        XCTAssertEqual(packer.words, [0b111100_00111111_10000000 << packer.bitsRemaining])
     }
 
     /// Test that we can add bits by consecutive calls.
@@ -65,8 +64,7 @@ class PulsePackerTests: XCTestCase {
         packer.add(0b0, length: 1)
         packer.add(0b1, length: 1)
 
-        XCTAssertEqual(packer.stringValue,
-                       ["11111110000000", "11110000"].joined())
+        XCTAssertEqual(packer.words, [0b111111_10000000_11110000 << packer.bitsRemaining])
     }
     
     /// Test that we can add a full byte value, filling multiple words.
@@ -75,9 +73,7 @@ class PulsePackerTests: XCTestCase {
         var packer = PulsePacker(timing: timing)
         packer.add(0b10101100, length: 8)
 
-        XCTAssertEqual(packer.stringValue,
-                       ["11110000", "11111110000000", "11110000", "11111110000000",
-                        "11110000", "11110000", "11111110000000", "11111110000000"].joined())
+        XCTAssertEqual(packer.words, [0b11110000_11111110_00000011_11000011, 0b11111000_00001111_00001111_00001111, 0b11100000_00111111_10000000 << packer.bitsRemaining])
 
     }
     

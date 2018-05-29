@@ -17,11 +17,13 @@ import Foundation
 /// the PWM pulse of the duration expected.
 public struct PulsePacker : Packer, CustomDebugStringConvertible {
     
+    public typealias Word = UInt32
+    
     /// Timing values used for conversion.
     public var timing: PulseTiming
 
     /// Packed words.
-    public var words: [Int]
+    public var words: [Word]
     
     /// Number of bits remaining in the final word.
     public var bitsRemaining = 0
@@ -38,7 +40,7 @@ public struct PulsePacker : Packer, CustomDebugStringConvertible {
     
     /// Duration in microseconds of the output.
     public var duration: Float {
-        let numberOfBits = words.count * Int.bitWidth - bitsRemaining
+        let numberOfBits = words.count * Word.bitWidth - bitsRemaining
         return Float(numberOfBits) * timing.pulseWidth
     }
 
@@ -79,7 +81,7 @@ public struct PulsePacker : Packer, CustomDebugStringConvertible {
         repeat {
             if bitsRemaining < 1 {
                 words.append(0)
-                bitsRemaining = Int.bitWidth
+                bitsRemaining = Word.bitWidth
             }
             
             let chunkLength = min(pulseLength, bitsRemaining)
@@ -87,7 +89,7 @@ public struct PulsePacker : Packer, CustomDebugStringConvertible {
             pulseLength -= chunkLength
 
             if high {
-                let bits = ~(~0 << chunkLength)
+                let bits: Word = ~(~0 << chunkLength)
                 words[words.index(before: words.endIndex)] |= bits << bitsRemaining
             }
         } while pulseLength > 0
