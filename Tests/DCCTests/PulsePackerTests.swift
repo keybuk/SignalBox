@@ -9,19 +9,6 @@ import XCTest
 
 import DCC
 
-// Since the word size is platform specific, we don't want to test where the word boundaries lie.
-// Easiest solution is to concatenate the string values of all of the words, and chop off the last
-// part that isn't used yet.
-extension PulsePacker {
-    
-    var stringValue: String {
-        let stringValue = words.map({ $0.binaryString }).joined()
-        let endIndex = stringValue.index(stringValue.endIndex, offsetBy: -bitsRemaining)
-        return String(stringValue[..<endIndex])
-    }
-    
-}
-
 class PulsePackerTests: XCTestCase {
 
     /// Goldilocks value for pulse width that gives a small number of output bits while
