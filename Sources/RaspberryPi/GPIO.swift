@@ -32,10 +32,7 @@ public final class GPIO : MappedRegisters, Collection {
     /// Offset of the GPIO registers from the peripherals base address.
     ///
     /// - Note: BCM2835 ARM Peripherals 6.1
-    public static let offset: UInt32 = 0x200000
-
-    /// Size of the GPIO registers range.
-    public static let size: Int = 0x0000c0
+    public let offset: UInt32 = 0x200000
 
     /// GPIO registers block.
     ///
@@ -74,7 +71,7 @@ public final class GPIO : MappedRegisters, Collection {
     }
 
     /// Pointer to the mapped GPIO registers.
-    public var registers: UnsafeMutablePointer<Registers>
+    public var registers: UnsafeMutablePointer<Registers>!
 
     /// Unmap `registers` on deinitialization.
     private var unmapOnDeinit: Bool
@@ -90,20 +87,20 @@ public final class GPIO : MappedRegisters, Collection {
     public subscript(index: Int) -> GPIOPin { return GPIOPin(gpio: self, number: index) }
 
     public init() throws {
-        registers = try GPIO.mapMemory()
         unmapOnDeinit = true
+        try mapMemory()
     }
 
     // For testing.
     internal init(registers: UnsafeMutablePointer<Registers>) {
-        self.registers = registers
         unmapOnDeinit = false
+        self.registers = registers
     }
 
     deinit {
         guard unmapOnDeinit else { return }
         do {
-            try GPIO.unmapMemory(of: registers)
+            try unmapMemory()
         } catch {
             print("Error on GPIO deinitialization: \(error)")
         }
