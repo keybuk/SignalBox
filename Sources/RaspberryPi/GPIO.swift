@@ -27,7 +27,15 @@
 ///         }
 ///     }
 ///
-public final class GPIO : Collection {
+public final class GPIO : MappedRegisters, Collection {
+
+    /// Offset of the GPIO registers from the peripherals base address.
+    ///
+    /// - Note: BCM2835 ARM Peripherals 6.1
+    public static let offset: UInt32 = 0x200000
+
+    /// Size of the GPIO registers range.
+    public static let size: Int = 0x0000c0
 
     /// GPIO registers block.
     ///
@@ -68,6 +76,9 @@ public final class GPIO : Collection {
     /// Pointer to the mapped GPIO registers.
     public var registers: UnsafeMutablePointer<Registers>
 
+    /// Unmap `registers` on deinitialization.
+    private var unmapOnDeinit: Bool
+
     /// Number of GPIO registers defined by the Raspberry Pi.
     ///
     /// This is accessible through the instance's `count` member, via `Collection` conformance.
@@ -78,9 +89,24 @@ public final class GPIO : Collection {
     public func index(after i: Int) -> Int { return i + 1 }
     public subscript(index: Int) -> GPIOPin { return GPIOPin(gpio: self, number: index) }
 
+    public init() throws {
+        registers = try GPIO.mapMemory()
+        unmapOnDeinit = true
+    }
+
     // For testing.
     internal init(registers: UnsafeMutablePointer<Registers>) {
         self.registers = registers
+        unmapOnDeinit = false
+    }
+
+    deinit {
+        guard unmapOnDeinit else { return }
+        do {
+            try GPIO.unmapMemory(of: registers)
+        } catch {
+            print("Error on GPIO deinitialization: \(error)")
+        }
     }
 
     /// Pull-up/down enable.
