@@ -6,3 +6,4 @@
 /AVR/**/*.elf
 /AVR/**/*.hex
 /Tests/LinuxMain.swift
+XCTestManifests.swift
