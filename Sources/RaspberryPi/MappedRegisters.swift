@@ -9,7 +9,7 @@
 import Glibc
 
 // This is not defined on Linux.
-let PAGE_SIZE = 4096
+public let PAGE_SIZE = 4096
 #else
 import Darwin
 
@@ -75,17 +75,17 @@ extension MappedRegisters {
     }
 
     /// The nearest page boundary below `address`
-    var mappableAddress: UInt32 {
+    var mapAddress: UInt32 {
         return address & ~(UInt32(clamping: PAGE_SIZE) - 1)
     }
 
     /// Offset of `address` from `mappableAddress`.
     var mapOffset: Int {
-        return Int(clamping: address - mappableAddress)
+        return Int(clamping: address - mapAddress)
     }
 
     /// The multiple of pages required to fit `Registers` and `offset`.
-    var mappableSize: Int {
+    var mapSize: Int {
         return ((mapOffset + MemoryLayout<Registers>.stride - 1) / Int(clamping: PAGE_SIZE) + 1) * Int(clamping: PAGE_SIZE)
     }
 
@@ -105,7 +105,7 @@ extension MappedRegisters {
         
         // Since "the zero page" is a valid address to which memory can be mapped, mmap() always returns a pointer.
         // Compare against the special MAP_FAILED value (-1) to determine failure.
-        let pointer = mmap(nil, mappableSize, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, off_t(mappableAddress))!
+        let pointer = mmap(nil, mapSize, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, off_t(mapAddress))!
         guard pointer != MAP_FAILED else { throw OSError(errno: errno) }
         registers = pointer.advanced(by: mapOffset).bindMemory(to: Registers.self, capacity: 1)
     }
@@ -115,7 +115,7 @@ extension MappedRegisters {
     /// - Throws: `OSError` on failure.
     func unmapMemory() throws {
         let pointer = registers.deinitialize(count: 1).advanced(by: -mapOffset)
-        guard munmap(pointer, mappableSize) == 0 else { throw OSError(errno: errno) }
+        guard munmap(pointer, mapSize) == 0 else { throw OSError(errno: errno) }
         registers = nil
     }
 
