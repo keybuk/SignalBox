@@ -7,14 +7,15 @@
 
 #if os(Linux)
 import Glibc
+
+// This is not defined on Linux.
+let PAGE_SIZE = 4096
 #else
 import Darwin
 
 // This is not defined on Darwin. Set to 0 to allow compilation to succeed.
 public let O_SYNC: Int32 = 0
 #endif
-
-import Foundation
 
 /// Location of the physical memory access device.
 private let memDevicePath = "/dev/mem"
@@ -73,9 +74,27 @@ extension MappedRegisters {
         return RaspberryPi.periperhalAddress + offset
     }
 
+    /// The nearest page boundary below `address`
+    var mappableAddress: UInt32 {
+        return address & ~(UInt32(clamping: PAGE_SIZE) - 1)
+    }
+
+    /// Offset of `address` from `mappableAddress`.
+    var mapOffset: Int {
+        return Int(clamping: address - mappableAddress)
+    }
+
+    /// The multiple of pages required to fit `Registers` and `offset`.
+    var mappableSize: Int {
+        return ((mapOffset + MemoryLayout<Registers>.stride - 1) / Int(clamping: PAGE_SIZE) + 1) * Int(clamping: PAGE_SIZE)
+    }
+
     /// Map the registers to the underlying hardware.
     ///
-    /// Registers are mapped from `address`. Use `unmapMemory` to release the pointer.
+    /// Registers are mapped from the nearest page boundary to `address`, and the offsets handled
+    /// internally.
+    ///
+    /// Use `unmapMemory` to release the pointer.
     ///
     /// - Throws: `OSError` on failure.
     func mapMemory() throws {
@@ -86,18 +105,17 @@ extension MappedRegisters {
         
         // Since "the zero page" is a valid address to which memory can be mapped, mmap() always returns a pointer.
         // Compare against the special MAP_FAILED value (-1) to determine failure.
-        let pointer = mmap(nil, MemoryLayout<Registers>.stride, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, off_t(address))!
+        let pointer = mmap(nil, mappableSize, PROT_READ | PROT_WRITE, MAP_SHARED, memFd, off_t(mappableAddress))!
         guard pointer != MAP_FAILED else { throw OSError(errno: errno) }
-        
-        registers = pointer.bindMemory(to: Registers.self, capacity: 1)
+        registers = pointer.advanced(by: mapOffset).bindMemory(to: Registers.self, capacity: 1)
     }
     
     /// Unmap the registers from the underlying hardware.
     ///
     /// - Throws: `OSError` on failure.
     func unmapMemory() throws {
-        let pointer = registers.deinitialize(count: 1)
-        guard munmap(pointer, MemoryLayout<Registers>.stride) == 0 else { throw OSError(errno: errno) }
+        let pointer = registers.deinitialize(count: 1).advanced(by: -mapOffset)
+        guard munmap(pointer, mappableSize) == 0 else { throw OSError(errno: errno) }
         registers = nil
     }
 
