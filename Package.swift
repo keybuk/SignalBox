@@ -4,10 +4,13 @@ import PackageDescription
 var package = Package(
     name: "SignalBox",
     targets: [
-        .target(name: "RaspberryPi"),
+        .target(name: "Util"),
+        .testTarget(name: "UtilTests", dependencies: ["Util"]),
+
+        .target(name: "RaspberryPi", dependencies: ["Util"]),
         .testTarget(name: "RaspberryPiTests", dependencies: ["RaspberryPi"]),
 
-        .target(name: "DCC"),
+        .target(name: "DCC", dependencies: ["Util"]),
         .testTarget(name: "DCCTests", dependencies: ["DCC"]),
 
         .target(name: "OldRaspberryPi"),

@@ -5,6 +5,8 @@
 //  Created by Scott James Remnant on 5/19/18.
 //
 
+import Util
+
 /// Serialized PWM input from logical bits.
 ///
 /// `SignalPacker` creates arrays of platform words containing the bit representation of the pulses
