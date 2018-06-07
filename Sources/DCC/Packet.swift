@@ -5,6 +5,8 @@
 //  Created by Scott James Remnant on 5/15/18.
 //
 
+import Util
+
 public protocol Packet : Packable {
     
     var bytes: [UInt8] { get }
@@ -45,8 +47,7 @@ public struct Preamble : Packable {
         let count = withCutout ? timing.preambleCount : SignalTiming.preambleCountMin
         if count <= UInt64.bitWidth {
             // FIXME: since Packer iterates the bits anyway, is this really an optimisation?
-            let bits: UInt64 = ~(~0 << count)
-            packer.add(bits, length: count)
+            packer.add(UInt64.mask(bits: count), length: count)
         } else {
             for _ in 0..<count {
                 packer.add(1, length: 1)

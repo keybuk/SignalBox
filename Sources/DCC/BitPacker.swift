@@ -59,8 +59,7 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer, CustomDebugStr
             bitsRemaining -= chunkLength
             length -= chunkLength
             
-            let mask: T = ~(~0 << chunkLength)
-            let bits = ResultType(truncatingIfNeeded: (value >> length) & mask)
+            let bits = ResultType(truncatingIfNeeded: (value >> length) & T.mask(bits: chunkLength))
             bytes[bytes.index(before: bytes.endIndex)] |= bits << bitsRemaining
         } while length > 0
     }
@@ -99,8 +98,7 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer, CustomDebugStr
             at = 7
             length -= chunkLength
             
-            let mask: T = ~(~0 << chunkLength)
-            let bits = ResultType(truncatingIfNeeded: (value >> length) & mask)
+            let bits = ResultType(truncatingIfNeeded: (value >> length) & T.mask(bits: chunkLength))
             bytes[bytes.index(before: bytes.endIndex)] |= bits << bitsRemaining
         } while length > 0
     }

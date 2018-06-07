@@ -5,6 +5,8 @@
 //  Created by Scott James Remnant on 12/22/16.
 //
 
+import Util
+
 /// General Purpose, Audio, PCM, and PWM Clocks.
 ///
 /// Instances of `Clock` are used to read and manipulate the underlying clock generators of the
@@ -215,10 +217,10 @@ public struct ClockControl : OptionSet {
     /// This is an internal method, access is provided through `Clock`.
     internal var source: ClockSource {
         get {
-            return ClockSource(rawValue: rawValue & ~(~0 << 4)) ?? .none
+            return ClockSource(rawValue: rawValue & UInt32.mask(bits: 4)) ?? .none
         }
         set {
-            self = ClockControl(rawValue: rawValue & (~0 << 4) | newValue.rawValue)
+            self = ClockControl(rawValue: rawValue & UInt32.mask(except: 4) | newValue.rawValue)
         }
     }
 
@@ -227,10 +229,10 @@ public struct ClockControl : OptionSet {
     /// This is an internal method, access is provided through `Clock`.
     internal var mash: ClockMASH {
         get {
-            return ClockMASH(rawValue: (rawValue >> 9) & ~(~0 << 2))!
+            return ClockMASH(rawValue: (rawValue >> 9) & UInt32.mask(bits: 2))!
         }
         set {
-            self = ClockControl(rawValue: rawValue & ~(~(~0 << 2) << 9) | (newValue.rawValue << 9))
+            self = ClockControl(rawValue: rawValue & UInt32.mask(except: 2, offset: 9) | (newValue.rawValue << 9))
         }
     }
 
@@ -319,11 +321,11 @@ public struct ClockDivisor : RawRepresentable {
     /// The value must be less than 4096.
     public var integer: Int {
         get {
-            return Int(clamping: (rawValue >> 12) & ~(~0 << 12))
+            return Int(clamping: (rawValue >> 12) & UInt32.mask(bits: 12))
         }
         set {
             assert(newValue < (1 << 12), "value out of range")
-            self = ClockDivisor(rawValue: rawValue & ~(~(~0 << 12) << 12) | (UInt32(clamping: newValue) << 12))
+            self = ClockDivisor(rawValue: rawValue & UInt32.mask(except: 12, offset: 12) | (UInt32(clamping: newValue) << 12))
         }
     }
 
@@ -334,11 +336,11 @@ public struct ClockDivisor : RawRepresentable {
     /// The value must be less than 4096.
     public var fractional: Int {
         get {
-            return Int(clamping: rawValue & ~(~0 << 12))
+            return Int(clamping: rawValue & UInt32.mask(bits: 12))
         }
         set {
             assert(newValue < (1 << 12), "value out of range")
-            self = ClockDivisor(rawValue: (rawValue & (~0 << 12)) | UInt32(clamping: newValue))
+            self = ClockDivisor(rawValue: rawValue & UInt32.mask(except: 12) | UInt32(clamping: newValue))
         }
     }
 

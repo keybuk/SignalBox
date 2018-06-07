@@ -89,8 +89,7 @@ public struct SignalPacker : Packer, CustomDebugStringConvertible {
             pulseLength -= chunkLength
 
             if high {
-                let bits: Word = ~(~0 << chunkLength)
-                words[words.index(before: words.endIndex)] |= bits << bitsRemaining
+                words[words.index(before: words.endIndex)] |= Word.mask(bits: chunkLength, offset: bitsRemaining)
             }
         } while pulseLength > 0
     }
