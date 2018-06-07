@@ -60,7 +60,7 @@ public final class Clock : MappedRegisters {
         public var divisor: ClockDivisor
 
         // For testing.
-        init() {
+        internal init() {
             control = []
             divisor = ClockDivisor(rawValue: 0)
         }

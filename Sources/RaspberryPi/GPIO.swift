@@ -38,22 +38,22 @@ public final class GPIO : MappedRegisters, Collection {
     ///
     /// - Note: BCM2835 ARM Peripherals 6.1
     public struct Registers {
-        var functionSelect: GPIOFunctionSelect
-        var outputSet: GPIOBitField
-        var outputClear: GPIOBitField
-        var level: GPIOBitField
-        var eventDetectStatus: GPIOBitField
-        var risingEdgeDetectEnable: GPIOBitField
-        var fallingEdgeDetectEnable: GPIOBitField
-        var highDetectEnable: GPIOBitField
-        var lowDetectEnable: GPIOBitField
-        var asyncRisingEdgeDetectEnable: GPIOBitField
-        var asyncFallingEdgeDetectEnable: GPIOBitField
-        var pullUpDownEnable: GPIOPullUpDown
-        var pullUpDownEnableClock: GPIOBitField
+        public var functionSelect: GPIOFunctionSelect
+        public var outputSet: GPIOBitField
+        public var outputClear: GPIOBitField
+        public var level: GPIOBitField
+        public var eventDetectStatus: GPIOBitField
+        public var risingEdgeDetectEnable: GPIOBitField
+        public var fallingEdgeDetectEnable: GPIOBitField
+        public var highDetectEnable: GPIOBitField
+        public var lowDetectEnable: GPIOBitField
+        public var asyncRisingEdgeDetectEnable: GPIOBitField
+        public var asyncFallingEdgeDetectEnable: GPIOBitField
+        public var pullUpDownEnable: GPIOPullUpDown
+        public var pullUpDownEnableClock: GPIOBitField
 
         // For testing.
-        init() {
+        internal init() {
             functionSelect = GPIOFunctionSelect()
             outputSet = GPIOBitField()
             outputClear = GPIOBitField()
