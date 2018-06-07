@@ -1,5 +1,5 @@
 //
-//  PulsePacker.swift
+//  SignalPacker.swift
 //  DCC
 //
 //  Created by Scott James Remnant on 5/19/18.
@@ -7,18 +7,18 @@
 
 /// Serialized PWM input from logical bits.
 ///
-/// `PulsePacker` creates arrays of platform words containing the bit representation of the pulses
+/// `SignalPacker` creates arrays of platform words containing the bit representation of the pulses
 /// required to output the logical bits from the values packed into it.
 ///
-/// Put simply, when initialized with a `PulseTiming.pulseWidth` of 1ms, a packed 1 bit value
+/// Put simply, when initialized with a `SignalTiming.pulseWidth` of 1ms, a packed 1 bit value
 /// results in an output of 58 consecutive 1 bits, followed by 58 consecutive 0 bits, representing
 /// the PWM pulse of the duration expected.
-public struct PulsePacker : Packer, CustomDebugStringConvertible {
+public struct SignalPacker : Packer, CustomDebugStringConvertible {
     
     public typealias Word = UInt32
     
     /// Timing values used for conversion.
-    public var timing: PulseTiming
+    public var timing: SignalTiming
 
     /// Packed words.
     public var words: [Word]
@@ -26,7 +26,7 @@ public struct PulsePacker : Packer, CustomDebugStringConvertible {
     /// Number of bits remaining in the final word.
     public var bitsRemaining = 0
     
-    public init(timing: PulseTiming) {
+    public init(timing: SignalTiming) {
         self.timing = timing
         words = []
     }

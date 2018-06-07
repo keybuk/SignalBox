@@ -33,16 +33,16 @@ public struct Preamble : Packable {
     
     // FIXME: This is just a thought experiment, it might not be the best way to do preambles.
     
-    public var timing: PulseTiming
+    public var timing: SignalTiming
     public var withCutout: Bool
     
-    init(timing: PulseTiming, withCutout: Bool = true) {
+    init(timing: SignalTiming, withCutout: Bool = true) {
         self.timing = timing
         self.withCutout = withCutout
     }
     
     public func add<T : Packer>(into packer: inout T) {
-        let count = withCutout ? timing.preambleCount : PulseTiming.preambleCountMin
+        let count = withCutout ? timing.preambleCount : SignalTiming.preambleCountMin
         if count <= UInt64.bitWidth {
             // FIXME: since Packer iterates the bits anyway, is this really an optimisation?
             let bits: UInt64 = ~(~0 << count)
