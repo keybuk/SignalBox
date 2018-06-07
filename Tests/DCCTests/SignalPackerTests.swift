@@ -9,7 +9,7 @@ import XCTest
 
 import DCC
 
-class SignalPackerTests: XCTestCase {
+class SignalPackerTests : XCTestCase {
 
     /// Goldilocks value for pulse width that gives a small number of output bits while
     /// maintaining timing accuracy.

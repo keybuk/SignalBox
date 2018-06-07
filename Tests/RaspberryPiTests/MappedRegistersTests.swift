@@ -22,7 +22,7 @@ final class Test : MappedRegisters {
 
 }
 
-class MappedRegistersTests: XCTestCase {
+class MappedRegistersTests : XCTestCase {
 
     /// Test that the bus address has the offset added to it.
     func testBusAddress() {

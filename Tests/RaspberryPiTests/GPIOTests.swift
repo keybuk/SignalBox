@@ -1,6 +1,6 @@
 //
 //  GPIOTests.swift
-//  DCCTests
+//  RaspberryPiTests
 //
 //  Created by Scott James Remnant on 5/31/18.
 //
@@ -9,7 +9,7 @@ import XCTest
 
 @testable import RaspberryPi
 
-class GPIOTests: XCTestCase {
+class GPIOTests : XCTestCase {
 
     // MARK: Collection conformance
 

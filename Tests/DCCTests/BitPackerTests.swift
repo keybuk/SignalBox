@@ -9,7 +9,7 @@ import XCTest
 
 import DCC
 
-class BitPackerTests: XCTestCase {
+class BitPackerTests : XCTestCase {
     
     /// Add a value to an unsigned type.
     func testUnsigndType() {

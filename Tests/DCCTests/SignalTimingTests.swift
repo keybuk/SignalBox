@@ -9,7 +9,7 @@ import XCTest
 
 import DCC
 
-class SignalTimingTests: XCTestCase {
+class SignalTimingTests : XCTestCase {
     
     // MARK: 1ms tests
     
