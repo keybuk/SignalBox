@@ -28,10 +28,17 @@
 ///
 public final class Clock : MappedRegisters {
 
+    /// Clock generator identifier.
     public let identifier: ClockIdentifier
 
+    /// Offset of the Clock registers from the peripherals base address.
+    ///
+    /// - Note: BCM2835 ARM Peripherals 6.3
     public let registersOffset: UInt32 = 0x101000
 
+    /// Offset of specific clocks from the base `registersOffset`.
+    ///
+    /// - Note: BCM2835 ARM Peripherals 6.3 and BCM2835 ARM Audio Clocks 1.2
     private let clockOffsets: [ClockIdentifier: UInt32] = [
         .generalPurpose0: 0x70,
         .generalPurpose1: 0x78,
@@ -40,10 +47,14 @@ public final class Clock : MappedRegisters {
         .pwm: 0xa0
     ]
 
+    /// Offset of the Clock registers from the peripherals base address.
     public var offset: UInt32 {
         return registersOffset + clockOffsets[identifier]!
     }
 
+    /// Clock generator registers block.
+    ///
+    /// - Note: BCM2835 ARM Peripherals 6.3
     public struct Registers {
         public var control: ClockControl
         public var divisor: ClockDivisor
