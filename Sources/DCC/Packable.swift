@@ -5,8 +5,6 @@
 //  Created by Scott James Remnant on 5/15/18.
 //
 
-import Foundation
-
 /// A type that can pack its values using a Packer.
 public protocol Packable {
 

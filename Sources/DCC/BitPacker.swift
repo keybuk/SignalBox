@@ -5,8 +5,6 @@
 //  Created by Scott James Remnant on 5/17/18.
 //
 
-import Foundation
-
 public typealias BytePacker = BitPacker<UInt8>
 
 /// Packs fields as bit fields into an array of bytes.

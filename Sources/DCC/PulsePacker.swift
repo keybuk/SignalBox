@@ -5,8 +5,6 @@
 //  Created by Scott James Remnant on 5/19/18.
 //
 
-import Foundation
-
 /// Serialized PWM input from logical bits.
 ///
 /// `PulsePacker` creates arrays of platform words containing the bit representation of the pulses

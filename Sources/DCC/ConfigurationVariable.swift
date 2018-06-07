@@ -5,8 +5,6 @@
 //  Created by Scott James Remnant on 5/27/18.
 //
 
-import Foundation
-
 public enum ConfigurationVariable : Int {
     
     case primaryAddress = 1

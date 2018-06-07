@@ -5,8 +5,6 @@
 //  Created by Scott James Remnant on 5/15/18.
 //
 
-import Foundation
-
 public extension String {
 
     /// Returns a new string formed from by adding as many occurrences of `character` are necessary to the start to reach a length of `length`.

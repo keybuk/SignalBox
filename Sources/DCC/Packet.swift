@@ -5,8 +5,6 @@
 //  Created by Scott James Remnant on 5/15/18.
 //
 
-import Foundation
-
 public protocol Packet : Packable {
     
     var bytes: [UInt8] { get }
