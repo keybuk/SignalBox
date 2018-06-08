@@ -31,7 +31,7 @@
 ///         }
 ///     }
 ///
-public final class PWM : MappedRegisters, Collection {
+public final class PWM : MappedPeripheral, Collection {
 
     /// Offset of the PWM registers from the peripherals base address.
     ///

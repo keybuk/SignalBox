@@ -27,7 +27,7 @@ import Util
 ///     clock[.pcm].isEnabled = true
 ///     while !clock[.pcm].isRunning {}
 ///
-public final class Clocks : MappedRegisters, Collection {
+public final class Clocks : MappedPeripheral, Collection {
 
     /// Offset of the Clock registers from the peripherals base address.
     ///

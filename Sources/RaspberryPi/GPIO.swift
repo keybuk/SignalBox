@@ -27,7 +27,7 @@
 ///         }
 ///     }
 ///
-public final class GPIO : MappedRegisters, Collection {
+public final class GPIO : MappedPeripheral, Collection {
 
     /// Offset of the GPIO registers from the peripherals base address.
     ///

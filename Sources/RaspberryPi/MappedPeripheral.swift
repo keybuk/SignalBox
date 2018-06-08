@@ -1,5 +1,5 @@
 //
-//  MappedRegisters.swift
+//  MappedPeripheral.swift
 //  RaspberryPi
 //
 //  Created by Scott James Remnant on 6/8/18.
@@ -28,9 +28,7 @@
 ///         }
 ///     }
 ///
-public protocol MappedRegisters : class {
-
-    associatedtype Registers
+public protocol MappedPeripheral {
 
     /// Offset of the registers from the peripherals base address.
     static var offset: UInt32 { get }
@@ -41,19 +39,16 @@ public protocol MappedRegisters : class {
     /// Physical address of the registers
     static var address: UInt32 { get }
 
-    /// Pointer to the mapped registers.
-    var registers: UnsafeMutablePointer<Registers> { get set }
-
 }
 
-extension MappedRegisters {
+extension MappedPeripheral {
 
-    /// Bus address of the registers.
+    /// Bus address of the peripheral.
     public static var busAddress: UInt32 {
         return RaspberryPi.peripheralBusAddress + offset
     }
 
-    /// Physical address of the registers
+    /// Physical address of the peripheral
     public static var address: UInt32 {
         return RaspberryPi.periperhalAddress + offset
     }
