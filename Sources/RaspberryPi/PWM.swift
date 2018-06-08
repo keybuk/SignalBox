@@ -36,7 +36,7 @@ public final class PWM : MappedRegisters, Collection {
     /// Offset of the PWM registers from the peripherals base address.
     ///
     /// - Note: BCM2835 Errata
-    public let offset: UInt32 = 0x20c000
+    public static let offset: UInt32 = 0x20c000
 
     /// PWM registers block.
     ///
@@ -68,7 +68,7 @@ public final class PWM : MappedRegisters, Collection {
     }
 
     /// Pointer to the mapped PWM registers.
-    public var registers: UnsafeMutablePointer<Registers>!
+    public var registers: UnsafeMutablePointer<Registers>
 
     /// Unmap `registers` on deinitialization.
     private var unmapOnDeinit: Bool
@@ -84,8 +84,10 @@ public final class PWM : MappedRegisters, Collection {
     public subscript(index: Int) -> PWMChannel { return PWMChannel(pwm: self, number: index) }
 
     public init() throws {
+        let memoryDevice = try MemoryDevice()
+
+        registers = try memoryDevice.map(address: PWM.address)
         unmapOnDeinit = true
-        try mapMemory()
     }
 
     // For testing.
@@ -97,7 +99,7 @@ public final class PWM : MappedRegisters, Collection {
     deinit {
         guard unmapOnDeinit else { return }
         do {
-            try unmapMemory()
+            try MemoryDevice.unmap(registers)
         } catch {
             print("Error on PWM deinitialization: \(error)")
         }
