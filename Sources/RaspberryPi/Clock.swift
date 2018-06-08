@@ -162,6 +162,7 @@ public final class Clock : MappedRegisters {
 
 }
 
+/// Clock generator identifier.
 public enum ClockIdentifier {
 
     case generalPurpose0
