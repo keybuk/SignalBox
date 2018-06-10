@@ -75,7 +75,8 @@ public final class GPIOPin {
     /// setting that back to `false.
     public var edgeDetect: GPIOEdge {
         get {
-            switch (gpio.registers.pointee.risingEdgeDetectEnable[number], gpio.registers.pointee.fallingEdgeDetectEnable[number]) {
+            let registers = gpio.registers.pointee
+            switch (registers.risingEdgeDetectEnable[number], registers.fallingEdgeDetectEnable[number]) {
             case (false, false): return .none
             case (true, false): return .rising
             case (false, true): return .falling
@@ -104,7 +105,8 @@ public final class GPIOPin {
     /// at the defined level.
     public var levelDetect: GPIOLevel {
         get {
-            switch (gpio.registers.pointee.highDetectEnable[number], gpio.registers.pointee.lowDetectEnable[number]) {
+            let registers = gpio.registers.pointee
+            switch (registers.highDetectEnable[number], registers.lowDetectEnable[number]) {
             case (false, false): return .none
             case (true, false): return .high
             case (false, true): return .low
@@ -135,7 +137,8 @@ public final class GPIOPin {
     /// setting that back to `false.
     public var asyncEdgeDetect: GPIOEdge {
         get {
-            switch (gpio.registers.pointee.asyncRisingEdgeDetectEnable[number], gpio.registers.pointee.asyncFallingEdgeDetectEnable[number]) {
+            let registers = gpio.registers.pointee
+            switch (registers.asyncRisingEdgeDetectEnable[number], registers.asyncFallingEdgeDetectEnable[number]) {
             case (false, false): return .none
             case (true, false): return .rising
             case (false, true): return .falling
