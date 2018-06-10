@@ -71,14 +71,13 @@ extension ClockControl : CustomDebugStringConvertible {
     public var debugDescription: String {
         var parts: [String] = []
         
-        parts.append(".source(.\(source))")
         parts.append(".mash(.\(mash))")
-        
         if contains(.invertOutput) { parts.append(".invertOutput") }
         if contains(.running) { parts.append(".running") }
         if contains(.kill) { parts.append(".kill") }
         if contains(.enabled) { parts.append(".enabled") }
-        
+        parts.append(".source(.\(source))")
+
         return "[" + parts.joined(separator: ", ") + "]"
     }
     

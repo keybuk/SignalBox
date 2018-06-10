@@ -97,7 +97,13 @@ public final class ClockGenerator {
 extension ClockGenerator : CustomDebugStringConvertible {
     
     public var debugDescription: String {
-        return "<\(type(of: self)) \(identifier), control: \(registers.pointee.control), divisor: \(divisor)>"
+        var parts: [String] = []
+        
+        parts.append("\(type(of: self)) \(identifier)")
+        parts.append("control: \(registers.pointee.control)")
+        parts.append("divisor: \(divisor)")
+        
+        return "<" + parts.joined(separator: ", ") + ">"
     }
     
 }
