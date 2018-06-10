@@ -43,7 +43,7 @@ public struct PWMDMAConfiguration : OptionSet, Equatable, Hashable {
             return Int((rawValue >> 8) & UInt32.mask(bits: 8))
         }
         set {
-            assert(newValue >= 0 && newValue < (1 << 8), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 8), "threshold out of range")
             self = PWMDMAConfiguration(rawValue: rawValue & UInt32.mask(except: 8, offset: 8) | (UInt32(newValue) << 8))
         }
     }
@@ -56,7 +56,7 @@ public struct PWMDMAConfiguration : OptionSet, Equatable, Hashable {
             return Int(rawValue & UInt32.mask(bits: 8))
         }
         set {
-            assert(newValue >= 0 && newValue < (1 << 8), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 8), "threshold out of range")
             self = PWMDMAConfiguration(rawValue: rawValue & UInt32.mask(except: 8) | UInt32(newValue))
         }
     }
