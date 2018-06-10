@@ -17,7 +17,7 @@ class GPIOTests : XCTestCase {
     func testRegistersLayout() {
         XCTAssertEqual(MemoryLayout<GPIO.Registers>.size, 0xa4)
 
-        #if swift(>=4.1.9)
+        #if swift(>=4.1.5)
         XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.functionSelect), 0x00)
         XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.outputSet), 0x1c)
         XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.outputClear), 0x28)
@@ -34,7 +34,7 @@ class GPIOTests : XCTestCase {
         #endif
 
         XCTAssertEqual(MemoryLayout<GPIOFunctionSelect>.size, 0x1c)
-        #if swift(>=4.1.9)
+        #if swift(>=4.1.5)
         XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field0), 0x00)
         XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field1), 0x04)
         XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field2), 0x08)
@@ -44,7 +44,7 @@ class GPIOTests : XCTestCase {
         #endif
 
         XCTAssertEqual(MemoryLayout<GPIOBitField>.size, 0x0c)
-        #if swift(>=4.1.9)
+        #if swift(>=4.1.5)
         XCTAssertEqual(MemoryLayout.offset(of: \GPIOBitField.field0), 0x00)
         XCTAssertEqual(MemoryLayout.offset(of: \GPIOBitField.field1), 0x04)
         #endif

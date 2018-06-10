@@ -20,7 +20,7 @@ class PWMTests : XCTestCase {
         XCTAssertEqual(MemoryLayout<PWMStatus>.size, 0x04)
         XCTAssertEqual(MemoryLayout<PWMDMAConfiguration>.size, 0x04)
 
-        #if swift(>=4.1.9)
+        #if swift(>=4.1.5)
         XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.control), 0x00)
         XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.status), 0x04)
         XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.dmaConfiguration), 0x08)

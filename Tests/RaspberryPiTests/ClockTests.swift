@@ -19,7 +19,7 @@ class ClockTests : XCTestCase {
         XCTAssertEqual(MemoryLayout<ClockControl>.size, 0x04)
         XCTAssertEqual(MemoryLayout<ClockDivisor>.size, 0x04)
 
-        #if swift(>=4.1.9)
+        #if swift(>=4.1.5)
         XCTAssertEqual(MemoryLayout.offset(of: \Clock.Registers.control), 0x00)
         XCTAssertEqual(MemoryLayout.offset(of: \Clock.Registers.divisor), 0x04)
         #endif

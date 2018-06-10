@@ -18,7 +18,7 @@ class DMAControlBlockTests : XCTestCase {
         XCTAssertEqual(MemoryLayout<DMAControlBlock>.size, 0x20)
         XCTAssertEqual(MemoryLayout<DMATransferInformation>.size, 0x04)
 
-        #if swift(>=4.1.9)
+        #if swift(>=4.1.5)
         XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.transferInformation), 0x00)
         XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.sourceAddress), 0x04)
         XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.destinationAddress), 0x08)
