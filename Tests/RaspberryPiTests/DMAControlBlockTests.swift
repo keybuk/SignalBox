@@ -10,7 +10,25 @@ import XCTest
 import RaspberryPi
 
 class DMAControlBlockTests : XCTestCase {
-    
+
+    // MARK: Layout
+
+    /// Test that the layout of the Registers struct matches hardware.
+    func testRegistersLayout() {
+        XCTAssertEqual(MemoryLayout<DMAControlBlock>.size, 0x20)
+        XCTAssertEqual(MemoryLayout<DMATransferInformation>.size, 0x04)
+
+        #if swift(>=4.1.9)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.transferInformation), 0x00)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.sourceAddress), 0x04)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.destinationAddress), 0x08)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.transferLength), 0x0c)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.stride), 0x10)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMAControlBlock.nextControlBlockAddress), 0x14)
+        #endif
+    }
+
+
     // MARK: sourceIgnoreReads
     
     /// Test that we can set sourceIgnoreReads, which sets the SRC_IGNORE bit of the transfer information.

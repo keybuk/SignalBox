@@ -9,6 +9,35 @@ import XCTest
 
 @testable import RaspberryPi
 
+class DMALayoutTests : XCTestCase {
+
+    // MARK: Layout
+
+    /// Test that the layout of the Registers struct matches hardware.
+    func testRegistersLayout() {
+        XCTAssertEqual(MemoryLayout<DMA.Registers>.size, 0x24)
+        XCTAssertEqual(MemoryLayout<DMAControlStatus>.size, 0x04)
+        XCTAssertEqual(MemoryLayout<DMATransferInformation>.size, 0x04)
+        XCTAssertEqual(MemoryLayout<DMADebug>.size, 0x04)
+
+        #if swift(>=4.1.9)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.controlStatus), 0x00)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.controlBlockAddress), 0x04)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.transferInformation), 0x08)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.sourceAddress), 0x0c)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.destinationAddress), 0x10)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.transferLength), 0x14)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.stride), 0x18)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.nextControlBlockAddress), 0x1c)
+        XCTAssertEqual(MemoryLayout.offset(of: \DMA.Registers.debug), 0x20)
+        #endif
+
+        XCTAssertEqual(MemoryLayout<DMABitField>.size, 0x04)
+    }
+
+}
+
+
 class DMATests : XCTestCase {
 
     var registers: ContiguousArray<DMA.Registers> = []
@@ -32,6 +61,7 @@ class DMATests : XCTestCase {
         registers.removeAll()
     }
 
+    
     /// Test that a modification to the first channel goes to the first set of registers.
     func testFirstChannel() {
         dma[0].reset()
