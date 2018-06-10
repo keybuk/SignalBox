@@ -964,40 +964,40 @@ class PWMTests : XCTestCase {
         XCTAssertEqual(pwm.isFifoEmpty, false)
     }
 
-    /// Test that the fifo read error status bit is returned via isFifoReadWhenEmpty.
-    func testIsFifoReadWhenEmpty() {
+    /// Test that the fifo read error status bit is returned via isFifoReadError.
+    func testIsFifoReadError() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         registers.status = PWMStatus(rawValue: 1 << 3)
 
-        XCTAssertEqual(pwm.isFifoReadWhenEmpty, true)
+        XCTAssertEqual(pwm.isFifoReadError, true)
     }
 
-    /// Test isFifoReadWhenEmpty defaults to false.
-    func testDefaultIsFifoReadWhenEmpty() {
+    /// Test isFifoReadError defaults to false.
+    func testDefaultIsFifoReadError() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        XCTAssertEqual(pwm.isFifoReadWhenEmpty, false)
+        XCTAssertEqual(pwm.isFifoReadError, false)
     }
 
-    /// Test that the fifo read error is cleared by writing false to isFifoReadWhenEmpty.
-    func testClearIsFifoReadWhenEmpty() {
+    /// Test that the fifo read error is cleared by writing false to isFifoReadError.
+    func testClearIsFifoReadError() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm.isFifoReadWhenEmpty = false
+        pwm.isFifoReadError = false
 
         XCTAssertEqual((registers.status.rawValue >> 3) & 1, 1)
     }
 
-    /// Test that writing true to isFifoReadWhenEmpty is a no-op.
-    func testIsFifoReadWhenEmptyNoop() {
+    /// Test that writing true to isFifoReadError is a no-op.
+    func testIsFifoReadErrorNoop() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm.isFifoReadWhenEmpty = true
+        pwm.isFifoReadError = true
 
         XCTAssertEqual(registers.status.rawValue, 0)
     }
@@ -1020,40 +1020,40 @@ class PWMTests : XCTestCase {
         XCTAssertEqual(pwm.isFifoFull, false)
     }
 
-    /// Test that the fifo write error status bit is returned via isFifoWrittenWhenFull.
-    func testIsFifoWrittenWhenFull() {
+    /// Test that the fifo write error status bit is returned via isFifoWriteError.
+    func testIsFifoWriteError() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         registers.status = PWMStatus(rawValue: 1 << 2)
 
-        XCTAssertEqual(pwm.isFifoWrittenWhenFull, true)
+        XCTAssertEqual(pwm.isFifoWriteError, true)
     }
 
-    /// Test isFifoWrittenWhenFull defaults to false.
-    func testDefaultIsFifoWrittenWhenFull() {
+    /// Test isFifoWriteError defaults to false.
+    func testDefaultIsFifoWriteError() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        XCTAssertEqual(pwm.isFifoWrittenWhenFull, false)
+        XCTAssertEqual(pwm.isFifoWriteError, false)
     }
 
-    /// Test that the fifo write error is cleared by writing false to isFifoWrittenWhenFull.
-    func testClearIsFifoWrittenWhenFull() {
+    /// Test that the fifo write error is cleared by writing false to isFifoWriteError.
+    func testClearIsFifoWriteError() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm.isFifoWrittenWhenFull = false
+        pwm.isFifoWriteError = false
 
         XCTAssertEqual((registers.status.rawValue >> 2) & 1, 1)
     }
 
-    /// Test that writing true to isFifoWrittenWhenFull is a no-op.
-    func testIsFifoWrittenWhenFullNoop() {
+    /// Test that writing true to isFifoWriteError is a no-op.
+    func testIsFifoWriteErrorNoop() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm.isFifoWrittenWhenFull = true
+        pwm.isFifoWriteError = true
 
         XCTAssertEqual(registers.status.rawValue, 0)
     }

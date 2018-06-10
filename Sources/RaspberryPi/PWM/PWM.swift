@@ -141,13 +141,6 @@ public final class PWM : MappedPeripheral, Collection {
         registers.pointee.control.insert(.clearFifo)
     }
 
-    /// Fifo is empty.
-    ///
-    /// This status applies to all channels.
-    public var isFifoEmpty: Bool {
-        get { return registers.pointee.status.contains(.fifoEmpty) }
-    }
-
     /// Fifo was read when empty.
     ///
     /// This status applies to all channels.
@@ -155,7 +148,7 @@ public final class PWM : MappedPeripheral, Collection {
     /// - Note:
     ///   Setting the value to false actually writes 1 to the underlying bit; the interface is
     ///   intended to be more programatic than the underlying hardware register.
-    public var isFifoReadWhenEmpty: Bool {
+    public var isFifoReadError: Bool {
         get { return registers.pointee.status.contains(.fifoReadError) }
 
         set {
@@ -165,13 +158,6 @@ public final class PWM : MappedPeripheral, Collection {
         }
     }
 
-    /// Fifo is full.
-    ///
-    /// This status applies to all channels.
-    public var isFifoFull: Bool {
-        get { return registers.pointee.status.contains(.fifoFull) }
-    }
-
     /// Fifo was written to when full.
     ///
     /// This status applies to all channels.
@@ -179,14 +165,28 @@ public final class PWM : MappedPeripheral, Collection {
     /// - Note:
     ///   Setting the value to false actually writes 1 to the underlying bit; the interface is
     ///   intended to be more programatic than the underlying hardware register.
-    public var isFifoWrittenWhenFull: Bool {
+    public var isFifoWriteError: Bool {
         get { return registers.pointee.status.contains(.fifoWriteError) }
-
+        
         set {
             if !newValue {
                 registers.pointee.status.insert(.fifoWriteError)
             }
         }
+    }
+    
+    /// Fifo is empty.
+    ///
+    /// This status applies to all channels.
+    public var isFifoEmpty: Bool {
+        get { return registers.pointee.status.contains(.fifoEmpty) }
+    }
+    
+    /// Fifo is full.
+    ///
+    /// This status applies to all channels.
+    public var isFifoFull: Bool {
+        get { return registers.pointee.status.contains(.fifoFull) }
     }
 
     // MARK: DMA configuration
