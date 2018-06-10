@@ -753,7 +753,7 @@ public final class PWMChannel {
 extension PWMChannel : CustomDebugStringConvertible {
 
     public var debugDescription: String {
-        return "<\(type(of: self)) mode: \(mode), range: \(range), data: \(data)>"
+        return "<\(type(of: self)) \(number) mode: \(mode), range: \(range), data: \(data)>"
     }
 
 }
