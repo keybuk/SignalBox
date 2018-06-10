@@ -54,9 +54,9 @@ public final class PWM : MappedPeripheral, Collection {
         public var channel2Data: UInt32
 
         internal init() {
-            control = PWMControl(rawValue: 0)
-            status = PWMStatus(rawValue: 0)
-            dmaConfiguration = PWMDMAConfiguration(rawValue: 0)
+            control = PWMControl()
+            status = PWMStatus()
+            dmaConfiguration = PWMDMAConfiguration()
             reserved0 = 0
             channel1Range = 0
             channel1Data = 0
