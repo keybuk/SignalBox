@@ -26,24 +26,24 @@ public final class PWMChannel {
     public var isEnabled: Bool {
         get {
             switch number {
-            case 1: return pwm.registers.pointee.control.contains(.channel1Enable)
-            case 2: return pwm.registers.pointee.control.contains(.channel2Enable)
+            case 1: return pwm.registers.pointee.control.contains(.channel1Enabled)
+            case 2: return pwm.registers.pointee.control.contains(.channel2Enabled)
             default: preconditionFailure("invalid channel")
             }
         }
         
         set {
-            let enable: PWMControl
+            let enabled: PWMControl
             switch number {
-            case 1: enable = .channel1Enable
-            case 2: enable = .channel2Enable
+            case 1: enabled = .channel1Enabled
+            case 2: enabled = .channel2Enabled
             default: preconditionFailure("invalid channel")
             }
             
             if newValue {
-                pwm.registers.pointee.control.insert(enable)
+                pwm.registers.pointee.control.insert(enabled)
             } else {
-                pwm.registers.pointee.control.remove(enable)
+                pwm.registers.pointee.control.remove(enabled)
             }
         }
     }
