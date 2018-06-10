@@ -11,6 +11,46 @@ import XCTest
 
 class GPIOTests : XCTestCase {
 
+    // MARK: Layout
+
+    /// Test that the layout of the Registers struct matches hardware.
+    func testRegistersLayout() {
+        XCTAssertEqual(MemoryLayout<GPIO.Registers>.size, 0xa4)
+
+        #if swift(>=4.2)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.functionSelect), 0x00)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.outputSet), 0x1c)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.outputClear), 0x28)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.level), 0x34)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.eventDetectStatus), 0x40)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.risingEdgeDetectEnable), 0x4c)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.fallingEdgeDetectEnable), 0x58)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.highDetectEnable), 0x64)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.lowDetectEnable), 0x70)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.asyncRisingEdgeDetectEnable), 0x7c)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.asyncFallingEdgeDetectEnable), 0x88)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.pullUpDownEnable), 0x94)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIO.Registers.pullUpDownEnableClock), 0x98)
+        #endif
+
+        XCTAssertEqual(MemoryLayout<GPIOFunctionSelect>.size, 0x1c)
+        #if swift(>=4.2)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field0), 0x00)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field1), 0x04)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field2), 0x08)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field3), 0x0c)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field4), 0x10)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIOFunctionSelect.field5), 0x14)
+        #endif
+
+        XCTAssertEqual(MemoryLayout<GPIOBitField>.size, 0x0c)
+        #if swift(>=4.2)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIOBitField.field0), 0x00)
+        XCTAssertEqual(MemoryLayout.offset(of: \GPIOBitField.field1), 0x04)
+        #endif
+    }
+
+
     // MARK: Collection conformance
 
     /// Test that the collection implementation produces a correct count.
@@ -978,7 +1018,7 @@ class GPIOTests : XCTestCase {
 
         gpio.pullUpDownEnable = .disabled
 
-        XCTAssertEqual(registers.pullUpDownEnable.rawValue, 0b00)
+        XCTAssertEqual(registers.pullUpDownEnable, 0b00)
     }
 
     /// Test that we can set the pull-up/down register to pull-down.
@@ -988,7 +1028,7 @@ class GPIOTests : XCTestCase {
 
         gpio.pullUpDownEnable = .pullDown
 
-        XCTAssertEqual(registers.pullUpDownEnable.rawValue, 0b01)
+        XCTAssertEqual(registers.pullUpDownEnable, 0b01)
     }
 
     /// Test that we can set the pull-up/down register to pull-down.
@@ -998,7 +1038,7 @@ class GPIOTests : XCTestCase {
 
         gpio.pullUpDownEnable = .pullUp
 
-        XCTAssertEqual(registers.pullUpDownEnable.rawValue, 0b10)
+        XCTAssertEqual(registers.pullUpDownEnable, 0b10)
     }
 
     /// Test that gets of the pull-up/down register always return `.disabled`.
