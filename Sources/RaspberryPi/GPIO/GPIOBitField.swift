@@ -40,7 +40,7 @@ public struct GPIOBitField : Equatable, Hashable {
             }
             
             let shift = index % 32
-            return field & (1 << shift) != 0
+            return field & UInt32.mask(bits: 1, offset: shift) != 0
         }
         
         set {
