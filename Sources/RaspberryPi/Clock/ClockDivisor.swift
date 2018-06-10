@@ -51,7 +51,7 @@ public struct ClockDivisor : RawRepresentable, Equatable, Hashable, CustomString
             return Int((rawValue >> 12) & UInt32.mask(bits: 12))
         }
         set {
-            assert(newValue >= 0 && newValue < (1 << 12), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 12), "integer out of range")
             self = ClockDivisor(rawValue: rawValue & UInt32.mask(except: 12, offset: 12) | (UInt32(newValue) << 12))
         }
     }
@@ -66,7 +66,7 @@ public struct ClockDivisor : RawRepresentable, Equatable, Hashable, CustomString
             return Int(rawValue & UInt32.mask(bits: 12))
         }
         set {
-            assert(newValue >= 0 && newValue < (1 << 12), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 12), "fractional out of range")
             self = ClockDivisor(rawValue: rawValue & UInt32.mask(except: 12) | UInt32(newValue))
         }
     }
