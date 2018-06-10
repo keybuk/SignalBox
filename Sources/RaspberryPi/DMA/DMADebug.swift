@@ -30,22 +30,22 @@ public struct DMADebug : OptionSet, Equatable, Hashable {
     public static let readLastNotSetError = DMADebug(rawValue: 1 << 0)
     
     public static func version(_ version: Int) -> DMADebug {
-        assert(version < (1 << 3), "version out of range")
+        assert(version >= 0 && version < (1 << 3), "version out of range")
         return DMADebug(rawValue: UInt32(version) << 25)
     }
     
     public static func axiIdentifier(_ identifier: Int) -> DMADebug {
-        assert(identifier < (1 << 8), "identifier out of range")
+        assert(identifier >= 0 && identifier < (1 << 8), "identifier out of range")
         return DMADebug(rawValue: UInt32(identifier) << 8)
     }
     
     public static func stateMachineState(_ state: Int) -> DMADebug {
-        assert(state < (1 << 9), "state out of range")
+        assert(state >= 0 && state < (1 << 9), "state out of range")
         return DMADebug(rawValue: UInt32(state) << 16)
     }
     
     public static func numberOfOutstandingWrites(_ count: Int) -> DMADebug {
-        assert(count < (1 << 4), "count out of range")
+        assert(count >= 0 && count < (1 << 4), "count out of range")
         return DMADebug(rawValue: UInt32(count) << 4)
     }
     

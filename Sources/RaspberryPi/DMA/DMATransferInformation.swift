@@ -43,7 +43,7 @@ public struct DMATransferInformation : OptionSet, Equatable, Hashable {
     public static let raiseInterrupt                 = DMATransferInformation(rawValue: 1 << 0)
     
     public static func waitCycles(_ cycles: Int) -> DMATransferInformation {
-        assert(cycles < (1 << 5), "cycles out of range")
+        assert(cycles >= 0 && cycles < (1 << 5), "cycles out of range")
         return DMATransferInformation(rawValue: UInt32(cycles) << 21)
     }
     
@@ -52,7 +52,7 @@ public struct DMATransferInformation : OptionSet, Equatable, Hashable {
     }
     
     public static func burstTransferLength(_ length: Int) -> DMATransferInformation {
-        assert(length < (1 << 4), "length out of range")
+        assert(length >= 0 && length < (1 << 4), "length out of range")
         return DMATransferInformation(rawValue: UInt32(length) << 12)
     }
     
@@ -64,7 +64,7 @@ public struct DMATransferInformation : OptionSet, Equatable, Hashable {
             return Int((rawValue >> 21) & UInt32.mask(bits: 5))
         }
         set {
-            assert(newValue < (1 << 5), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 5), "cycles out of range")
             self = DMATransferInformation(rawValue: rawValue & UInt32.mask(except: 5, offset: 21) | (UInt32(newValue) << 21))
         }
     }
@@ -89,7 +89,7 @@ public struct DMATransferInformation : OptionSet, Equatable, Hashable {
             return Int((rawValue >> 12) & UInt32.mask(bits: 4))
         }
         set {
-            assert(newValue < (1 << 4), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 4), "length out of range")
             self = DMATransferInformation(rawValue: rawValue & UInt32.mask(except: 4, offset: 12) | (UInt32(newValue) << 12))
         }
     }

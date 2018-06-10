@@ -37,12 +37,12 @@ public struct DMAControlStatus : OptionSet, Equatable, Hashable {
     public static let active                      = DMAControlStatus(rawValue: 1 << 0)
     
     public static func panicPriorityLevel(_ level: Int) -> DMAControlStatus {
-        assert(level < (1 << 4), "level out of range")
+        assert(level >= 0 && level < (1 << 4), "level out of range")
         return DMAControlStatus(rawValue: UInt32(level) << 20)
     }
     
     public static func priorityLevel(_ level: Int) -> DMAControlStatus {
-        assert(level < (1 << 4), "level out of range")
+        assert(level >= 0 && level < (1 << 4), "level out of range")
         return DMAControlStatus(rawValue: UInt32(level) << 16)
     }
     
@@ -54,7 +54,7 @@ public struct DMAControlStatus : OptionSet, Equatable, Hashable {
             return Int((rawValue >> 20) & UInt32.mask(bits: 4))
         }
         set {
-            assert(newValue < (1 << 4), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 4), "level out of range")
             self = DMAControlStatus(rawValue: rawValue & UInt32.mask(except: 4, offset: 20) | (UInt32(newValue) << 20))
         }
     }
@@ -67,7 +67,7 @@ public struct DMAControlStatus : OptionSet, Equatable, Hashable {
             return Int((rawValue >> 16) & UInt32.mask(bits: 4))
         }
         set {
-            assert(newValue < (1 << 4), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 4), "level out of range")
             self = DMAControlStatus(rawValue: rawValue & UInt32.mask(except: 4, offset: 16) | (UInt32(newValue) << 16))
         }
     }

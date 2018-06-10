@@ -328,7 +328,7 @@ public struct DMAControlBlock : Equatable, Hashable {
     public var yLength: Int {
         get { return Int((transferLength >> 16) & UInt32.mask(bits: 14)) }
         set {
-            assert(newValue >= 0 && newValue < (1 << 14), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 14), "length out of range")
             transferLength = transferLength & UInt32.mask(except: 14, offset: 16) | (UInt32(newValue) << 16)
         }
     }
@@ -344,7 +344,7 @@ public struct DMAControlBlock : Equatable, Hashable {
     public var xLength: Int {
         get { return Int(transferLength & UInt32.mask(bits: 16)) }
         set {
-            assert(newValue >= 0 && newValue < (1 << 16), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 16), "length out of range")
             transferLength = transferLength & UInt32.mask(except: 16) | UInt32(newValue)
         }
     }
@@ -366,7 +366,7 @@ public struct DMAControlBlock : Equatable, Hashable {
             return Int(truncatingIfNeeded: Int32(bitPattern: stride << 16) >> 16)
         }
         set {
-            assert(newValue >= -32_768 && newValue <= 32_767, "value out of range")
+            assert(newValue >= -32_768 && newValue <= 32_767, "stride out of range")
             // Since the value is signed, we convert it to UInt32 using the truncatingIfNeeded
             // approach, which retains the sign.
             let field = UInt32(truncatingIfNeeded: newValue) & UInt32.mask(bits: 16)
@@ -390,7 +390,7 @@ public struct DMAControlBlock : Equatable, Hashable {
             return Int(truncatingIfNeeded: Int32(bitPattern: stride) >> 16)
         }
         set {
-            assert(newValue >= -32_768 && newValue <= 32_767, "value out of range")
+            assert(newValue >= -32_768 && newValue <= 32_767, "stride out of range")
             // Since the value is signed, we convert it to UInt32 using the truncatingIfNeeded
             // approach, which retains the sign.
             let field = UInt32(truncatingIfNeeded: newValue) & UInt32.mask(bits: 16)
