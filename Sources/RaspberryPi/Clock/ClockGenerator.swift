@@ -22,10 +22,15 @@ public final class ClockGenerator {
         self.identifier = identifier
     }
     
+    /// Pointer to registers for this specific clock.
+    private var registers: UnsafeMutablePointer<Clock.Registers> {
+        return clock.registers.advanced(by: identifier.offset / MemoryLayout<Clock.Registers>.stride)
+    }
+    
     /// Timing source.
     public var source: ClockSource {
-        get { return clock.registers[identifier.registerIndex].control.source }
-        set { clock.registers[identifier.registerIndex].control.source = newValue }
+        get { return registers.pointee.control.source }
+        set { registers.pointee.control.source = newValue }
     }
     
     /// Clock generator is enabled.
@@ -33,12 +38,12 @@ public final class ClockGenerator {
     /// When this is set, it will not take effect immediately but at the next clock cycle. Check
     /// the value of `isRunning` to once the clock generator has changed.
     public var isEnabled: Bool {
-        get { return clock.registers[identifier.registerIndex].control.contains(.enabled) }
+        get { return registers.pointee.control.contains(.enabled) }
         set {
             if newValue {
-                clock.registers[identifier.registerIndex].control.insert(.enabled)
+                registers.pointee.control.insert(.enabled)
             } else {
-                clock.registers[identifier.registerIndex].control.remove(.enabled)
+                registers.pointee.control.remove(.enabled)
             }
         }
     }
@@ -48,7 +53,7 @@ public final class ClockGenerator {
     /// To avoid glitches, `source`, `mash`, and `divisor` should not be changed while this is
     /// `true`.
     public var isRunning: Bool {
-        return clock.registers[identifier.registerIndex].control.contains(.busy)
+        return registers.pointee.control.contains(.busy)
     }
     
     /// Noise-shaping MASH filter.
@@ -61,8 +66,8 @@ public final class ClockGenerator {
     ///
     /// To avoid glitches, do not change while `isRunning` is `true`.
     public var mash: ClockMASH {
-        get { return clock.registers[identifier.registerIndex].control.mash }
-        set { clock.registers[identifier.registerIndex].control.mash = newValue }
+        get { return registers.pointee.control.mash }
+        set { registers.pointee.control.mash = newValue }
     }
     
     /// Frequency divisor.
@@ -81,8 +86,8 @@ public final class ClockGenerator {
     ///
     /// To avoid glitches, do not change while `isRunning` is `true`.
     public var divisor: ClockDivisor {
-        get { return clock.registers[identifier.registerIndex].divisor }
-        set { clock.registers[identifier.registerIndex].divisor = newValue }
+        get { return registers.pointee.divisor }
+        set { registers.pointee.divisor = newValue }
     }
     
 }
@@ -92,7 +97,7 @@ public final class ClockGenerator {
 extension ClockGenerator : CustomDebugStringConvertible {
     
     public var debugDescription: String {
-        return "<\(type(of: self)) \(identifier), control: \(clock.registers[identifier.registerIndex].control), divisor: \(divisor)>"
+        return "<\(type(of: self)) \(identifier), control: \(registers.pointee.control), divisor: \(divisor)>"
     }
     
 }

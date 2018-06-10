@@ -58,9 +58,9 @@ public final class Clock : MappedPeripheral, Collection {
     /// Unmap `registers` on deinitialization.
     private var unmapOnDeinit: Bool
 
-    public var startIndex: ClockIdentifier { return ClockIdentifier.startIndex }
-    public var endIndex: ClockIdentifier { return ClockIdentifier.endIndex }
-    public func index(after i: ClockIdentifier) -> ClockIdentifier { return ClockIdentifier.index(after: i) }
+    public var startIndex: ClockIdentifier { return ClockIdentifier.generalPurpose0 }
+    public var endIndex: ClockIdentifier { return ClockIdentifier.invalid }
+    public func index(after i: ClockIdentifier) -> ClockIdentifier { return i.next }
     public subscript(index: ClockIdentifier) -> ClockGenerator {
         return ClockGenerator(clock: self, identifier: index)
     }

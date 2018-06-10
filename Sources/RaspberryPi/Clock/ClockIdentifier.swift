@@ -8,19 +8,22 @@
 /// Clock generator identifier.
 public enum ClockIdentifier : Comparable {
     
+    // BCM2835 ARM Peripherals 6.3
     case generalPurpose0
     case generalPurpose1
     case generalPurpose2
     
+    // BCM2835 Audio Clocks.
     case pcm
     case pwm
     
+    // This exists only to provide ability to conform to `Collection.Index`.
     case invalid
     
     /// Offset of clock-specific registers from the register base.
     ///
     /// - Note: BCM2835 ARM Peripherals 6.3, and BCM2835 Audio Clocks.
-    internal var registerOffset: Int {
+    internal var offset: Int {
         switch self {
         case .generalPurpose0: return 0x70
         case .generalPurpose1: return 0x78
@@ -31,33 +34,20 @@ public enum ClockIdentifier : Comparable {
         }
     }
     
-    /// Index of clock-specific registers within the mapped array.
-    ///
-    /// Divides the offset taken from the datasheet by the stride of the register structure.
-    internal var registerIndex: Int {
-        return registerOffset / MemoryLayout<Clock.Registers>.stride
-    }
-    
-    /// Ordered list of clock identifiers.
-    ///
-    /// Used to allow Clocks to be treated as a collection.
-    private static let ordered: [ClockIdentifier] = [
-        .generalPurpose0,
-        .generalPurpose1,
-        .generalPurpose2,
-        .pcm,
-        .pwm,
-        .invalid
-    ]
-    
-    internal static var startIndex: ClockIdentifier { return ordered[ordered.startIndex] }
-    internal static var endIndex: ClockIdentifier { return ordered[ordered.endIndex - 1] }
-    internal static func index(after i: ClockIdentifier) -> ClockIdentifier {
-        return ordered[ordered.index(after: ordered.index(of: i)!)]
+    /// Next identifier in ordered set.
+    internal var next: ClockIdentifier {
+        switch self {
+        case .generalPurpose0: return .generalPurpose1
+        case .generalPurpose1: return .generalPurpose2
+        case .generalPurpose2: return .pcm
+        case .pcm: return .pwm
+        case .pwm: return .invalid
+        default: preconditionFailure("invalid identifier")
+        }
     }
     
     public static func < (lhs: ClockIdentifier, rhs: ClockIdentifier) -> Bool {
-        return lhs.registerOffset < rhs.registerOffset
+        return lhs.offset < rhs.offset
     }
     
 }
