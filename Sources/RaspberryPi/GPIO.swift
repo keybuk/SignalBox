@@ -6,6 +6,8 @@
 //
 //
 
+import Util
+
 /// General Purpose I/O (GPIO)
 ///
 /// Instances of `GPIO` are used to read and manipulate the underlying GPIO hardware of the
@@ -153,7 +155,7 @@ public final class GPIO : MappedPeripheral, Collection {
 ///     fsel[19] = .output
 ///     gpio.registers.pointee.functionSelect = fsel
 ///
-public struct GPIOFunctionSelect {
+public struct GPIOFunctionSelect : Equatable, Hashable {
 
     internal var field0: UInt32
     internal var field1: UInt32
@@ -177,13 +179,13 @@ public struct GPIOFunctionSelect {
             }
 
             let shift = (index % 10) * 3
-            let bits = (field >> shift) & 0b111
+            let bits = (field >> shift) & UInt32.mask(bits: 3)
             return GPIOFunction(rawValue: bits)!
         }
 
         set {
             let shift = (index % 10) * 3
-            let mask: UInt32 = ~(0b111 << shift)
+            let mask = UInt32.mask(except: 3, offset: shift)
             let bits = newValue.rawValue << shift
 
             switch index / 10 {
@@ -243,7 +245,7 @@ public enum GPIOFunction : UInt32 {
 ///     outputSet[19] = true
 ///     gpio.registers.pointee.outputSet = outputSet
 ///
-public struct GPIOBitField {
+public struct GPIOBitField : Equatable, Hashable {
 
     internal var field0: UInt32
     internal var field1: UInt32
@@ -264,7 +266,7 @@ public struct GPIOBitField {
 
         set {
             let shift = index % 32
-            let mask: UInt32 = ~(1 << shift)
+            let mask = UInt32.mask(except: 1, offset: shift)
             let bits: UInt32 = newValue ? 1 << shift : 0
 
             switch index / 32 {
@@ -499,3 +501,19 @@ public enum GPIOLevel {
 
 }
 
+// MARK: Debugging
+
+extension GPIOPin : CustomDebugStringConvertible {
+    
+    public var debugDescription: String {
+        var description = "<\(type(of: self)) \(number) \(function) \(value)"
+        if edgeDetect != .none { description += ", edgeDetect: \(edgeDetect)" }
+        if levelDetect != .none { description += ", levelDetect: \(levelDetect)" }
+        if asyncEdgeDetect != .none { description += ", asyncEdgeDetect: \(asyncEdgeDetect)" }
+        if isEventDetected { description += ", event" }
+        description += ">"
+
+        return description
+    }
+    
+}
