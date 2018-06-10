@@ -48,7 +48,7 @@ public final class MemoryDevice {
     ///
     /// - Throws: `OSError` on failure.
     public func map(address: UInt32, size: Int) throws -> UnsafeMutableRawPointer {
-        assert(address & UInt32.mask(bits: Int(clamping: PAGE_SHIFT)) == 0, "address must be page-aligned")
+        assert(address & UInt32.mask(bits: Int(PAGE_SHIFT)) == 0, "address must be page-aligned")
         let pointer = mmap(nil, size, PROT_READ | PROT_WRITE, MAP_SHARED, fileDescriptor, off_t(address))!
         guard pointer != MAP_FAILED else { throw OSError(errno: errno) }
         return pointer
