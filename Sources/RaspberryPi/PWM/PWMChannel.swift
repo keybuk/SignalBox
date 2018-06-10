@@ -56,14 +56,15 @@ public final class PWMChannel {
     /// Encapsulates both the MODEx and MSENx fields of the control register.
     public var mode: PWMMode {
         get {
-            let serializerMode: PWMControl, useMarkspace: PWMControl
+            let serializerMode: PWMControl, useMarkSpace: PWMControl
             switch number {
-            case 1: (serializerMode, useMarkspace) = (.channel1SerializerMode, .channel1UseMarkSpace)
-            case 2: (serializerMode, useMarkspace) = (.channel2SerializerMode, .channel2UseMarkSpace)
+            case 1: (serializerMode, useMarkSpace) = (.channel1SerializerMode, .channel1UseMarkSpace)
+            case 2: (serializerMode, useMarkSpace) = (.channel2SerializerMode, .channel2UseMarkSpace)
             default: preconditionFailure("invalid channel")
             }
             
-            switch (pwm.registers.pointee.control.contains(serializerMode), pwm.registers.pointee.control.contains(useMarkspace)) {
+            let control = pwm.registers.pointee.control
+            switch (control.contains(serializerMode), control.contains(useMarkSpace)) {
             case (true, _): return .serializer
             case (false, true): return .markSpace
             case (false, false): return .pwm
@@ -71,10 +72,10 @@ public final class PWMChannel {
         }
         
         set {
-            let serializerMode: PWMControl, useMarkspace: PWMControl
+            let serializerMode: PWMControl, useMarkSpace: PWMControl
             switch number {
-            case 1: (serializerMode, useMarkspace) = (.channel1SerializerMode, .channel1UseMarkSpace)
-            case 2: (serializerMode, useMarkspace) = (.channel2SerializerMode, .channel2UseMarkSpace)
+            case 1: (serializerMode, useMarkSpace) = (.channel1SerializerMode, .channel1UseMarkSpace)
+            case 2: (serializerMode, useMarkSpace) = (.channel2SerializerMode, .channel2UseMarkSpace)
             default: preconditionFailure("invalid channel")
             }
             
@@ -82,13 +83,13 @@ public final class PWMChannel {
             switch newValue {
             case .pwm:
                 control.remove(serializerMode)
-                control.remove(useMarkspace)
+                control.remove(useMarkSpace)
             case .markSpace:
                 control.remove(serializerMode)
-                control.insert(useMarkspace)
+                control.insert(useMarkSpace)
             case .serializer:
                 control.insert(serializerMode)
-                control.remove(useMarkspace)
+                control.remove(useMarkSpace)
             }
             pwm.registers.pointee.control = control
         }
