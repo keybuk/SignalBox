@@ -246,14 +246,6 @@ public enum PWMBit {
 
 }
 
-extension PWM : CustomDebugStringConvertible {
-
-    public var debugDescription: String {
-        return "<\(type(of: self)) control: \(registers.pointee.control), status: \(registers.pointee.status)>"
-    }
-
-}
-
 /// PWM control register.
 ///
 /// Provides an type conforming to `OptionSet` that allows direct manipulation of the PWM control
@@ -262,7 +254,7 @@ extension PWM : CustomDebugStringConvertible {
 ///     var control: PWMControl = [ .channel1Enable, .channel1UseFifo, .channel1UseMarkspace ]
 ///     pwm.registers.control.pointee = control
 ///
-public struct PWMControl : OptionSet {
+public struct PWMControl : OptionSet, Equatable, Hashable {
 
     public let rawValue: UInt32
 
@@ -288,32 +280,6 @@ public struct PWMControl : OptionSet {
 
 }
 
-extension PWMControl : CustomDebugStringConvertible {
-
-    public var debugDescription: String {
-        var parts: [String] = []
-
-        if contains(.channel2UseMarkSpace) { parts.append(".channel2UseMarkSpace") }
-        if contains(.channel2UseFifo) { parts.append(".channel2UseFifo") }
-        if contains(.channel2InvertPolarity) { parts.append(".channel2InvertPolarity") }
-        if contains(.channel2SilenceBit) { parts.append(".channel2SilenceBit") }
-        if contains(.channel2RepeatLastData) { parts.append(".channel2RepeatLastData") }
-        if contains(.channel2SerializerMode) { parts.append(".channel2SerializerMode") }
-        if contains(.channel2Enable) { parts.append(".channel2Enable") }
-        if contains(.channel1UseMarkSpace) { parts.append(".channel1UseMarkSpace") }
-        if contains(.clearFifo) { parts.append(".clearFifo") }
-        if contains(.channel1UseFifo) { parts.append(".channel1UseFifo") }
-        if contains(.channel1InvertPolarity) { parts.append(".channel1InvertPolarity") }
-        if contains(.channel1SilenceBit) { parts.append(".channel1SilenceBit") }
-        if contains(.channel1RepeatLastData) { parts.append(".channel1RepeatLastData") }
-        if contains(.channel1SerializerMode) { parts.append(".channel1SerializerMode") }
-        if contains(.channel1Enable) { parts.append(".channel1Enable") }
-
-        return "[" + parts.joined(separator: ", ") + "]"
-    }
-
-}
-
 /// PWM status register.
 ///
 /// Provides an type conforming to `OptionSet` that allows direct manipulation of the PWM status
@@ -323,7 +289,7 @@ extension PWMControl : CustomDebugStringConvertible {
 ///     var status: PWMControl = [ .busError, .channel1GapOccurred, .fifoReadError, .fifoWriteError ]
 ///     pwm.registers.status.pointee = status
 ///
-public struct PWMStatus : OptionSet {
+public struct PWMStatus : OptionSet, Equatable, Hashable {
 
     public let rawValue: UInt32
 
@@ -347,30 +313,6 @@ public struct PWMStatus : OptionSet {
 
 }
 
-extension PWMStatus : CustomDebugStringConvertible {
-
-    public var debugDescription: String {
-        var parts: [String] = []
-
-        if contains(.channel4Transmitting) { parts.append(".channel4Transmitting") }
-        if contains(.channel3Transmitting) { parts.append(".channel3Transmitting") }
-        if contains(.channel2Transmitting) { parts.append(".channel2Transmitting") }
-        if contains(.channel1Transmitting) { parts.append(".channel1Transmitting") }
-        if contains(.busError) { parts.append(".busError") }
-        if contains(.channel4GapOccurred) { parts.append(".channel4GapOccurred") }
-        if contains(.channel3GapOccurred) { parts.append(".channel3GapOccurred") }
-        if contains(.channel2GapOccurred) { parts.append(".channel2GapOccurred") }
-        if contains(.channel1GapOccurred) { parts.append(".channel1GapOccurred") }
-        if contains(.fifoReadError) { parts.append(".fifoReadError") }
-        if contains(.fifoWriteError) { parts.append(".fifoWriteError") }
-        if contains(.fifoEmpty) { parts.append(".fifoEmpty") }
-        if contains(.fifoFull) { parts.append(".fifoFull") }
-
-        return "[" + parts.joined(separator: ", ") + "]"
-    }
-
-}
-
 /// PWM DMA configuration register.
 ///
 /// Provides an type conforming to `OptionSet` that allows direct manipulation of the PWM DMA
@@ -379,7 +321,7 @@ extension PWMStatus : CustomDebugStringConvertible {
 ///     var config: PWMDMAConfiguration = [ .enabled, .panicThreshold(15)., dreqThreshold(15) ]
 ///     pwm.registers.dmaConfiguration.pointee = config
 ///
-public struct PWMDMAConfiguration : OptionSet {
+public struct PWMDMAConfiguration : OptionSet, Equatable, Hashable {
 
     public let rawValue: UInt32
 
@@ -390,12 +332,12 @@ public struct PWMDMAConfiguration : OptionSet {
     public static let enabled = PWMDMAConfiguration(rawValue: 1 << 31)
 
     public static func panicThreshold(_ threshold: Int) -> PWMDMAConfiguration {
-        assert(threshold < (1 << 8), "threshold out of range")
+        assert(threshold >= 0 && threshold < (1 << 8), "threshold out of range")
         return PWMDMAConfiguration(rawValue: UInt32(threshold) << 8)
     }
 
     public static func dreqThreshold(_ threshold: Int) -> PWMDMAConfiguration {
-        assert(threshold < (1 << 8), "threshold out of range")
+        assert(threshold >= 0 && threshold < (1 << 8), "threshold out of range")
         return PWMDMAConfiguration(rawValue: UInt32(threshold))
     }
 
@@ -407,7 +349,7 @@ public struct PWMDMAConfiguration : OptionSet {
             return Int((rawValue >> 8) & UInt32.mask(bits: 8))
         }
         set {
-            assert(newValue < (1 << 8), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 8), "value out of range")
             self = PWMDMAConfiguration(rawValue: rawValue & UInt32.mask(except: 8, offset: 8) | (UInt32(newValue) << 8))
         }
     }
@@ -420,23 +362,9 @@ public struct PWMDMAConfiguration : OptionSet {
             return Int(rawValue & UInt32.mask(bits: 8))
         }
         set {
-            assert(newValue < (1 << 8), "value out of range")
+            assert(newValue >= 0 && newValue < (1 << 8), "value out of range")
             self = PWMDMAConfiguration(rawValue: rawValue & UInt32.mask(except: 8) | UInt32(newValue))
         }
-    }
-
-}
-
-extension PWMDMAConfiguration : CustomDebugStringConvertible {
-
-    public var debugDescription: String {
-        var parts: [String] = []
-
-        if contains(.enabled) { parts.append(".enabled") }
-        parts.append(".panicThreshold(\(panicThreshold))")
-        parts.append(".dreqThreshold(\(dreqThreshold))")
-
-        return "[" + parts.joined(separator: ", ") + "]"
     }
 
 }
@@ -748,6 +676,80 @@ public final class PWMChannel {
         }
     }
 
+}
+
+// MARK: Debugging
+
+extension PWM : CustomDebugStringConvertible {
+    
+    public var debugDescription: String {
+        return "<\(type(of: self)) control: \(registers.pointee.control), status: \(registers.pointee.status)>"
+    }
+    
+}
+
+extension PWMControl : CustomDebugStringConvertible {
+    
+    public var debugDescription: String {
+        var parts: [String] = []
+        
+        if contains(.channel2UseMarkSpace) { parts.append(".channel2UseMarkSpace") }
+        if contains(.channel2UseFifo) { parts.append(".channel2UseFifo") }
+        if contains(.channel2InvertPolarity) { parts.append(".channel2InvertPolarity") }
+        if contains(.channel2SilenceBit) { parts.append(".channel2SilenceBit") }
+        if contains(.channel2RepeatLastData) { parts.append(".channel2RepeatLastData") }
+        if contains(.channel2SerializerMode) { parts.append(".channel2SerializerMode") }
+        if contains(.channel2Enable) { parts.append(".channel2Enable") }
+        if contains(.channel1UseMarkSpace) { parts.append(".channel1UseMarkSpace") }
+        if contains(.clearFifo) { parts.append(".clearFifo") }
+        if contains(.channel1UseFifo) { parts.append(".channel1UseFifo") }
+        if contains(.channel1InvertPolarity) { parts.append(".channel1InvertPolarity") }
+        if contains(.channel1SilenceBit) { parts.append(".channel1SilenceBit") }
+        if contains(.channel1RepeatLastData) { parts.append(".channel1RepeatLastData") }
+        if contains(.channel1SerializerMode) { parts.append(".channel1SerializerMode") }
+        if contains(.channel1Enable) { parts.append(".channel1Enable") }
+        
+        return "[" + parts.joined(separator: ", ") + "]"
+    }
+    
+}
+
+extension PWMStatus : CustomDebugStringConvertible {
+    
+    public var debugDescription: String {
+        var parts: [String] = []
+        
+        if contains(.channel4Transmitting) { parts.append(".channel4Transmitting") }
+        if contains(.channel3Transmitting) { parts.append(".channel3Transmitting") }
+        if contains(.channel2Transmitting) { parts.append(".channel2Transmitting") }
+        if contains(.channel1Transmitting) { parts.append(".channel1Transmitting") }
+        if contains(.busError) { parts.append(".busError") }
+        if contains(.channel4GapOccurred) { parts.append(".channel4GapOccurred") }
+        if contains(.channel3GapOccurred) { parts.append(".channel3GapOccurred") }
+        if contains(.channel2GapOccurred) { parts.append(".channel2GapOccurred") }
+        if contains(.channel1GapOccurred) { parts.append(".channel1GapOccurred") }
+        if contains(.fifoReadError) { parts.append(".fifoReadError") }
+        if contains(.fifoWriteError) { parts.append(".fifoWriteError") }
+        if contains(.fifoEmpty) { parts.append(".fifoEmpty") }
+        if contains(.fifoFull) { parts.append(".fifoFull") }
+        
+        return "[" + parts.joined(separator: ", ") + "]"
+    }
+    
+}
+
+extension PWMDMAConfiguration : CustomDebugStringConvertible {
+    
+    public var debugDescription: String {
+        var parts: [String] = []
+        
+        if contains(.enabled) { parts.append(".enabled") }
+        parts.append(".panicThreshold(\(panicThreshold))")
+        parts.append(".dreqThreshold(\(dreqThreshold))")
+        
+        return "[" + parts.joined(separator: ", ") + "]"
+    }
+    
 }
 
 extension PWMChannel : CustomDebugStringConvertible {
