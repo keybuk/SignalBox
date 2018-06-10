@@ -24,7 +24,7 @@ public struct ClockControl : OptionSet, Equatable, Hashable {
     }
     
     public static let invertOutput = ClockControl(rawValue: 1 << 8)
-    public static let busy         = ClockControl(rawValue: 1 << 7)
+    public static let running      = ClockControl(rawValue: 1 << 7)
     public static let kill         = ClockControl(rawValue: 1 << 5)
     public static let enabled      = ClockControl(rawValue: 1 << 4)
     
@@ -75,7 +75,7 @@ extension ClockControl : CustomDebugStringConvertible {
         parts.append(".mash(.\(mash))")
         
         if contains(.invertOutput) { parts.append(".invertOutput") }
-        if contains(.busy) { parts.append(".busy") }
+        if contains(.running) { parts.append(".running") }
         if contains(.kill) { parts.append(".kill") }
         if contains(.enabled) { parts.append(".enabled") }
         

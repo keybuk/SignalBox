@@ -963,7 +963,7 @@ class ClockControlTests : XCTestCase {
     func testSetBusy() {
         var control = ClockControl(rawValue: 0)
 
-        control.insert(.busy)
+        control.insert(.running)
 
         XCTAssertEqual((control.rawValue >> 7) & 1, 1)
     }
@@ -972,7 +972,7 @@ class ClockControlTests : XCTestCase {
     func testGetBusy() {
         let control = ClockControl(rawValue: 1 << 7)
 
-        XCTAssertTrue(control.contains(.busy))
+        XCTAssertTrue(control.contains(.running))
     }
 
     /// Test that we can set the flip bit in the control register.

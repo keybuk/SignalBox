@@ -53,7 +53,7 @@ public final class ClockGenerator {
     /// To avoid glitches, `source`, `mash`, and `divisor` should not be changed while this is
     /// `true`.
     public var isRunning: Bool {
-        return registers.pointee.control.contains(.busy)
+        return registers.pointee.control.contains(.running)
     }
     
     /// Noise-shaping MASH filter.
