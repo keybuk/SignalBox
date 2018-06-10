@@ -622,78 +622,78 @@ class PWMTests : XCTestCase {
         XCTAssertEqual(pwm[2].isTransmitting, false)
     }
 
-    /// Test that the channel 1 gap occurred status bit is returned via isTransmissionGap.
-    func testOneIsTransmissionGap() {
+    /// Test that the channel 1 gap occurred status bit is returned via gapOccurred.
+    func testOneGapOccurred() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         registers.status = PWMStatus(rawValue: 1 << 4)
 
-        XCTAssertEqual(pwm[1].isTransmissionGap, true)
+        XCTAssertEqual(pwm[1].gapOccurred, true)
     }
 
-    /// Test that the channel 2 gap occurred status bit is returned via isTransmissionGap.
-    func testTwoIsTransmissionGap() {
+    /// Test that the channel 2 gap occurred status bit is returned via gapOccurred.
+    func testTwoGapOccurred() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         registers.status = PWMStatus(rawValue: 1 << 5)
 
-        XCTAssertEqual(pwm[2].isTransmissionGap, true)
+        XCTAssertEqual(pwm[2].gapOccurred, true)
     }
 
-    /// Test that the default channel 1 isTransmissionGap is false.
-    func testDefaultOneIsTransmissionGap() {
+    /// Test that the default channel 1 gapOccurred is false.
+    func testDefaultOneGapOccurred() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        XCTAssertEqual(pwm[1].isTransmissionGap, false)
+        XCTAssertEqual(pwm[1].gapOccurred, false)
     }
 
-    /// Test that the default channel 2 isTransmissionGap is false.
-    func testDefaultTwoIsTransmissionGap() {
+    /// Test that the default channel 2 gapOccurred is false.
+    func testDefaultTwoGapOccurred() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        XCTAssertEqual(pwm[2].isTransmissionGap, false)
+        XCTAssertEqual(pwm[2].gapOccurred, false)
     }
 
     /// Test the the channel 1 gap occurred status bit is written when clearing.
-    func testClearOneIsTransmissionGap() {
+    func testClearOneGapOccurred() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm[1].isTransmissionGap = false
+        pwm[1].gapOccurred = false
 
         XCTAssertEqual((registers.status.rawValue >> 4) & 1, 1)
     }
 
     /// Test the the channel 2 gap occurred status bit is written when clearing.
-    func testClearTwoIsTransmissionGap() {
+    func testClearTwoGapOccurred() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm[2].isTransmissionGap = false
+        pwm[2].gapOccurred = false
 
         XCTAssertEqual((registers.status.rawValue >> 5) & 1, 1)
     }
 
-    /// Test that writing true to channel 1 isTransmissionGap has no effect.
-    func testOneIsTransmissionGapNoop() {
+    /// Test that writing true to channel 1 gapOccurred has no effect.
+    func testOneGapOccurredNoop() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm[1].isTransmissionGap = true
+        pwm[1].gapOccurred = true
 
         XCTAssertEqual(registers.status.rawValue, 0)
     }
 
-    /// Test that writing true to channel 2 isTransmissionGap has no effect.
-    func testTwoIsTransmissionGapNoop() {
+    /// Test that writing true to channel 2 gapOccurred has no effect.
+    func testTwoGapOccurredNoop() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm[2].isTransmissionGap = true
+        pwm[2].gapOccurred = true
 
         XCTAssertEqual(registers.status.rawValue, 0)
     }

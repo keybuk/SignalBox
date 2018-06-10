@@ -235,7 +235,7 @@ public final class PWMChannel {
     /// - Note:
     ///   Setting the value to false actually writes 1 to the underlying bit; the interface is
     ///   intended to be more programatic than the underlying hardware register.
-    public var isTransmissionGap: Bool {
+    public var gapOccurred: Bool {
         get {
             switch number {
             case 1: return pwm.registers.pointee.status.contains(.channel1GapOccurred)
