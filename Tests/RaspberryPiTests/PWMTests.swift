@@ -11,6 +11,28 @@ import XCTest
 
 class PWMTests : XCTestCase {
 
+    // MARK: Layout
+
+    /// Test that the layout of the Registers struct matches hardware.
+    func testRegistersLayout() {
+        XCTAssertEqual(MemoryLayout<PWM.Registers>.size, 0x28)
+        XCTAssertEqual(MemoryLayout<PWMControl>.size, 0x04)
+        XCTAssertEqual(MemoryLayout<PWMStatus>.size, 0x04)
+        XCTAssertEqual(MemoryLayout<PWMDMAConfiguration>.size, 0x04)
+
+        #if swift(>=4.1.9)
+        XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.control), 0x00)
+        XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.status), 0x04)
+        XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.dmaConfiguration), 0x08)
+        XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.channel1Range), 0x10)
+        XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.channel1Data), 0x14)
+        XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.fifoInput), 0x18)
+        XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.channel2Range), 0x20)
+        XCTAssertEqual(MemoryLayout.offset(of: \PWM.Registers.channel2Data), 0x24)
+        #endif
+    }
+
+
     // MARK: Collection conformance
 
     /// Test that the collection implementation produces a correct count.
