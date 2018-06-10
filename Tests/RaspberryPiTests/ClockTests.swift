@@ -11,6 +11,21 @@ import XCTest
 
 class ClockTests : XCTestCase {
 
+    // MARK: Layout
+
+    /// Test that the layout of the Registers struct matches hardware.
+    func testRegistersLayout() {
+        XCTAssertEqual(MemoryLayout<Clock.Registers>.size, 0x08)
+        XCTAssertEqual(MemoryLayout<ClockControl>.size, 0x04)
+        XCTAssertEqual(MemoryLayout<ClockDivisor>.size, 0x04)
+
+        #if swift(>=4.1.9)
+        XCTAssertEqual(MemoryLayout.offset(of: \Clock.Registers.control), 0x00)
+        XCTAssertEqual(MemoryLayout.offset(of: \Clock.Registers.divisor), 0x04)
+        #endif
+    }
+
+
     // MARK: Collection conformance
 
     /// Test that the collection implementation produces a correct count.
