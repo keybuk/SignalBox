@@ -28,8 +28,9 @@ public struct ClockControl : OptionSet, Equatable, Hashable {
     public static let kill         = ClockControl(rawValue: 1 << 5)
     public static let enabled      = ClockControl(rawValue: 1 << 4)
     
-    public static func mash(_ mash: ClockMASH) -> ClockControl {
-        return ClockControl(rawValue: mash.rawValue << 9)
+    public static func mash(_ mash: Int) -> ClockControl {
+        assert(mash >= 0 && mash <= 3, "mash out of range")
+        return ClockControl(rawValue: UInt32(mash) << 9)
     }
     
     public static func source(_ source: ClockSource) -> ClockControl {
@@ -51,12 +52,13 @@ public struct ClockControl : OptionSet, Equatable, Hashable {
     /// Noise-shaping MASH filter.
     ///
     /// This is an internal method, access is provided through `Clock`.
-    internal var mash: ClockMASH {
+    internal var mash: Int {
         get {
-            return ClockMASH(rawValue: (rawValue >> 9) & UInt32.mask(bits: 2))!
+            return Int((rawValue >> 9) & UInt32.mask(bits: 2))
         }
         set {
-            self = ClockControl(rawValue: rawValue & UInt32.mask(except: 2, offset: 9) | (newValue.rawValue << 9))
+            assert(newValue >= 0 && newValue <= 3, "mash out of range")
+            self = ClockControl(rawValue: rawValue & UInt32.mask(except: 2, offset: 9) | (UInt32(newValue) << 9))
         }
     }
     

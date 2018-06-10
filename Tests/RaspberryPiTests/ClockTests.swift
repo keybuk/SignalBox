@@ -548,7 +548,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        clock[.generalPurpose0].mash = .integer
+        clock[.generalPurpose0].mash = 0
 
         XCTAssertEqual((registers[14].control.rawValue >> 9) & ~(~0 << 2), 0)
     }
@@ -564,7 +564,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        XCTAssertEqual(clock[.generalPurpose0].mash, .integer)
+        XCTAssertEqual(clock[.generalPurpose0].mash, 0)
     }
 
     /// Test that we can directly set the MASH field of the control register to 1-stage.
@@ -579,7 +579,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        clock[.generalPurpose0].mash = .oneStage
+        clock[.generalPurpose0].mash = 1
 
         XCTAssertEqual((registers[14].control.rawValue >> 9) & ~(~0 << 2), 1)
     }
@@ -595,7 +595,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        XCTAssertEqual(clock[.generalPurpose0].mash, .oneStage)
+        XCTAssertEqual(clock[.generalPurpose0].mash, 1)
     }
 
     /// Test that we can directly set the MASH field of the control register to 2-stage.
@@ -610,7 +610,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        clock[.generalPurpose0].mash = .twoStage
+        clock[.generalPurpose0].mash = 2
 
         XCTAssertEqual((registers[14].control.rawValue >> 9) & ~(~0 << 2), 2)
     }
@@ -626,7 +626,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        XCTAssertEqual(clock[.generalPurpose0].mash, .twoStage)
+        XCTAssertEqual(clock[.generalPurpose0].mash, 2)
     }
 
     /// Test that we can directly set the MASH field of the control register to 3-stage.
@@ -641,7 +641,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        clock[.generalPurpose0].mash = .threeStage
+        clock[.generalPurpose0].mash = 3
 
         XCTAssertEqual((registers[14].control.rawValue >> 9) & ~(~0 << 2), 3)
     }
@@ -657,7 +657,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        XCTAssertEqual(clock[.generalPurpose0].mash, .threeStage)
+        XCTAssertEqual(clock[.generalPurpose0].mash, 3)
     }
 
     /// Test that setting the MASH field includes the clock password.
@@ -671,7 +671,7 @@ class ClockTests : XCTestCase {
             }
         }
 
-        clock[.generalPurpose0].mash = .oneStage
+        clock[.generalPurpose0].mash = 1
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -1067,7 +1067,7 @@ class ClockControlTests : XCTestCase {
     func testIntegerMASH() {
         var control = ClockControl(rawValue: 0)
 
-        control = [ .mash(.integer) ]
+        control = [ .mash(0) ]
 
         XCTAssertEqual((control.rawValue >> 9) & ~(~0 << 2), 0)
     }
@@ -1076,7 +1076,7 @@ class ClockControlTests : XCTestCase {
     func testOneStageMASH() {
         var control = ClockControl(rawValue: 0)
 
-        control = [ .mash(.oneStage) ]
+        control = [ .mash(1) ]
 
         XCTAssertEqual((control.rawValue >> 9) & ~(~0 << 2), 1)
     }
@@ -1085,7 +1085,7 @@ class ClockControlTests : XCTestCase {
     func testTwoStageMASH() {
         var control = ClockControl(rawValue: 0)
 
-        control = [ .mash(.twoStage) ]
+        control = [ .mash(2) ]
 
         XCTAssertEqual((control.rawValue >> 9) & ~(~0 << 2), 2)
     }
@@ -1094,7 +1094,7 @@ class ClockControlTests : XCTestCase {
     func testThreeStageMASH() {
         var control = ClockControl(rawValue: 0)
 
-        control = [ .mash(.threeStage) ]
+        control = [ .mash(3) ]
 
         XCTAssertEqual((control.rawValue >> 9) & ~(~0 << 2), 3)
     }

@@ -62,10 +62,10 @@ public final class ClockGenerator {
     /// divided by `divisor`. This is achieved by dropping or waiting additional ticks, above and
     /// below the intended frequency, in order to reach it.
     ///
-    /// The amount of filter applied is adjusted by this setting.
+    /// The amount of filter applied is adjusted by this setting, in the range 0...3.
     ///
     /// To avoid glitches, do not change while `isRunning` is `true`.
-    public var mash: ClockMASH {
+    public var mash: Int {
         get { return registers.pointee.control.mash }
         set { registers.pointee.control.mash = newValue }
     }
