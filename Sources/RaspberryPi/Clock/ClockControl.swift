@@ -20,7 +20,7 @@ public struct ClockControl : OptionSet, Equatable, Hashable {
     public let rawValue: UInt32
     
     public init(rawValue: UInt32) {
-        self.rawValue = 0x5a000000 | rawValue
+        self.rawValue = (0x5a << 24) | rawValue
     }
     
     public static let invertOutput = ClockControl(rawValue: 1 << 8)
