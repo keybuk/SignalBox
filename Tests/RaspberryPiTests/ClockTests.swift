@@ -15,32 +15,32 @@ class ClockTests : XCTestCase {
 
     /// Test that the collection implementation produces a correct count.
     func testCount() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clocks = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clocks = Clock(registers: &registers)
 
         XCTAssertEqual(clocks.count, 5)
     }
 
     /// Test that the start index of the collection is the first general purpose 0.
     func testStartIndex() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clocks = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clocks = Clock(registers: &registers)
 
         XCTAssertEqual(clocks.startIndex, .generalPurpose0)
     }
 
     /// Test that the end index of the collection is the invalid identifier.
     func testEndIndex() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clocks = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clocks = Clock(registers: &registers)
 
         XCTAssertEqual(clocks.endIndex, .invalid)
     }
 
     /// Test that the collection implementation has correct indexes.
     func testIndexes() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clocks = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clocks = Clock(registers: &registers)
 
         XCTAssertEqual(Array(clocks.indices), [ .generalPurpose0, .generalPurpose1, .generalPurpose2, .pcm, .pwm ])
     }
@@ -50,8 +50,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when modifying the generalPurpose0 clock, the right registers are modified.
     func testGeneralPurpose0() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].isEnabled = true
 
@@ -60,8 +60,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when modifying the generalPurpose1 clock, the right registers are modified.
     func testGeneralPurpose1() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose1].isEnabled = true
 
@@ -70,8 +70,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when modifying the generalPurpose2 clock, the right registers are modified.
     func testGeneralPurpose2() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose2].isEnabled = true
 
@@ -80,8 +80,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when modifying the PCM clock, the right registers are modified.
     func testPCM() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.pcm].isEnabled = true
 
@@ -90,8 +90,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when modifying the PWM clock, the right registers are modified.
     func testPWM() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.pwm].isEnabled = true
 
@@ -103,8 +103,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the source field of the control register to oscillator.
     func testSetOscillatorSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -120,8 +120,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the oscillator source field of the control register.
     func testGetOscillatorSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -134,8 +134,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the source field of the control register to testdebug0.
     func testSetTestDebug0Source() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -151,8 +151,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the testdebug0 source field of the control register.
     func testGetTestDebug0Source() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -165,8 +165,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the source field of the control register to testdebug1.
     func testSetTestDebug1Source() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -182,8 +182,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the testdebug1 source field of the control register.
     func testGetTestDebug1Source() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -196,8 +196,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the source field of the control register to PLLA.
     func testSetPLLASource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -213,8 +213,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the PLLA source field of the control register.
     func testGetPLLASource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -227,8 +227,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the source field of the control register to PLLC.
     func testSetPLLCSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -244,8 +244,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the PLLC source field of the control register.
     func testGetPLLCSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -258,8 +258,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the source field of the control register to PLLD.
     func testSetPLLDSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -275,8 +275,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the PLLD source field of the control register.
     func testGetPLLDSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -289,8 +289,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the source field of the control register to HDMI Auxillary.
     func testSetHDMIAuxillarySource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -306,8 +306,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the HDMI Auxillary source field of the control register.
     func testGetHDMIAuxillarySource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -320,8 +320,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the source field of the control register to GND/none.
     func testSetGndSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -337,8 +337,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the GND/none source field of the control register.
     func testGetGndSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -351,8 +351,8 @@ class ClockTests : XCTestCase {
 
     /// Test that invalid data in source field of the control register returns as GND/none.
     func testInvalidSource() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -366,8 +366,8 @@ class ClockTests : XCTestCase {
 
     /// Test that setting the source field includes the clock password.
     func testSetSourcePassword() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -389,8 +389,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can get the enabled bit from the control register.
     func testIsEnabled() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -403,8 +403,8 @@ class ClockTests : XCTestCase {
 
     /// Test that the enabled bit defaults to false.
     func testNotIsEnabled() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -417,8 +417,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can set the enabled bit in the control register.
     func testSetIsEnabled() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -433,8 +433,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can clear the enabled bit from the control register.
     func testClearIsEnabled() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -449,8 +449,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when we enable the clock, the request includes the password.
     func testSetIsEnabledPassword() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -469,8 +469,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when we disable the clock, the request includes the password.
     func testClearIsEnabledPassword() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -492,8 +492,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can get the busy bit from the control register.
     func testIsRunning() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -506,8 +506,8 @@ class ClockTests : XCTestCase {
 
     /// Test that the enabled bit defaults to false.
     func testNotIsRunning() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -523,8 +523,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the MASH field of the control register to integer.
     func testSetIntegerMASH() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -540,8 +540,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the integer MASH field of the control register.
     func testGetIntegerMASH() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -554,8 +554,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the MASH field of the control register to 1-stage.
     func testSetOneStageMASH() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -571,8 +571,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the 1-stage MASH field of the control register.
     func testGetOneStageMASH() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -585,8 +585,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the MASH field of the control register to 2-stage.
     func testSetTwoStageMASH() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -602,8 +602,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the 2-stage MASH field of the control register.
     func testGetTwoStageMASH() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -616,8 +616,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly set the MASH field of the control register to 3-stage.
     func testSetThreeStageMASH() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         // Corrupt the field to make sure the spare bits become zero.
         withUnsafeMutablePointer(to: &registers[14].control) {
@@ -633,8 +633,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can directly get the 3-stage MASH field of the control register.
     func testGetThreeStageMASH() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -647,8 +647,8 @@ class ClockTests : XCTestCase {
 
     /// Test that setting the MASH field includes the clock password.
     func testSetMASHPassword() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].control) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -670,8 +670,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can initialize a divisor.
     func testInitialize() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].divisor = ClockDivisor(integer: 23, fractional: 503)
 
@@ -681,8 +681,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can initialize the highest divisor.
     func testInitializeHighest() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].divisor = ClockDivisor(integer: 4095, fractional: 4095)
 
@@ -692,8 +692,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can initialize a zero divisor.
     func testInitializeZero() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].divisor = ClockDivisor(integer: 0, fractional: 0)
 
@@ -703,8 +703,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when we initialize, the field includes the clock password.
     func testInitializePassword() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].divisor) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -726,8 +726,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can initialize a divisor from a float.
     func testInitializeUpperBound() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].divisor = ClockDivisor(upperBound: 23.123)
 
@@ -737,8 +737,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can initialize a divisor from a whole number float.
     func testInitializeUpperBoundExact() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].divisor = ClockDivisor(upperBound: 98)
 
@@ -748,8 +748,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can initialize a divisor from a float close to the next whole number.
     func testInitializeUpperBoundAlmostNext() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].divisor = ClockDivisor(upperBound: 197.9999)
 
@@ -759,8 +759,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can initialize a divisor from a float close to the highest number.
     func testInitializeUpperBoundHighest() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].divisor = ClockDivisor(upperBound: 4095.9999)
 
@@ -770,8 +770,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can initialize a divisor from a zero float.
     func testInitializeUpperBoundZero() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         clock[.generalPurpose0].divisor = ClockDivisor(upperBound: 0)
 
@@ -781,8 +781,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when we initialize from a float, the field includes the clock password.
     func testInitializeUpperBoundPassword() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].divisor) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -803,8 +803,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can set the integer component.
     func testSetInteger() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].divisor) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -819,8 +819,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when we set the integer component, it doesn't alter the fractional.
     func testSetIntegerLeavesFractional() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].divisor) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -835,8 +835,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when we set the integer component, the field includes the password.
     func testSetIntegerPassword() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].divisor) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -858,8 +858,8 @@ class ClockTests : XCTestCase {
 
     /// Test that we can set the fractional component.
     func testSetFractional() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].divisor) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -874,8 +874,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when we set the fractional component, it doesn't alter the integer.
     func testSetFractionalLeavesInteger() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].divisor) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
@@ -890,8 +890,8 @@ class ClockTests : XCTestCase {
 
     /// Test that when we set the fractional component, the field includes the password.
     func testSetFractionalPassword() {
-        var registers = Array(repeating: Clocks.Registers(), count: Clocks.registerCount)
-        let clock = Clocks(registers: &registers)
+        var registers = Array(repeating: Clock.Registers(), count: Clock.registerCount)
+        let clock = Clock(registers: &registers)
 
         withUnsafeMutablePointer(to: &registers[14].divisor) {
             $0.withMemoryRebound(to: UInt32.self, capacity: 1) {
