@@ -48,7 +48,7 @@ public final class Clock : MappedPeripheral, Collection {
         // For testing.
         internal init() {
             control = []
-            divisor = ClockDivisor(rawValue: 0)
+            divisor = ClockDivisor()
         }
     }
 

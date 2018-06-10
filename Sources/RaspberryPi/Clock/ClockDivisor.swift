@@ -31,6 +31,10 @@ public struct ClockDivisor : RawRepresentable, Equatable, Hashable, CustomString
         self.rawValue = (0x5a << 24) | rawValue
     }
     
+    public init() {
+        self.init(rawValue: 0)
+    }
+    
     public init(integer: Int, fractional: Int) {
         assert(integer >= 0 && integer < 4096, "integer out of range")
         assert(fractional >= 0 && fractional < 4096, "fractional out of range")
