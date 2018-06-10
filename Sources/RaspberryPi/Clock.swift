@@ -156,7 +156,7 @@ public enum ClockIdentifier : Comparable {
 ///     var control: ClockControl = [ .source(.pwm), .mash(.none), .enabled ]
 ///     clock.registers.control.pointee = control
 ///
-public struct ClockControl : OptionSet {
+public struct ClockControl : OptionSet, Equatable, Hashable {
 
     public let rawValue: UInt32
 
@@ -203,24 +203,6 @@ public struct ClockControl : OptionSet {
 
 }
 
-extension ClockControl : CustomDebugStringConvertible {
-
-    public var debugDescription: String {
-        var parts: [String] = []
-
-        parts.append(".source(.\(source))")
-        parts.append(".mash(.\(mash))")
-
-        if contains(.invertOutput) { parts.append(".invertOutput") }
-        if contains(.busy) { parts.append(".busy") }
-        if contains(.kill) { parts.append(".kill") }
-        if contains(.enabled) { parts.append(".enabled") }
-
-        return "[" + parts.joined(separator: ", ") + "]"
-    }
-
-}
-
 /// Clock MASH filter options.
 public enum ClockMASH : UInt32 {
 
@@ -261,7 +243,7 @@ public enum ClockSource : UInt32 {
 ///
 ///     clock.divisor = ClockDivisor(upperBoard: 91.5)
 ///
-public struct ClockDivisor : RawRepresentable {
+public struct ClockDivisor : RawRepresentable, Equatable, Hashable, CustomStringConvertible {
 
     public let rawValue: UInt32
 
@@ -270,9 +252,9 @@ public struct ClockDivisor : RawRepresentable {
     }
 
     public init(integer: Int, fractional: Int) {
-        assert(integer < 4096, "integer out of range")
-        assert(fractional < 4096, "fractional out of range")
-        self.init(rawValue: (UInt32(clamping: integer) << 12) | UInt32(clamping: fractional))
+        assert(integer >= 0 && integer < 4096, "integer out of range")
+        assert(fractional >= 0 && fractional < 4096, "fractional out of range")
+        self.init(rawValue: (UInt32(integer) << 12) | UInt32(fractional))
     }
 
     public init<T: BinaryFloatingPoint>(upperBound value: T) {
@@ -286,11 +268,11 @@ public struct ClockDivisor : RawRepresentable {
     /// The value must be less than 4096.
     public var integer: Int {
         get {
-            return Int(clamping: (rawValue >> 12) & UInt32.mask(bits: 12))
+            return Int((rawValue >> 12) & UInt32.mask(bits: 12))
         }
         set {
-            assert(newValue < (1 << 12), "value out of range")
-            self = ClockDivisor(rawValue: rawValue & UInt32.mask(except: 12, offset: 12) | (UInt32(clamping: newValue) << 12))
+            assert(newValue >= 0 && newValue < (1 << 12), "value out of range")
+            self = ClockDivisor(rawValue: rawValue & UInt32.mask(except: 12, offset: 12) | (UInt32(newValue) << 12))
         }
     }
 
@@ -301,17 +283,13 @@ public struct ClockDivisor : RawRepresentable {
     /// The value must be less than 4096.
     public var fractional: Int {
         get {
-            return Int(clamping: rawValue & UInt32.mask(bits: 12))
+            return Int(rawValue & UInt32.mask(bits: 12))
         }
         set {
-            assert(newValue < (1 << 12), "value out of range")
-            self = ClockDivisor(rawValue: rawValue & UInt32.mask(except: 12) | UInt32(clamping: newValue))
+            assert(newValue >= 0 && newValue < (1 << 12), "value out of range")
+            self = ClockDivisor(rawValue: rawValue & UInt32.mask(except: 12) | UInt32(newValue))
         }
     }
-
-}
-
-extension ClockDivisor : CustomStringConvertible {
 
     public var description: String {
         let floatValue = Float(integer) + Float(fractional) / 4096
@@ -400,6 +378,26 @@ public final class Clock {
         set { clocks.registers[identifier.registerIndex].divisor = newValue }
     }
 
+}
+
+// MARK: Debugging
+
+extension ClockControl : CustomDebugStringConvertible {
+    
+    public var debugDescription: String {
+        var parts: [String] = []
+        
+        parts.append(".source(.\(source))")
+        parts.append(".mash(.\(mash))")
+        
+        if contains(.invertOutput) { parts.append(".invertOutput") }
+        if contains(.busy) { parts.append(".busy") }
+        if contains(.kill) { parts.append(".kill") }
+        if contains(.enabled) { parts.append(".enabled") }
+        
+        return "[" + parts.joined(separator: ", ") + "]"
+    }
+    
 }
 
 extension Clock : CustomDebugStringConvertible {
