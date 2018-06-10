@@ -320,7 +320,21 @@ public final class PWMChannel {
 extension PWMChannel : CustomDebugStringConvertible {
     
     public var debugDescription: String {
-        return "<\(type(of: self)) \(number) mode: \(mode), range: \(range), data: \(data)>"
+        var parts: [String] = []
+
+        parts.append("\(type(of: self)) \(number)")
+        if isEnabled { parts.append("enabled") }
+        parts.append("mode: \(mode)")
+        parts.append("range: \(range)")
+        parts.append("data: \(data)")
+        if silenceBit != .low { parts.append("silenceBit: \(silenceBit)") }
+        if invertPolarity { parts.append("invertPolarity") }
+        if isTransmitting { parts.append("transmitting") }
+        if gapOccurred { parts.append("gapOccurred") }
+        if useFifo { parts.append("useFifo") }
+        if repeatLastData { parts.append("repeatLastData")}
+        
+        return "<" + parts.joined(separator: ", ") + ">"
     }
     
 }

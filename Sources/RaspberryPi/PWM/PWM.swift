@@ -234,7 +234,12 @@ public final class PWM : MappedPeripheral, Collection {
 extension PWM : CustomDebugStringConvertible {
     
     public var debugDescription: String {
-        return "<\(type(of: self)) control: \(registers.pointee.control), status: \(registers.pointee.status)>"
+        var parts: [String] = []
+        
+        parts.append("\(type(of: self)) control: \(registers.pointee.control)")
+        parts.append("status: \(registers.pointee.status)")
+        
+        return "<" + parts.joined(separator: ", ") + ">"
     }
     
 }
