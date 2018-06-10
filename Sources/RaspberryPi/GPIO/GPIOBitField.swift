@@ -46,7 +46,7 @@ public struct GPIOBitField : Equatable, Hashable {
         set {
             let shift = index % 32
             let mask = UInt32.mask(except: 1, offset: shift)
-            let bits: UInt32 = newValue ? 1 << shift : 0
+            let bits = UInt32.mask(bits: newValue ? 1 : 0, offset: shift)
             
             switch index / 32 {
             case 0: field0 = field0 & mask | bits
