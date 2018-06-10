@@ -194,14 +194,17 @@ public final class GPIOPin {
 extension GPIOPin : CustomDebugStringConvertible {
     
     public var debugDescription: String {
-        var description = "<\(type(of: self)) \(number) \(function) \(value)"
-        if edgeDetect != .none { description += ", edgeDetect: \(edgeDetect)" }
-        if levelDetect != .none { description += ", levelDetect: \(levelDetect)" }
-        if asyncEdgeDetect != .none { description += ", asyncEdgeDetect: \(asyncEdgeDetect)" }
-        if isEventDetected { description += ", event" }
-        description += ">"
+        var parts: [String] = []
         
-        return description
+        parts.append("\(type(of: self)) \(number)")
+        parts.append("function: \(function)")
+        parts.append("value: \(value)")
+        if edgeDetect != .none { parts.append("edgeDetect: \(edgeDetect)") }
+        if levelDetect != .none { parts.append("levelDetect: \(levelDetect)") }
+        if asyncEdgeDetect != .none { parts.append("asyncEdgeDetect: \(asyncEdgeDetect)") }
+        if isEventDetected { parts.append("eventDetected") }
+        
+        return "<" + parts.joined(separator: ", ") + ">"
     }
     
 }
