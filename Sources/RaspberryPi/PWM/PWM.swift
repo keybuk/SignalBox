@@ -216,15 +216,15 @@ public final class PWM : MappedPeripheral, Collection {
         set { registers.pointee.dmaConfiguration.panicThreshold = newValue }
     }
 
-    /// DREQ threshold.
+    /// Data Request threshold.
     ///
     /// When the number of data bits remaining reaches this threshold, the DREQ signal
     /// is set.
     ///
     /// This setting is shared between all PWM channels.
-    public var dreqThreshold: Int {
-        get { return registers.pointee.dmaConfiguration.dreqThreshold }
-        set { registers.pointee.dmaConfiguration.dreqThreshold = newValue }
+    public var dataRequestThreshold: Int {
+        get { return registers.pointee.dmaConfiguration.dataRequestThreshold }
+        set { registers.pointee.dmaConfiguration.dataRequestThreshold = newValue }
     }
 
 }

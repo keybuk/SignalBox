@@ -12,7 +12,7 @@ import Util
 /// Provides an type conforming to `OptionSet` that allows direct manipulation of the PWM DMA
 /// configuration registers as a set of enumerated constants.
 ///
-///     var config: PWMDMAConfiguration = [ .enabled, .panicThreshold(15)., dreqThreshold(15) ]
+///     var config: PWMDMAConfiguration = [ .enabled, .panicThreshold(15)., dataRequestThreshold(15) ]
 ///     pwm.registers.dmaConfiguration.pointee = config
 ///
 public struct PWMDMAConfiguration : OptionSet, Equatable, Hashable {
@@ -30,7 +30,7 @@ public struct PWMDMAConfiguration : OptionSet, Equatable, Hashable {
         return PWMDMAConfiguration(rawValue: UInt32(threshold) << 8)
     }
     
-    public static func dreqThreshold(_ threshold: Int) -> PWMDMAConfiguration {
+    public static func dataRequestThreshold(_ threshold: Int) -> PWMDMAConfiguration {
         assert(threshold >= 0 && threshold < (1 << 8), "threshold out of range")
         return PWMDMAConfiguration(rawValue: UInt32(threshold))
     }
@@ -48,10 +48,10 @@ public struct PWMDMAConfiguration : OptionSet, Equatable, Hashable {
         }
     }
     
-    /// DREQ threshold.
+    /// Data Request threshold.
     ///
     /// This is an internal method, access is provided through `PWM`.
-    internal var dreqThreshold: Int {
+    internal var dataRequestThreshold: Int {
         get {
             return Int(rawValue & UInt32.mask(bits: 8))
         }
@@ -72,7 +72,7 @@ extension PWMDMAConfiguration : CustomDebugStringConvertible {
         
         if contains(.enabled) { parts.append(".enabled") }
         parts.append(".panicThreshold(\(panicThreshold))")
-        parts.append(".dreqThreshold(\(dreqThreshold))")
+        parts.append(".dataRequestThreshold(\(dataRequestThreshold))")
         
         return "[" + parts.joined(separator: ", ") + "]"
     }

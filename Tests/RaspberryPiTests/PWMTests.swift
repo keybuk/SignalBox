@@ -1080,7 +1080,7 @@ class PWMTests : XCTestCase {
         pwm.isDMAEnabled = true
 
         XCTAssertEqual(pwm.panicThreshold, 3)
-        XCTAssertEqual(pwm.dreqThreshold, 5)
+        XCTAssertEqual(pwm.dataRequestThreshold, 5)
     }
 
     /// Test that disabling DMA clears the appropriate bit.
@@ -1105,7 +1105,7 @@ class PWMTests : XCTestCase {
         pwm.isDMAEnabled = false
 
         XCTAssertEqual(pwm.panicThreshold, 3)
-        XCTAssertEqual(pwm.dreqThreshold, 5)
+        XCTAssertEqual(pwm.dataRequestThreshold, 5)
     }
 
     /// Test that isDMAEnabled is true when the appropriate bit is set.
@@ -1175,7 +1175,7 @@ class PWMTests : XCTestCase {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm.dreqThreshold = 5
+        pwm.dataRequestThreshold = 5
 
         XCTAssertEqual(registers.dmaConfiguration.rawValue & ~(~0 << 8), 5)
     }
@@ -1187,7 +1187,7 @@ class PWMTests : XCTestCase {
 
         registers.dmaConfiguration = PWMDMAConfiguration(rawValue: ~0)
 
-        pwm.dreqThreshold = 5
+        pwm.dataRequestThreshold = 5
 
         XCTAssertEqual(registers.dmaConfiguration.rawValue & ~(~0 << 8), 5)
     }
@@ -1199,7 +1199,7 @@ class PWMTests : XCTestCase {
 
         registers.dmaConfiguration = PWMDMAConfiguration(rawValue: ~0)
 
-        pwm.dreqThreshold = 5
+        pwm.dataRequestThreshold = 5
 
         XCTAssertEqual(registers.dmaConfiguration.rawValue | ~(~0 << 8), ~0)
     }
@@ -1211,7 +1211,7 @@ class PWMTests : XCTestCase {
 
         registers.dmaConfiguration = PWMDMAConfiguration(rawValue: 5)
 
-        XCTAssertEqual(pwm.dreqThreshold, 5)
+        XCTAssertEqual(pwm.dataRequestThreshold, 5)
     }
 
 }
