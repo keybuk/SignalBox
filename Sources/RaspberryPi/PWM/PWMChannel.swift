@@ -287,7 +287,7 @@ public final class PWMChannel {
     ///
     /// When `true`, if the FIFO becomes empty, the last data written to it is repeated rather
     /// than `silenceBit` being output. Has no effect when `useFifo` is `false`.
-    public var repeatFifoData: Bool {
+    public var repeatLastData: Bool {
         get {
             switch number {
             case 1: return pwm.registers.pointee.control.contains(.channel1RepeatLastData)

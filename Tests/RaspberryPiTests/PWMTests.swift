@@ -855,92 +855,92 @@ class PWMTests : XCTestCase {
     }
 
 
-    // MARK: repeatFifoData
+    // MARK: repeatLastData
 
     /// Test that repeating fifo data for channel 1 sets the appopriate bit.
-    func testSetOneRepeatFifoData() {
+    func testSetOneRepeatLastData() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm[1].repeatFifoData = true
+        pwm[1].repeatLastData = true
 
         XCTAssertEqual((registers.control.rawValue >> 2) & 1, 1)
     }
 
     /// Test that silence for channel 1 clears the appropriate bit.
-    func testClearOneRepeatFifoData() {
+    func testClearOneRepeatLastData() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         // Corrupt the register to ensure bits are cleared.
         registers.control = PWMControl(rawValue: ~0)
 
-        pwm[1].repeatFifoData = false
+        pwm[1].repeatLastData = false
 
         XCTAssertEqual((registers.control.rawValue >> 2) & 1, 0)
     }
 
-    /// Test that repeatFifoData is true for channel 1 when the appropriate bit is set.
-    func testGetOneRepeatFifoData() {
+    /// Test that repeatLastData is true for channel 1 when the appropriate bit is set.
+    func testGetOneRepeatLastData() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         registers.control = PWMControl(rawValue: 1 << 2)
 
-        XCTAssertEqual(pwm[1].repeatFifoData, true)
+        XCTAssertEqual(pwm[1].repeatLastData, true)
     }
 
-    /// Test that repeatFifoData is false for channel 1 when the appropriate bit is not set.
-    func testDefaultOneRepeatFifoData() {
+    /// Test that repeatLastData is false for channel 1 when the appropriate bit is not set.
+    func testDefaultOneRepeatLastData() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         registers.control = PWMControl(rawValue: 0)
 
-        XCTAssertEqual(pwm[1].repeatFifoData, false)
+        XCTAssertEqual(pwm[1].repeatLastData, false)
     }
 
     /// Test that repeating fifo data for channel 2 sets the appopriate bit.
-    func testSetTwoRepeatFifoData() {
+    func testSetTwoRepeatLastData() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
-        pwm[2].repeatFifoData = true
+        pwm[2].repeatLastData = true
 
         XCTAssertEqual((registers.control.rawValue >> 10) & 1, 1)
     }
 
     /// Test that silence for channel 2 clears the appropriate bit.
-    func testClearTwoRepeatFifoData() {
+    func testClearTwoRepeatLastData() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         // Corrupt the register to ensure bits are cleared.
         registers.control = PWMControl(rawValue: ~0)
 
-        pwm[2].repeatFifoData = false
+        pwm[2].repeatLastData = false
 
         XCTAssertEqual((registers.control.rawValue >> 10) & 1, 0)
     }
 
-    /// Test that repeatFifoData is true for channel 2 when the appropriate bit is set.
-    func testGetTwoRepeatFifoData() {
+    /// Test that repeatLastData is true for channel 2 when the appropriate bit is set.
+    func testGetTwoRepeatLastData() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         registers.control = PWMControl(rawValue: 1 << 10)
 
-        XCTAssertEqual(pwm[2].repeatFifoData, true)
+        XCTAssertEqual(pwm[2].repeatLastData, true)
     }
 
-    /// Test that repeatFifoData is false for channel 2 when the appropriate bit is not set.
-    func testDefaultTwoRepeatFifoData() {
+    /// Test that repeatLastData is false for channel 2 when the appropriate bit is not set.
+    func testDefaultTwoRepeatLastData() {
         var registers = PWM.Registers()
         let pwm = PWM(registers: &registers)
 
         registers.control = PWMControl(rawValue: 0)
 
-        XCTAssertEqual(pwm[2].repeatFifoData, false)
+        XCTAssertEqual(pwm[2].repeatLastData, false)
     }
 
 
