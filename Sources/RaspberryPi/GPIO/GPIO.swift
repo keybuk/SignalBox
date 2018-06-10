@@ -49,7 +49,7 @@ public final class GPIO : MappedPeripheral, Collection {
         public var lowDetectEnable: GPIOBitField
         public var asyncRisingEdgeDetectEnable: GPIOBitField
         public var asyncFallingEdgeDetectEnable: GPIOBitField
-        public var pullUpDownEnable: GPIOPullUpDown
+        public var pullUpDownEnable: UInt32
         public var pullUpDownEnableClock: GPIOBitField
 
         // For testing.
@@ -65,7 +65,7 @@ public final class GPIO : MappedPeripheral, Collection {
             lowDetectEnable = GPIOBitField()
             asyncRisingEdgeDetectEnable = GPIOBitField()
             asyncFallingEdgeDetectEnable = GPIOBitField()
-            pullUpDownEnable = .disabled
+            pullUpDownEnable = 0
             pullUpDownEnableClock = GPIOBitField()
         }
     }
@@ -127,7 +127,7 @@ public final class GPIO : MappedPeripheral, Collection {
     ///
     public var pullUpDownEnable: GPIOPullUpDown {
         get { return .disabled }
-        set { registers.pointee.pullUpDownEnable = newValue }
+        set { registers.pointee.pullUpDownEnable = newValue.rawValue }
     }
 
 }
