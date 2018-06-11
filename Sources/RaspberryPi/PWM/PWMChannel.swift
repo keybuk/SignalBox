@@ -101,15 +101,16 @@ public final class PWMChannel {
     /// `data` of from the FIRO.
     ///
     /// In PWM mode the range and data define a ratio of time, the output will be high during
-    /// the `range` portion and low during the remainder of `data`. Durations are as short as
-    /// possible.
+    /// the `data` portion and low during the remainder of `range`. The duration of `data`
+    /// lasts for one clock cycle, and the duration of the remainder lasts for whatever the ratio
+    /// demands.
     ///
-    /// In Mark-space mode `range` bits of one cycle each will be output high, while the
-    /// remainder of `data` bits will be output low.
+    /// In Mark-space mode `data` bits of one cycle each will be output high, while the
+    /// remainder of `range` bits will be output low.
     ///
-    /// In Serialiser mode `range` defines the number of bits of `data` that will be transmitted,
-    /// with the high or low state determined by `data`. In this mode ranges over a value of 32
-    /// result in padding zeros at the end of data.
+    /// In Serializer mode `range` defines the number of most-significant bits of `data` that will
+    /// be transmitted, with the high or low state determined by `data`. In this mode ranges over
+    /// a value of 32 result in padding zeros at the end of data.
     public var range: UInt32 {
         get {
             switch number {
@@ -132,11 +133,17 @@ public final class PWMChannel {
     /// The behavior of channel data depends on the `mode` of the PWM, and works with the value in
     /// `range`. In addition, data is unused when `useFifo` is `true`.
     ///
-    /// In PWM mode `data` defines the total duration of a pulse as a ratio compared to `range`.
+    /// In PWM mode the range and data define a ratio of time, the output will be high during
+    /// the `data` portion and low during the remainder of `range`. The duration of `data`
+    /// lasts for one clock cycle, and the duration of the remainder lasts for whatever the ratio
+    /// demands.
     ///
-    /// In Mark-space mode `data` defines the total duration of a pulse as a number of bits.
+    /// In Mark-space mode `data` bits of one cycle each will be output high, while the
+    /// remainder of `range` bits will be output low.
     ///
-    /// In Serialiser mode `data` defines the actual bits output, limited to `range` bits.
+    /// In Serializer mode `range` defines the number of most-significant bits of `data` that will
+    /// be transmitted, with the high or low state determined by `data`. In this mode ranges over
+    /// a value of 32 result in padding zeros at the end of data.
     public var data: UInt32 {
         get {
             switch number {
