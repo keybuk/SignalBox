@@ -75,8 +75,12 @@ public struct ClockDivisor : RawRepresentable, Equatable, Hashable, CustomString
         }
     }
     
+    /// Float equivalent of the divisor.
+    public var floatValue: Float {
+        return Float(integer) + Float(fractional) / 4096
+    }
+    
     public var description: String {
-        let floatValue = Float(integer) + Float(fractional) / 4096
         return floatValue.description
     }
     

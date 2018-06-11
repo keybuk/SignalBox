@@ -760,6 +760,26 @@ class ClockTests : XCTestCase {
             }
         }
     }
+    
+    
+    // MARK: Divisor floatValue
+    
+    /// Test that can we get the float value of a divisor.
+    func testDivisorFloatValue() {
+        clock[.generalPurpose0].divisor = ClockDivisor(upperBound: 28.3)
+        
+        XCTAssertEqual(clock[.generalPurpose0].divisor.floatValue, 28.2998, accuracy: 0.0001)
+    }
+
+    
+    // MARK: Divisor string value
+    
+    /// Test that can we turn the divisor into a string.
+    func testDivisorDescriptioon() {
+        clock[.generalPurpose0].divisor = ClockDivisor(upperBound: 28.3)
+        
+        XCTAssertEqual("\(clock[.generalPurpose0].divisor)", "\(28.2998 as Float)")
+    }
 
 }
 
