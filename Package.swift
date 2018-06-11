@@ -1,8 +1,13 @@
 // swift-tools-version:4.0
 import PackageDescription
 
-var package = Package(
+let package = Package(
     name: "SignalBox",
+    products: [
+        .library(name: "Util", targets: ["RaspberryPi"]),
+        .library(name: "RaspberryPi", targets: ["RaspberryPi"]),
+        .library(name: "DCC", targets: ["DCC"]),
+        ],
     targets: [
         .target(name: "Util"),
         .testTarget(name: "UtilTests", dependencies: ["Util"]),
@@ -18,7 +23,3 @@ var package = Package(
         .target(name: "OldPrototype", dependencies: ["OldRaspberryPi", "OldDCC"]),
         ]
 )
-
-#if os(Linux)
-package.dependencies.append(.package(url: "https://github.com/mdaxter/CBSD", from: "1.0.0"))
-#endif
