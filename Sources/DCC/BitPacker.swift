@@ -16,7 +16,7 @@ public typealias BytePacker = BitPacker<UInt8>
 ///
 /// In addition to the serial `Packer` conformance, values can be added at fields with specific
 /// positions within a byte.
-public struct BitPacker<ResultType : FixedWidthInteger> : Packer, CustomDebugStringConvertible {
+public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
     
     /// Packed bytes.
     public var bytes: [ResultType]
@@ -26,11 +26,6 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer, CustomDebugStr
     
     public init() {
         bytes = []
-    }
-    
-    public var debugDescription: String {
-        let bitsString = bytes.map({ $0.binaryString }).joined(separator: " ")
-        return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
     
     /// Add a field with the contents of a value.
@@ -125,4 +120,15 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer, CustomDebugStr
         }
     }
     
+}
+
+// MARK: Debugging
+
+extension BitPacker : CustomDebugStringConvertible {
+
+    public var debugDescription: String {
+        let bitsString = bytes.map({ $0.binaryString }).joined(separator: " ")
+        return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
+    }
+
 }

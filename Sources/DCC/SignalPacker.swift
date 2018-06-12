@@ -15,7 +15,7 @@ import Util
 /// Put simply, when initialized with a `SignalTiming.pulseWidth` of 1ms, a packed 1 bit value
 /// results in an output of 58 consecutive 1 bits, followed by 58 consecutive 0 bits, representing
 /// the PWM pulse of the duration expected.
-public struct SignalPacker : Packer, CustomDebugStringConvertible {
+public struct SignalPacker : Packer {
     
     public typealias Word = UInt32
     
@@ -31,11 +31,6 @@ public struct SignalPacker : Packer, CustomDebugStringConvertible {
     public init(timing: SignalTiming) {
         self.timing = timing
         words = []
-    }
-    
-    public var debugDescription: String {
-        let bitsString = words.map({ $0.binaryString }).joined(separator: " ")
-        return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
     
     /// Duration in microseconds of the output.
@@ -94,4 +89,15 @@ public struct SignalPacker : Packer, CustomDebugStringConvertible {
         } while pulseLength > 0
     }
     
+}
+
+// MARK: Debugging
+
+extension SignalPacker : CustomDebugStringConvertible {
+
+    public var debugDescription: String {
+        let bitsString = words.map({ $0.binaryString }).joined(separator: " ")
+        return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
+    }
+
 }
