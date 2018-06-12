@@ -403,3 +403,29 @@ public struct DMAControlBlock : Equatable, Hashable {
     }
 
 }
+
+// MARK: Debugging
+
+extension DMAControlBlock : CustomDebugStringConvertible {
+
+    public var debugDescription: String {
+        var parts: [String] = []
+
+        parts.append("\(type(of: self)) \(transferInformation)")
+        parts.append("sourceAddress: \(sourceAddress.hexString)")
+        parts.append("destinationAddress:: \(destinationAddress.hexString)")
+        if is2D {
+            parts.append("yLength: \(yLength)")
+            parts.append("xLength: \(xLength)")
+            parts.append("sourceStride: \(sourceStride)")
+            parts.append("destinationStride: \(destinationStride)")
+        } else {
+            parts.append("transferLength: \(transferLength)")
+            parts.append("stride: \(stride)")
+        }
+        parts.append("nextControlBlockAddress: \(nextControlBlockAddress.hexString)")
+
+        return "<" + parts.joined(separator: ", ") + ">"
+    }
+
+}
