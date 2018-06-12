@@ -256,7 +256,7 @@ public final class DMAChannel {
     /// - Note:
     ///   Setting the value to false actually writes 1 to the underlying bit; the interface is
     ///   intended to be more programatic than the underlying hardware register.
-    var isReadError: Bool {
+    public var isReadError: Bool {
         get { return registers.pointee.debug.contains(.readError) }
         set {
             if !newValue {
@@ -272,7 +272,7 @@ public final class DMAChannel {
     /// - Note:
     ///   Setting the value to false actually writes 1 to the underlying bit; the interface is
     ///   intended to be more programatic than the underlying hardware register.
-    var isFifoError: Bool {
+    public var isFifoError: Bool {
         get { return registers.pointee.debug.contains(.fifoError) }
         set {
             if !newValue {
@@ -289,7 +289,7 @@ public final class DMAChannel {
     /// - Note:
     ///   Setting the value to false actually writes 1 to the underlying bit; the interface is
     ///   intended to be more programatic than the underlying hardware register.
-    var isReadLastNotSetError: Bool {
+    public var isReadLastNotSetError: Bool {
         get { return registers.pointee.debug.contains(.readLastNotSetError) }
         set {
             if !newValue {
