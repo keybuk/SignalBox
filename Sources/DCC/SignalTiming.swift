@@ -180,3 +180,13 @@ public struct SignalTiming {
     }
 
 }
+
+// MARK: Debugging
+
+extension SignalTiming : CustomDebugStringConvertible {
+
+    public var debugDescription: String {
+        return "<\(type(of: self)) \(pulseWidth)µs, 1: \(oneBitLength), 0: \(zeroBitLength)>"
+    }
+
+}
