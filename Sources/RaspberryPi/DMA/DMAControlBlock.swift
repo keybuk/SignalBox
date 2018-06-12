@@ -64,8 +64,12 @@ public struct DMAControlBlock : Equatable, Hashable {
 
     private var reserved0: UInt32
     private var reserved1: UInt32
-    
-    public static var stopAddress = 0
+
+    /// Control block address to stop transfer.
+    ///
+    /// Assign this value to `nextControlBlockAddress` to indicate the final control block in a
+    /// transfer.
+    public static var stopAddress: UInt32 = 0
     
     public init() {
         transferInformation = DMATransferInformation()
