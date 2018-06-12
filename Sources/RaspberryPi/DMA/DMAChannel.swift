@@ -310,7 +310,7 @@ extension DMAChannel : CustomDebugStringConvertible {
         let register = dma.registers[number].pointee
         parts.append("\(type(of: self)) \(number) \(isEnabled ? "enabled" : "disabled") \(register.controlStatus)")
         if let controlBlock = controlBlock {
-            parts.append("controlBlock: \(String(register.controlBlockAddress, radix: 16)) \(controlBlock)")
+            parts.append("controlBlock: \(register.controlBlockAddress.hexString) \(controlBlock)")
         }
         parts.append("debug: \(register.debug)")
         
