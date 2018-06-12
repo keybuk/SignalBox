@@ -47,7 +47,7 @@ public final class UncachedMemory {
     ///
     /// - Throws: `Mailbox.Error` or `OSError` on failure.
     public init(minimumSize: Int) throws {
-        size = Int(PAGE_SIZE) * (((minimumSize - 1) / Int(PAGE_SIZE)) + 1)
+        size = Int(PAGE_SIZE) * ((minimumSize - 1) / Int(PAGE_SIZE) + 1)
 
         let memoryDevice = try MemoryDevice()
         let mailbox = try Mailbox()
