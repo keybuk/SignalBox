@@ -8,7 +8,6 @@
 
 import Foundation
 
-import OldRaspberryPi
 import OldDCC
 
 let locoAddress: Address = 3
@@ -56,10 +55,9 @@ func functionPacket(_ function: Int, value: Bool) -> Packet {
     }
 }
 
-let raspberryPi = try RaspberryPi()
-
-var driver = Driver(raspberryPi: raspberryPi)
-driver.startup()
+var driver = Driver()
+try
+    driver.startup()
 
 var startupBitstream = Bitstream(bitDuration: driver.bitDuration)
 for _ in 0..<20 {
@@ -143,7 +141,7 @@ loop: while true {
 
 // This is a bit scrappy now, but we'll be in a main loop eventually, so this will all make sense.
 try driver.stop {
-    driver.shutdown()
+    try! driver.shutdown()
     exit(0)
 }
 

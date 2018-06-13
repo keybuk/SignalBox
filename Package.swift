@@ -18,8 +18,7 @@ let package = Package(
         .target(name: "DCC", dependencies: ["Util"]),
         .testTarget(name: "DCCTests", dependencies: ["DCC"]),
 
-        .target(name: "OldRaspberryPi"),
-        .target(name: "OldDCC", dependencies: ["OldRaspberryPi"]),
-        .target(name: "OldPrototype", dependencies: ["OldRaspberryPi", "OldDCC"]),
+        .target(name: "OldDCC", dependencies: ["Util", "RaspberryPi"]),
+        .target(name: "OldPrototype", dependencies: ["OldDCC"]),
         ]
 )

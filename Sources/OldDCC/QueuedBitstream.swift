@@ -6,8 +6,8 @@
 //
 //
 
-import OldRaspberryPi
-
+import RaspberryPi
+import Util
 
 /// Errors that can be thrown by bitstream parsing.
 public enum QueuedBitstreamError : Error {
@@ -28,14 +28,6 @@ public enum QueuedBitstreamError : Error {
 /// The principle difficulty is that the PWM doesn't immediately begin outputting the word written after a DREQ, which requires that associated GPIO events such as the RailCom cutout and Debug period have to be delayed relative to the words they are intended to accompany. This ultimately requires in some cases that the bitstream loop be partially or even completely unrolled in order to generate a correct repeating output.
 public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     
-    /// Raspberry Pi hardware information.
-    public let raspberryPi: RaspberryPi
-    
-    /// Size of words.
-    ///
-    /// Generally the platform's word size, but can be overriden at initialization for testing purposes.
-    let wordSize: Int
-    
     /// DMA Control Blocks parsed from the bitstream.
     ///
     /// Since the physical uncached addresses are not yet known, the values of `sourceAddress` are offsets in bytes from the start of the `data` array; and the values of `destinationAddress`, and `nextControlBlockAddress` are offsets in bytes from the start of the `controlBlocks` array if they are below `RaspberryPi.peripheralBusAddress`.
@@ -44,18 +36,12 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     /// Data parsed from the bitstream.
     ///
     /// The first value is always the flag used by the start and end control blocks and begins as zero.
-    public private(set) var data: [Int] = [ 0 ]
+    public private(set) var data: [UInt32] = [ 0 ]
     
     /// Breakpoints that were present in the bitstream.
     public private(set) var breakpoints: [Breakpoint] = []
     
-    init(raspberryPi: RaspberryPi, wordSize: Int) {
-        self.raspberryPi = raspberryPi
-        self.wordSize = wordSize
-    }
-    
-    public init(raspberryPi: RaspberryPi) {
-        self.init(raspberryPi: raspberryPi, wordSize: MemoryLayout<Int>.size * 8)
+    public init() {
     }
     
     /// Adds a DMA Control Block for the start of a bitstream.
@@ -64,11 +50,11 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     mutating func addControlBlockForStart() {
         controlBlocks.append(DMAControlBlock(
             transferInformation: [ .waitForWriteResponse ],
-            sourceAddress: MemoryLayout<Int>.stride * data.count,
+            sourceAddress: UInt32(MemoryLayout<UInt32>.stride * data.count),
             destinationAddress: 0,
-            transferLength: MemoryLayout<Int>.stride,
-            tdModeStride: 0,
-            nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1)))
+            transferLength: UInt32(MemoryLayout<UInt32>.stride),
+            stride: 0,
+            nextControlBlockAddress: UInt32(MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1))))
         data.append(1)
     }
     
@@ -78,12 +64,12 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     mutating func addControlBlockForEnd() {
         controlBlocks.append(DMAControlBlock(
             transferInformation: [ .waitForWriteResponse ],
-            sourceAddress: MemoryLayout<Int>.stride * data.count,
+            sourceAddress: UInt32(MemoryLayout<UInt32>.stride * data.count),
             destinationAddress: 0,
-            transferLength: MemoryLayout<Int>.stride,
-            tdModeStride: 0,
-            nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1)))
-        data.append(-1)
+            transferLength: UInt32(MemoryLayout<UInt32>.stride),
+            stride: 0,
+            nextControlBlockAddress: UInt32(MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1))))
+        data.append(~0)
     }
     
     /// Adds a DMA Control Block and accompanying data for a section of bitstream data.
@@ -92,14 +78,14 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     ///
     /// - Parameters:
     ///   - words: data to be written to the PWM FIFO.
-    mutating func addControlBlockForData(_ words: [Int]) {
+    mutating func addControlBlockForData(_ words: [UInt32]) {
         controlBlocks.append(DMAControlBlock(
-            transferInformation: [ .noWideBursts, .peripheralMapping(.pwm), .sourceAddressIncrement, .destinationDREQ, .waitForWriteResponse ],
-            sourceAddress: MemoryLayout<Int>.stride * data.count,
-            destinationAddress: raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset,
-            transferLength: MemoryLayout<Int>.stride * words.count,
-            tdModeStride: 0,
-            nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1)))
+            transferInformation: [ .noWideBursts, .peripheral(.pwm), .incrementSourceAddress, .destinationWaitsForDataRequest, .waitForWriteResponse ],
+            sourceAddress: UInt32(MemoryLayout<UInt32>.stride * data.count),
+            destinationAddress: PWM.busAddress + 0x18,
+            transferLength: UInt32(MemoryLayout<UInt32>.stride * words.count),
+            stride: 0,
+            nextControlBlockAddress: UInt32(MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1))))
         data.append(contentsOf: words)
     }
     
@@ -109,14 +95,14 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     ///
     /// - Parameters:
     ///   - range: new range in bits.
-    mutating func addControlBlockForRange(_ range: Int) {
+    mutating func addControlBlockForRange(_ range: UInt32) {
         controlBlocks.append(DMAControlBlock(
-            transferInformation: [ .noWideBursts, .peripheralMapping(.pwm), .destinationDREQ, .waitForWriteResponse ],
-            sourceAddress: MemoryLayout<Int>.stride * data.count,
-            destinationAddress: raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset,
-            transferLength: MemoryLayout<Int>.stride,
-            tdModeStride: 0,
-            nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1)))
+            transferInformation: [ .noWideBursts, .peripheral(.pwm), .destinationWaitsForDataRequest, .waitForWriteResponse ],
+            sourceAddress: UInt32(MemoryLayout<UInt32>.stride * data.count),
+            destinationAddress: PWM.busAddress + 0x10,
+            transferLength: UInt32(MemoryLayout<UInt32>.stride),
+            stride: 0,
+            nextControlBlockAddress: UInt32(MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1))))
         data.append(range)
     }
     
@@ -152,18 +138,27 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         
         // Write out the GPIO control block specially. Each Set/Clear register cluster is two 32-bit integers long, and separated by one 32-bit integer.
         // Use the 2D Mode Stride function to arrange this, writing 2 × 2 words, with a 1 word stride at the destination but not the source.
-        controlBlocks.append(DMAControlBlock(
-            transferInformation: [ .noWideBursts, .peripheralMapping(.pwm), .sourceAddressIncrement, .destinationAddressIncrement, .destinationDREQ, .tdMode, .waitForWriteResponse ],
-            sourceAddress: MemoryLayout<Int>.stride * data.count,
-            destinationAddress: raspberryPi.peripheralBusAddress + GPIO.offset + GPIO.outputSetOffset,
-            transferLength: DMAControlBlock.tdTransferLength(x: MemoryLayout<Int>.stride * 2, y: 2),
-            tdModeStride: DMAControlBlock.tdModeStride(source: 0, destination: MemoryLayout<Int>.stride),
-            nextControlBlockAddress: MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1)))
+        var controlBlock = DMAControlBlock()
+        controlBlock.transferInformation = [ .noWideBursts, .peripheral(.pwm), .incrementSourceAddress, .incrementDestinationAddress, .destinationWaitsForDataRequest, .waitForWriteResponse ]
+        controlBlock.sourceAddress = UInt32(MemoryLayout<UInt32>.stride * data.count)
+        controlBlock.destinationAddress = GPIO.busAddress + 0x1c
+        controlBlock.is2D = true
+        controlBlock.xLength = MemoryLayout<UInt32>.stride * 2
+        controlBlock.yLength = 2
+        controlBlock.sourceStride = 0
+        controlBlock.destinationStride = MemoryLayout<UInt32>.stride
+        controlBlock.nextControlBlockAddress = UInt32(MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1))
+        controlBlocks.append(controlBlock)
+
+        data.append(0)
+        data.append(0)
+        data.append(0)
+        data.append(0)
         
-        data.append(gpioSet.field0)
-        data.append(gpioSet.field1)
-        data.append(gpioClear.field0)
-        data.append(gpioClear.field1)
+//        data.append(gpioSet.field0)
+//        data.append(gpioSet.field1)
+//        data.append(gpioClear.field0)
+//        data.append(gpioClear.field1)
     }
     
     /// Adjusts the last control block's `nextControlBlockAddress`.
@@ -174,7 +169,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         assert(!controlBlocks.isEmpty, "Cannot be called without control blocks.")
 
         // Since we never repeat back to the start control block, we can use the value zero as a placeholder for the stop address.
-        controlBlocks[controlBlocks.index(before: controlBlocks.endIndex)].nextControlBlockAddress = MemoryLayout<DMAControlBlock>.stride * (next ?? 0)
+        controlBlocks[controlBlocks.index(before: controlBlocks.endIndex)].nextControlBlockAddress = UInt32(MemoryLayout<DMAControlBlock>.stride * (next ?? 0))
     }
     
     /// Offsets of control block written out for the bitstream.
@@ -194,7 +189,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         let index: Array<Bitstream>.Index
         
         /// Current value of the range, or 0 to match anything.
-        let range: Int
+        let range: UInt32
         
         /// Set of delayed events.
         let delayedEvents: DelayedEvents
@@ -287,7 +282,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         var delayedEvents = breakpoint.map({ $0.delayedEvents }) ?? DelayedEvents()
         
         // For efficiency, we collect multiple consecutive words of data together into a single control block, and only break where necessary. For loop unrolling we track the bitstream state at the point that the `words` array began.
-        var words: [Int] = []
+        var words: [UInt32] = []
         var wordsState: BitstreamState?
         
         // After we exit the loop, the `loopControlBlockOffset` contains the offset of the appropriate control block index to jump to.
@@ -338,9 +333,9 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
                     wordsState = nil
 
                     // Follow with a range change if the size of the final word doesn't match its current value.
-                    if size != range {
-                        addControlBlockForRange(size)
-                        range = size
+                    if UInt32(size) != range {
+                        addControlBlockForRange(UInt32(size))
+                        range = UInt32(size)
                     }
                     
                     // Follow with a GPIO control block if events became due.
@@ -405,7 +400,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     /// Memory region containing copy of bitstream in uncached memory.
     ///
     /// The value is `nil` until `commit()` is called.
-    public private(set) var memory: MemoryRegion?
+    public private(set) var memory: UncachedMemory?
     
     /// Make the bitstream available to the DMA engine.
     ///
@@ -415,18 +410,18 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     ///   `MailboxError` or `RaspberryPiError` if the memory region cannot be allocated.
     public mutating func commit() throws {
         guard self.memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
-        
+
         let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
-        let dataSize = MemoryLayout<Int>.stride * data.count
-        
-        let memory = try raspberryPi.allocateUncachedMemory(minimumSize: controlBlocksSize + dataSize)
-        
+        let dataSize = MemoryLayout<UInt32>.stride * data.count
+
+        let memory = try UncachedMemory(minimumSize: controlBlocksSize + dataSize)
+
         for index in controlBlocks.indices {
-            if controlBlocks[index].sourceAddress < raspberryPi.peripheralBusAddress {
-                controlBlocks[index].sourceAddress += memory.busAddress + controlBlocksSize
+            if controlBlocks[index].sourceAddress < RaspberryPi.peripheralBusAddress {
+                controlBlocks[index].sourceAddress += memory.busAddress + UInt32(controlBlocksSize)
             }
-            if controlBlocks[index].destinationAddress < raspberryPi.peripheralBusAddress {
-                controlBlocks[index].destinationAddress += memory.busAddress + controlBlocksSize
+            if controlBlocks[index].destinationAddress < RaspberryPi.peripheralBusAddress {
+//                controlBlocks[index].destinationAddress += memory.busAddress + UInt32(controlBlocksSize)
             }
             if controlBlocks[index].nextControlBlockAddress > 0 {
                 controlBlocks[index].nextControlBlockAddress += memory.busAddress
@@ -434,10 +429,10 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
                 controlBlocks[index].nextControlBlockAddress = DMAControlBlock.stopAddress
             }
         }
-        
+
         memory.pointer.initializeMemory(as: DMAControlBlock.self, from: controlBlocks, count: controlBlocks.count)
-        memory.pointer.advanced(by: controlBlocksSize).initializeMemory(as: Int.self, from: data, count: data.count)
-        
+        memory.pointer.advanced(by: controlBlocksSize).initializeMemory(as: UInt32.self, from: data, count: data.count)
+
         self.memory = memory
         self.controlBlockOffsets.removeAll()
     }
@@ -447,7 +442,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     /// This address is within the “‘C’ Alias” and may be handed directly to hardware such as the DMA Engine. To obtain an equivalent address outside the alias, remove RaspberryPi.uncachedAliasBusAddress from this value.
     ///
     /// This value is only available once `commit()` has been called.
-    public var busAddress: Int {
+    public var busAddress: UInt32 {
         guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
         return memory.busAddress
     }
@@ -459,7 +454,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
         
         let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
-        let uncachedData = memory.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: Int.self)
+        let uncachedData = memory.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: UInt32.self)
         
         return uncachedData[0] != 0
     }
@@ -473,9 +468,9 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         guard let memory = memory else { fatalError("Queued bitstream has not been committed to uncached memory.") }
         
         let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
-        let uncachedData = memory.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: Int.self)
+        let uncachedData = memory.pointer.advanced(by: controlBlocksSize).assumingMemoryBound(to: UInt32.self)
         
-        return uncachedData[0] < 0
+        return uncachedData[0] == ~0
     }
     
     /// Parse a bitstream for transferring from another.
@@ -531,8 +526,8 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         // Set the nextControlBlockAddress for each end control block to the associated new transfer offset.
         // We can do this at any time, since these mark the point at which we would be repeating our transmission, and it's always okay to send just one full copy.
         for (breakpoint, transferOffset) in zip(breakpoints, transferOffsets) {
-            if uncachedControlBlocks[breakpoint.controlBlockOffset].destinationAddress == busAddress + controlBlocksSize {
-                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = nextBitstream.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffset
+            if uncachedControlBlocks[breakpoint.controlBlockOffset].destinationAddress == busAddress + UInt32(controlBlocksSize) {
+                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = nextBitstream.busAddress + UInt32(MemoryLayout<DMAControlBlock>.stride * transferOffset)
             }
         }
         
@@ -544,7 +539,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         // - if we were not repeating, but are now, and we caught it at an end control block, we transmit exactly one full copy and just cost a little time setting these blocks which aren't going to be used.
         if isRepeating {
             for (breakpoint, transferOffset) in zip(breakpoints, transferOffsets) {
-                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = nextBitstream.busAddress + MemoryLayout<DMAControlBlock>.stride * transferOffset
+                uncachedControlBlocks[breakpoint.controlBlockOffset].nextControlBlockAddress = nextBitstream.busAddress + UInt32(MemoryLayout<DMAControlBlock>.stride * transferOffset)
             }
         }
     }
@@ -556,23 +551,23 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         var description = "QueuedBitstream:\n"
         
         // Adjust the base of the addresses depending on whether commit() has been called or not.
-        let controlBlocksBase: Int
-        let dataBase: Int
+        let controlBlocksBase: UInt32
+        let dataBase: UInt32
         if let memory = memory {
             controlBlocksBase = memory.busAddress
-            dataBase = memory.busAddress + MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
+            dataBase = memory.busAddress + UInt32(MemoryLayout<DMAControlBlock>.stride * controlBlocks.count)
             
-            description += "  committed at " + String(UInt(bitPattern: memory.busAddress), radix: 16) + "\n"
+            description += "  committed at \(memory.busAddress.hexString)\n"
         } else {
             controlBlocksBase = 0
             dataBase = 0
         }
         
         for (offset, controlBlock) in controlBlocks.enumerated() {
-            let dataIndex = (controlBlock.sourceAddress - dataBase) / MemoryLayout<Int>.stride
-            let dataSize = controlBlock.transferLength / MemoryLayout<Int>.stride
+            let dataIndex = Int((controlBlock.sourceAddress - dataBase) / UInt32(MemoryLayout<UInt32>.stride))
+            let dataSize = Int(controlBlock.transferLength / UInt32(MemoryLayout<UInt32>.stride))
             
-            let next = controlBlock.nextControlBlockAddress == 0 ? "⏚" : "\((controlBlock.nextControlBlockAddress - controlBlocksBase) / MemoryLayout<DMAControlBlock>.stride)"
+            let next = controlBlock.nextControlBlockAddress == 0 ? "⏚" : "\((controlBlock.nextControlBlockAddress - controlBlocksBase) / UInt32(MemoryLayout<DMAControlBlock>.stride))"
             let bp = breakpoints.filter({ $0.controlBlockOffset == offset }).isEmpty ? "" : " ◆"
 
             switch controlBlock.destinationAddress {
@@ -581,39 +576,40 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
                 switch data[dataIndex] {
                 case 1:
                     description += "  \(offset): Start → \(next)\(bp)\n"
-                case -1:
+                case ~0:
                     description += "  \(offset): End → \(next)\(bp)\n"
                 default:
                     description += "  \(offset): Unknown start/end \(data[dataIndex]) → \(next)\(bp)\n"
                 }
-            case raspberryPi.peripheralBusAddress + PWM.offset + PWM.fifoInputOffset:
+            case PWM.busAddress + 0x18:
                 // PWM Data.
                 description += "  \(offset): Data → \(next)\(bp)\n"
-                for i in dataIndex..<(dataIndex + dataSize) {
-                    description += "    \(String(binaryValueOf: data[i], length: wordSize))\n"
+                for i in dataIndex..<(dataIndex + Int(dataSize)) {
+                    description += "    \(data[i].binaryString)\n"
                 }
-            case raspberryPi.peripheralBusAddress + PWM.offset + PWM.channel1RangeOffset:
+            case PWM.busAddress + 0x10:
                 // PWM Range.
                 description += "  \(offset): Range \(data[dataIndex]) → \(next)\(bp)\n"
-            case raspberryPi.peripheralBusAddress + GPIO.offset + GPIO.outputSetOffset:
+            case GPIO.busAddress + 0x1c:
                 // GPIO.
-                let setField = GPIOBitField(field0: data[dataIndex], field1: data[dataIndex + 1])
-                let clearField = GPIOBitField(field0: data[dataIndex + 2], field1: data[dataIndex + 3])
-                
-                description += "  \(offset): GPIO → \(next)\(bp)\n"
-                if setField[Driver.railComGPIO] {
-                    description += "    ↑ RailCom\n"
-                }
-                if setField[Driver.debugGPIO] {
-                    description += "    ↑ Debug\n"
-                }
-                
-                if clearField[Driver.railComGPIO] {
-                    description += "    ↓ RailCom\n"
-                }
-                if clearField[Driver.debugGPIO] {
-                    description += "    ↓ Debug\n"
-                }
+                break
+//                let setField = GPIOBitField(field0: data[dataIndex], field1: data[dataIndex + 1])
+//                let clearField = GPIOBitField(field0: data[dataIndex + 2], field1: data[dataIndex + 3])
+//
+//                description += "  \(offset): GPIO → \(next)\(bp)\n"
+//                if setField[Driver.railComGPIO] {
+//                    description += "    ↑ RailCom\n"
+//                }
+//                if setField[Driver.debugGPIO] {
+//                    description += "    ↑ Debug\n"
+//                }
+//
+//                if clearField[Driver.railComGPIO] {
+//                    description += "    ↓ RailCom\n"
+//                }
+//                if clearField[Driver.debugGPIO] {
+//                    description += "    ↓ Debug\n"
+//                }
             default:
                 description += "  \(offset): Unknown → \(next)\(bp)\n"
             }
@@ -638,7 +634,7 @@ public struct Breakpoint : Hashable {
     public let controlBlockOffset: Int
     
     /// PWM Range in effect at this point in the stream.
-    let range: Int
+    let range: UInt32
 
     /// Set of delayed events that are pending at this point in the stream.
     let delayedEvents: QueuedBitstream.DelayedEvents

@@ -8,7 +8,7 @@
 
 import Dispatch
 
-import OldRaspberryPi
+import RaspberryPi
 
 
 /// DMA Driver.
@@ -43,7 +43,7 @@ public class Driver {
     public static let debugGPIO = 19
     
     /// DMA channel to use.
-    public static let dmaChannel = 5
+    public static let dmaChannel = 4
     
     /// Clock source to use.
     ///
@@ -67,9 +67,6 @@ public class Driver {
     ///
     /// Writing to the PWM FIFO does not immediately result in output, instead the word that we write is first placed into the FIFO, and then next into the PWM's internal queue, before being output. Thus to synchronize an external event, such as a GPIO, with the PWM output we delay it by this many DREQ signals.
     static let eventDelay = 2
-
-    /// Raspberry Pi hardware information.
-    public let raspberryPi: RaspberryPi
 
     /// Queue of bitstreams.
     ///
@@ -95,9 +92,7 @@ public class Driver {
     ///
     /// - Parameters:
     ///   - raspberryPi: Raspberry Pi hardware information.
-    public init(raspberryPi: RaspberryPi) {
-        self.raspberryPi = raspberryPi
-        
+    public init() {
         dispatchQueue = DispatchQueue(label: "com.netsplit.DCC.Driver")
         dispatchGroup = DispatchGroup()
         
@@ -120,52 +115,71 @@ public class Driver {
     /// Initialize hardware.
     ///
     /// Sets up the PWM, GPIO and DMA hardware and prepares for a bitstream to be queued. The DMA Engine will not be activated until the first bitstream is queued with `queue(bitstream:)`.
-    public func startup() {
+    public func startup() throws {
         // Disable both PWM channels, and reset the error state.
-        var pwm = raspberryPi.pwm()
-        pwm.dmaConfiguration.remove(.enabled)
-        pwm.control.remove([ .channel1Enable, .channel2Enable ])
-        pwm.status.insert([ .busError, .fifoReadError, .fifoWriteError, .channel1GapOccurred, .channel2GapOccurred, .channel3GapOccurred, .channel4GapOccurred ])
+        let pwm = try PWM()
+        pwm.isDMAEnabled = false
+        pwm[1].isEnabled = false
+        pwm[2].isEnabled = false
+
+        pwm.isBusError = false
+        pwm.isFifoReadError = false
+        pwm.isFifoWriteError = false
+        pwm[1].gapOccurred = false
+        pwm[2].gapOccurred = false
 
         // Clear the FIFO, and ensure neither channel is consuming from it.
-        pwm.control.remove([ .channel1UseFifo, .channel2UseFifo ])
-        pwm.control.insert(.clearFifo)
-        
+        pwm[1].useFifo = false
+        pwm[2].useFifo = false
+        pwm.clearFifo()
+
         // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
-        var clock = raspberryPi.clock(identifier: .pwm)
-        clock.disable()
-        clock.control = [ .source(Driver.clockSource), .mash(.integer) ]
-        clock.divisor = [ .integer(divisor) ]
-        clock.enable()
+        let clock = try Clock()
+        clock[.pwm].isEnabled = false
+        while clock[.pwm].isRunning {}
+
+        clock[.pwm].source = Driver.clockSource
+        clock[.pwm].mash = 0
+        clock[.pwm].divisor = ClockDivisor(integer: divisor, fractional: 0)
+
+        clock[.pwm].isEnabled = true
+        while !clock[.pwm].isRunning {}
         
         // Make sure that the DMA Engine is enabled, abort any existing use of it, and clear error state.
-        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        dma.enabled = true
-        dma.controlStatus.insert(.abort)
-        dma.controlStatus.insert(.reset)
-        dma.debug.insert([ .readError, .fifoError, .readLastNotSetError ])
+        let dma = try DMA()
+        dma[Driver.dmaChannel].isEnabled = true
+        dma[Driver.dmaChannel].isActive = false
+        dma[Driver.dmaChannel].abort()
+
+        dma[Driver.dmaChannel].reset()
+        dma[Driver.dmaChannel].isReadError = false
+        dma[Driver.dmaChannel].isFifoError = false
+        dma[Driver.dmaChannel].isReadLastNotSetError = false
 
         // Set the DCC GPIO for PWM output.
-        var gpio = raspberryPi.gpio(number: Driver.dccGPIO)
-        gpio.function = Driver.dccGPIOFunction
+        let gpio = try GPIO()
+        gpio[Driver.dccGPIO].function = Driver.dccGPIOFunction
         
         // Set the RailCom GPIO for output and clear.
-        gpio = raspberryPi.gpio(number: Driver.railComGPIO)
-        gpio.function = .output
-        gpio.value = false
+        gpio[Driver.railComGPIO].function = .output
+        gpio[Driver.railComGPIO].value = false
         
         // Set the debug GPIO for output and clear.
-        gpio = raspberryPi.gpio(number: Driver.debugGPIO)
-        gpio.function = .output
-        gpio.value = false
+        gpio[Driver.debugGPIO].function = .output
+        gpio[Driver.debugGPIO].value = false
         
         // Enable the PWM, using the FIFO in serializer mode, and DREQ signals sent to the DMA Engine.
-        pwm.dmaConfiguration = [ .enabled, .dreqThreshold(1), .panicThreshold(1) ]
-        pwm.control = [ .channel1UseFifo, .channel1SerializerMode, .channel1Enable ]
-        
+        pwm.isDMAEnabled = true
+        pwm.dataRequestThreshold = 1
+        pwm.panicThreshold = 1
+        pwm[1].useFifo = true
+        pwm[1].mode = .serializer
+        pwm[1].isEnabled = true
+
         // Set the DMA Engine priority levels.
-        dma.controlStatus = [ .priorityLevel(8), .panicPriorityLevel(8) ]
-        
+        dma[Driver.dmaChannel].priorityLevel = 8
+        dma[Driver.dmaChannel].panicPriorityLevel = 8
+
         isRunning = true
         DispatchQueue.global().asyncAfter(deadline: .now() + Driver.watchdogInterval, execute: watchdog)
     }
@@ -181,20 +195,20 @@ public class Driver {
     ///     try driver.stop {
     ///         driver.shutdown()
     ///     }
-    public func shutdown() {
+    public func shutdown() throws {
         // Disable the PWM channel.
-        var pwm = raspberryPi.pwm()
-        pwm.control.remove(.channel1Enable)
-        pwm.dmaConfiguration.remove(.enabled)
+        let pwm = try PWM()
+        pwm[1].isEnabled = false
+        pwm.isDMAEnabled = false
 
         // Stop the clock.
-        var clock = raspberryPi.clock(identifier: .pwm)
-        clock.disable()
+        let clock = try Clock()
+        clock[.pwm].isEnabled = false
 
         // Stop the DMA Engine.
-        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        dma.controlStatus.remove(.active)
-        dma.controlStatus.insert(.abort)
+        let dma = try DMA()
+        dma[Driver.dmaChannel].isActive = false
+        dma[Driver.dmaChannel].abort()
 
         // Clear the bitstream queue to free the uncached memory associated with each bitstream, also cancel any pending tasks and wait for them to ensure blocks aren't holding references as well.
         isRunning = false
@@ -204,15 +218,13 @@ public class Driver {
         }
         
         // Restore the DCC GPIO to output, and clear all pins.
-        var gpio = raspberryPi.gpio(number: Driver.dccGPIO)
-        gpio.function = .output
-        gpio.value = false
+        let gpio = try GPIO()
+        gpio[Driver.dccGPIO].function = .output
+        gpio[Driver.dccGPIO].value = false
+
+        gpio[Driver.railComGPIO].value = false
         
-        gpio = raspberryPi.gpio(number: Driver.railComGPIO)
-        gpio.value = false
-        
-        gpio = raspberryPi.gpio(number: Driver.debugGPIO)
-        gpio.value = false
+        gpio[Driver.debugGPIO].value = false
     }
     
     /// Interval between watchdog checks.
@@ -221,55 +233,56 @@ public class Driver {
     /// Checks for and clears PWM and DMA error states.
     func watchdog() {
         guard isRunning else { return }
-        
-        var pwm = raspberryPi.pwm()
-        if pwm.status.contains(.busError) {
-            // Always seems to be set, and doesn't go away *shrug*
-            //print("PWM Bus Error")
-            pwm.status.insert(.busError)
+
+        if let pwm = try? PWM() {
+            if pwm.isBusError {
+                // Always seems to be set, and doesn't go away *shrug*
+                //print("PWM Bus Error")
+                pwm.isBusError = false
+            }
+
+            if pwm.isFifoReadError {
+                print("PWM FIFO Read Error")
+                pwm.isFifoReadError = false
+            }
+
+            if pwm.isFifoWriteError {
+                print("PWM FIFO Write Error")
+                pwm.isFifoWriteError = false
+            }
+
+            if pwm[1].gapOccurred {
+                print("PWM Channel 1 Gap Occurred")
+                pwm[1].gapOccurred = false
+            }
+
+            if pwm.isFifoEmpty {
+                // Doesn't seem to be an issue, unless maybe we get a gap as above?
+//                print("PWM FIFO Empty")
+            }
         }
-        
-        if pwm.status.contains(.fifoReadError) {
-            print("PWM FIFO Read Error")
-            pwm.status.insert(.fifoReadError)
+
+        if let dma = try? DMA() {
+            if dma[Driver.dmaChannel].isErrorDetected {
+                print("DMA Error Detected:")
+            }
+
+            if dma[Driver.dmaChannel].isReadError {
+                print("DMA Read Error")
+                dma[Driver.dmaChannel].isReadError = false
+            }
+
+            if dma[Driver.dmaChannel].isFifoError {
+                print("DMA FIFO Error")
+                dma[Driver.dmaChannel].isFifoError = false
+            }
+
+            if dma[Driver.dmaChannel].isReadLastNotSetError {
+                print("DMA Read Last Not Set Error")
+                dma[Driver.dmaChannel].isReadLastNotSetError = false
+            }
         }
-        
-        if pwm.status.contains(.fifoWriteError) {
-            print("PWM FIFO Write Error")
-            pwm.status.insert(.fifoWriteError)
-        }
-        
-        if pwm.status.contains(.channel1GapOccurred) {
-            print("PWM Channel 1 Gap Occurred")
-            pwm.status.insert(.channel1GapOccurred)
-        }
-        
-        if pwm.status.contains(.fifoEmpty) {
-            // Doesn't seem to be an issue, unless maybe we get a gap as above?
-            //print("PWM FIFO Empty")
-        }
-        
-        var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-        
-        if dma.controlStatus.contains(.errorDetected) {
-            print("DMA Error Detected:")
-        }
-        
-        if dma.debug.contains(.readError) {
-            print("DMA Read Error")
-            dma.debug.insert(.readError)
-        }
-        
-        if dma.debug.contains(.fifoError) {
-            print("DMA FIFO Error")
-            dma.debug.insert(.fifoError)
-        }
-        
-        if dma.debug.contains(.readLastNotSetError) {
-            print("DMA Read Last Not Set Error")
-            dma.debug.insert(.readLastNotSetError)
-        }
-        
+
         DispatchQueue.global().asyncAfter(deadline: .now() + Driver.watchdogInterval, execute: watchdog)
     }
 
@@ -291,27 +304,35 @@ public class Driver {
     public func queue(bitstream: Bitstream, repeating: Bool = true, completionHandler: (() -> Void)? = nil) throws {
         print("Bitstream duration \(bitstream.duration)µs")
         try dispatchQueue.sync {
-            var dma = raspberryPi.dma(channel: Driver.dmaChannel)
-            let dmaActive = dma.controlStatus.contains(.active)
+            let dma = try DMA()
+            let dmaActive = dma[Driver.dmaChannel].isActive
+            print("DMA \(dmaActive)")
 
             var activateBitstream: QueuedBitstream? = nil
             if requiresPowerOn {
+                print("Requires power on")
                 activateBitstream = try queue(bitstream: powerOnBitstream, repeating: false, removePreviousBitstream: !bitstreamQueue.isEmpty, removeThisBitstream: false)
                 requiresPowerOn = false
+                print("Required power on")
             }
             
             try queue(bitstream: bitstream, repeating: repeating, removePreviousBitstream: true, removeThisBitstream: false, completionHandler: completionHandler)
-            
+            print("Queued")
+
             if !repeating {
+                print("Requires power off")
                 requiresPowerOn = true
                 try queue(bitstream: powerOffBitstream, repeating: false, removePreviousBitstream: true, removeThisBitstream: true)
+                print("Required power off")
             }
             
             // Activate the DMA if this is the first bitstream in the queue.
             if !dmaActive {
-                dma.controlBlockAddress = activateBitstream!.busAddress
-                dma.controlStatus.insert(.active)
+                print("Activate DMA")
+                dma[Driver.dmaChannel].controlBlockAddress = activateBitstream!.busAddress
+                dma[Driver.dmaChannel].isActive = true
             }
+            print("Done")
         }
     }
     
@@ -337,14 +358,22 @@ public class Driver {
         }
 
         // Generate the new bitstream based on transferring from the breakpoints of the last one.
-        var queuedBitstream = QueuedBitstream(raspberryPi: raspberryPi)
+        print("Start")
+        var queuedBitstream = QueuedBitstream()
         if let previousBitstream = bitstreamQueue.last {
+            print("Previous")
             let transferOffsets = try queuedBitstream.transfer(from: previousBitstream, into: bitstream, repeating: repeating)
+            print("Transfer from")
             try queuedBitstream.commit()
+            print("Committed")
             previousBitstream.transfer(to: queuedBitstream, at: transferOffsets)
+            print("Transfer to")
         } else {
+            print("new")
             try queuedBitstream.parseBitstream(bitstream, repeating: repeating)
+            print("Parsed")
             try queuedBitstream.commit()
+            print("Committed")
         }
         
         // Once the new bitstream is transmitting, remove the first one from the queue... strictly speaking this isn't necessarily the one we were transmitting just now, but it doesn't matter as long as this is called the right number of times by all the queued blocks—we'll ultimately end up with just queuedBitstream in the queue.
@@ -357,8 +386,8 @@ public class Driver {
             self.whenRepeating(queuedBitstream, after: .microseconds(Int(bitstream.duration))) {
                 if removeThisBitstream {
                     // We only remove ourselves if the DMA Channel has gone inactive; if it's still active, that means our next control block address was changed to point at another bitstream, which will remove us in its own whenTransmitting above.
-                    var dma = self.raspberryPi.dma(channel: Driver.dmaChannel)
-                    if !dma.controlStatus.contains(.active) {
+                    let dma = try! DMA()
+                    if !dma[Driver.dmaChannel].isActive {
                         self.bitstreamQueue.remove(at: 0)
                     }
                 }
@@ -441,7 +470,7 @@ public class Driver {
         var bitstream = Bitstream(bitDuration: bitDuration)
 
         for _ in 0..<Driver.eventDelay {
-            bitstream.append(.data(word: 0, size: bitstream.wordSize))
+            bitstream.append(.data(word: 0, size: UInt32.bitWidth))
         }
 
         bitstream.append(.railComCutoutEnd)
@@ -457,7 +486,7 @@ public class Driver {
         bitstream.append(.debugEnd)
         
         for _ in 0..<Driver.eventDelay {
-            bitstream.append(.data(word: 0, size: bitstream.wordSize))
+            bitstream.append(.data(word: 0, size: UInt32.bitWidth))
         }
         
         return bitstream

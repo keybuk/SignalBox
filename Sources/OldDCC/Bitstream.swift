@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Util
 
 /// Bitstream serializes logical DCC packets into a physical bitstream.
 ///
@@ -115,14 +116,8 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
     /// This is the value of `railComCutoutLength` rounded up to the nearest double of `oneBitLength`, thus allowing for the complete transmission of logical one bits by the end of the RailCom output period.
     public let railComLength: Int
 
-    /// Size of words.
-    ///
-    /// Generally the platform's word size, but can be overriden at initialization for testing purposes.
-    let wordSize: Int
-    
-    init(bitDuration: Float, wordSize: Int) {
+    public init(bitDuration: Float) {
         self.bitDuration = bitDuration
-        self.wordSize = wordSize
         
         oneBitLength = Int((Bitstream.oneBitDuration - 1.0) / bitDuration) + 1
         zeroBitLength = Int((Bitstream.zeroBitDuration - 1.0) / bitDuration) + 1
@@ -151,10 +146,6 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
             "Duration of RailCom cutout would be \(Float(railComCutoutLength) * bitDuration)µs which is outside the valid range \(Bitstream.railComCutoutEndMinimumDuration)–\(Bitstream.railComCutoutEndMaximumDuration)µs")
     }
     
-    public init(bitDuration: Float) {
-        self.init(bitDuration: bitDuration, wordSize: MemoryLayout<Int>.size * 8)
-    }
-
     /// Events generated from the input.
     private var events: [BitstreamEvent] = []
     
@@ -196,38 +187,32 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
     ///
     /// Physical bits are the input to the PWM, with a duration of `bitDuration`. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
     ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    /// If the last event is `.data` with a `size` smaller than the type, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - bits: physical bits to be added, this is an LSB-aligned value.
     ///   - count: number of right-most bits from `bits` to be added.
-    public mutating func append(physicalBits bits: Int, count: Int) {
-        assert(count <= wordSize, "cannot append more physical bits than the word size")
+    public mutating func append(physicalBits bits: UInt32, count: Int) {
         var count = count
         
         // Where the last events type is already data, remove and extend it.
         if case let .data(word: word, size: size)? = events.last,
-            size < wordSize,
+            size < UInt32.bitWidth,
             count > 0
         {
             // This is a little more complex because the values in `bits` are lsb-aligned while the values in `words` are msb-aligned, and we have to beware of one-fill when shifting to the right.
-            let mask = (1 << (wordSize - size)) - 1
-            let alignedBits = (bits << (wordSize - count)) >> size
+            let mask: UInt32 = (1 << (UInt32.bitWidth - size)) - 1
+            let alignedBits = (bits << (UInt32.bitWidth - count)) >> size
 
             events.removeLast()
-            events.append(.data(word: word | (alignedBits & mask), size: Swift.min(size + count, wordSize)))
+            events.append(.data(word: word | (alignedBits & mask), size: Swift.min(size + count, UInt32.bitWidth)))
             
-            count -= wordSize - size
+            count -= UInt32.bitWidth - size
         }
         
         // If any bits remain, add a new word with them.
         if count > 0 {
-            var word = bits << (wordSize - count)
-            
-            // For testing, wordSize can be defined as shorter than the size of Int on this platform; so be sure to mask out the left-most excess part.
-            if wordSize < MemoryLayout<Int>.size * 8 {
-                word &= ~(~0 << wordSize)
-            }
+            let word = bits << (UInt32.bitWidth - count)
             
             events.append(.data(word: word, size: count))
         }
@@ -237,7 +222,7 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
     ///
     /// Physical bits are the input to the PWM, with a duration of `bitDuration`. A physical bit value of 1 means the mapped GPIO will be +3V for the duration, while a physical bit value of 0 means it will be 0V for the duration.
     ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    /// If the last event is `.data` with a `size` less than the type, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - bit: physical bit to be added.
@@ -247,15 +232,15 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
         
         // Where the last events type is already data, remove and extend it.
         if case let .data(word: word, size: size)? = events.last,
-            size < wordSize,
+            size < UInt32.bitWidth,
             count > 0
         {
             events.removeLast()
 
-            let numberOfBits = Swift.min(count, wordSize - size)
+            let numberOfBits = Swift.min(count, UInt32.bitWidth - size)
             switch bit {
             case 1:
-                let bits = ~(~0 << numberOfBits) << (wordSize - size - numberOfBits)
+                let bits: UInt32 = ~(~0 << numberOfBits) << (UInt32.bitWidth - size - numberOfBits)
                 events.append(.data(word: word | bits, size: size + numberOfBits))
             case 0:
                 events.append(.data(word: word, size: size + numberOfBits))
@@ -269,12 +254,12 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
         
         // While any bits remain, add new words with them.
         while count > 0 {
-            let numberOfBits = Swift.min(count, wordSize)
+            let numberOfBits = Swift.min(count, UInt32.bitWidth)
             switch bit {
             case 1:
-                // Append `count` bits; use a short-cut if we're just filling an entire word to avoid the `x << wordSize` error.
-                if numberOfBits < (MemoryLayout<Int>.size * 8) {
-                    let bits = ~(~0 << numberOfBits) << (wordSize - numberOfBits)
+                // Append `count` bits; use a short-cut if we're just filling an entire word to avoid the `x << 32` error.
+                if numberOfBits < UInt32.bitWidth {
+                    let bits: UInt32 = ~(~0 << numberOfBits) << (UInt32.bitWidth - numberOfBits)
                     events.append(.data(word: bits, size: numberOfBits))
                 } else {
                     events.append(.data(word: ~0, size: numberOfBits))
@@ -294,7 +279,7 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
     ///
     /// Logical bits represent the DCC signal. A logical bit value of 1 has a duration of +3V for at least `oneBitDuration`, followed by 0V for the same duration; while a logical bit value of 0 has a duration of +3V for `zeroBitDuration`, followed by 0V for the same duration.
     ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    /// If the last event is `.data` with a `size` less than the type, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - bit: logical bit to append, must be the value 1 or 0.
@@ -313,7 +298,7 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
     
     /// Append a DCC preamble.
     ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    /// If the last event is `.data` with a `size` less than the type, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - length: number of preamble bits (default: 14).
@@ -330,7 +315,7 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
     ///
     /// The RailCom cutout is a period of logical 1 bits, combined with the `.railComCutoutStart` and `.railComCutoutEnd` events at points to produce the correct timings. If the RailCom cutout signal is ignored, this thus simply extends the preamble of the following command without interrupting the DCC signal.
     ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    /// If the last event is `.data` with a `size` less than the type, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - debug: `true` if the debug GPIO pin should be cleared at the end of the RailCom cutout.
@@ -363,7 +348,7 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
     ///
     /// The contents of the packet are appended along with the packet start bit, data byte start bits, and packet end bit.
     ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    /// If the last event is `.data` with a `size` less than the type, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - packet: DCC packet to be added, including the error detection data byte.
@@ -385,7 +370,7 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
     ///
     /// An operations mode packet consists of a 14-bit preamble, followed by the packet and a RailCom cutout.
     ///
-    /// If the last event is `.data` with a `size` less than `wordSize`, it will be extended to include the new bits, otherwise a new `.data` is appended.
+    /// If the last event is `.data` with a `size` less than the type, it will be extended to include the new bits, otherwise a new `.data` is appended.
     ///
     /// - Parameters:
     ///   - packet: individual bytes for the packet, including the error detection data byte.
@@ -409,7 +394,7 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
         for event in events {
             switch event {
             case let .data(word: word, size: size):
-                description += "  \(String(binaryValueOf: word >> (wordSize - size), length: size))\n"
+                description += "  \((word >> (UInt32.bitWidth - size)).binaryString)\n"
             case .railComCutoutStart:
                 description += "  ↓ RailCom\n"
             case .railComCutoutEnd:
@@ -434,8 +419,8 @@ public struct Bitstream : Collection, CustomDebugStringConvertible {
 /// Event than can occur within the DCC bitstream.
 public enum BitstreamEvent : Hashable {
 
-    /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than the Bitstream `wordSize`.
-    case data(word: Int, size: Int)
+    /// Physical bit data for PWM input consisting of an msb-aligned `word` of `size` bits, which may be less than the word size.
+    case data(word: UInt32, size: Int)
     
     /// The RailCom cutout period should begin aligned with the start of the next `.data`.
     case railComCutoutStart
@@ -458,7 +443,7 @@ public enum BitstreamEvent : Hashable {
     public var hashValue: Int {
         switch self {
         case let .data(word, size):
-            return 0 ^ word ^ size
+            return 0 ^ Int(word) ^ size
         case .railComCutoutStart:
             return 1
         case .railComCutoutEnd:
@@ -502,19 +487,4 @@ public enum BitstreamEvent : Hashable {
         }
     }
 
-}
-
-
-extension String {
-    
-    /// Initializes a String containing the binary value of an integer, padded to a given length.
-    init(binaryValueOf value: Int, length: Int) {
-        self = String(UInt(bitPattern: value), radix: 2).leftPadding(toLength: length, withPad: "0")
-    }
-
-    /// Returns a new string formed from the String by inserting as many occurrences as necessary of a given pad string to the start.
-    func leftPadding(toLength length: Int, withPad character: Character) -> String {
-        return String(repeating: String(character), count: length - self.count) + self
-    }
-    
 }
