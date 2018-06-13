@@ -16,7 +16,6 @@ public protocol Packet : Packable {
 public extension Packet {
     
     public func add<T : Packer>(into packer: inout T) {
-        let bytes = self.bytes
         for byte in bytes {
             packer.add(0, length: 1)
             packer.add(byte, length: 8)

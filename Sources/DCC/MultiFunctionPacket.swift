@@ -33,7 +33,7 @@ public struct MultiFunctionPacket : Packet {
         // - multiple feature expansion
         // - only one cv access
         // - optional decoder acknowledgement
-        
+
         for instruction in instructions {
             instruction.add(into: &packer)
         }
