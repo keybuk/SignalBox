@@ -89,8 +89,58 @@ public final class ClockGenerator {
         get { return registers.pointee.divisor }
         set { registers.pointee.divisor = newValue }
     }
-    
+
+    /// Configure the clock for a target cycle time.
+    ///
+    /// Sets the clock `source` and `divisor` to reach the closest cycle time to `cycle` as it is
+    /// possible to reach.
+    ///
+    /// - Parameters:
+    ///   - cycle: cycle time in µs.
+    ///   - mash: number of stages of MASH filter to use.
+    ///
+    /// - Returns: cycle time the clock has been configured for. This may not be the requested
+    ///   time, but will be the closest that can be configured. If no clock can provide that value
+    ///   `nil` is returned.
+    public func configure(forCycle cycle: Float, mash: Int) -> Float? {
+        assert(cycle > 0, "cycle out of range")
+
+        var bestCycle: Float?
+        for source in ClockSource.allCases {
+            guard source != .hdmiAux else { continue }
+            guard let divisor = source.divisor(for: cycle, mash: mash) else { continue }
+
+            let thisCycle = divisor.floatValue / source.frequency
+            if bestCycle == nil || abs(cycle - thisCycle) < abs(cycle - bestCycle!) {
+                bestCycle = thisCycle
+                self.source = source
+                self.divisor = divisor
+                self.mash = mash
+            }
+        }
+
+        return bestCycle
+    }
+
+    /// Configure the clock for a target frequency.
+    ///
+    /// Sets the clock `source` and `divisor` to reach the closest frequency to `frequency` as it
+    /// is possible to reach.
+    ///
+    /// - Parameters:
+    ///   - frequency: desired frequency in MHz.
+    ///   - mash: number of stages of MASH filter to use.
+    ///
+    /// - Returns: frequency the clock has been configured for. This may not be the requested
+    ///   frequency, but will be the closest that can be configured. If no clock can provide that
+    ///   value `nil` is returned.
+    public func configure(forFrequency frequency: Float, mash: Int) -> Float? {
+        assert(frequency > 0, "frequency out of range")
+        return configure(forCycle: 1 / frequency, mash: mash).map { 1 / $0 }
+    }
+
 }
+
 
 // MARK: Debugging
 

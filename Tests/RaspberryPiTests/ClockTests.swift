@@ -781,6 +781,173 @@ class ClockTests : XCTestCase {
         XCTAssertEqual("\(clock[.generalPurpose0].divisor)", "\(28.2998 as Float)")
     }
 
+
+    // MARK: configure(forCycle:mash:)
+
+    /// A cycle of 10µs should be possible.
+    func testConfigure10µsPossible() {
+        let cycle = clock[.pwm].configure(forCycle: 10, mash: 0)
+
+        XCTAssertNotNil(cycle)
+    }
+
+    /// A cycle of 10µs should be exactly possible.
+    func testConfigure10µsExact() {
+        let cycle = clock[.pwm].configure(forCycle: 10, mash: 0)
+
+        XCTAssertEqual(cycle!, 10)
+    }
+
+    /// A cycle of 10µs should use the oscillator.
+    func testConfigure10µsSource() {
+        let _ = clock[.pwm].configure(forCycle: 10, mash: 0)
+
+        XCTAssertEqual(clock[.pwm].source, .oscillator)
+    }
+
+    /// A cycle of 10µs should have an integer divisor of 192.
+    func testConfigure10µsIntegerDivisor() {
+        let _ = clock[.pwm].configure(forCycle: 10, mash: 0)
+
+        XCTAssertEqual(clock[.pwm].divisor.integer, 192)
+    }
+
+    /// A cycle of 10µs should have an fractional divisor of 0 since we specified no mash.
+    func testConfigure10µsFractionalDivisor() {
+        let _ = clock[.pwm].configure(forCycle: 10, mash: 0)
+
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 0)
+    }
+
+    /// A cycle of 10µs should set the mash to 0.
+    func testConfigure10µsMASH() {
+        let _ = clock[.pwm].configure(forCycle: 10, mash: 0)
+
+        XCTAssertEqual(clock[.pwm].mash, 0)
+    }
+
+    /// A cycle of 10µs with MASH should set the MASH.
+    func testConfigure10µsWithMASH() {
+        let _ = clock[.pwm].configure(forCycle: 10, mash: 1)
+
+        XCTAssertEqual(clock[.pwm].mash, 1)
+    }
+
+    /// A cycle of 1µs should be possible using the PPLD.
+    func testConfigure1µsPossible() {
+        let cycle = clock[.pwm].configure(forCycle: 1, mash: 0)
+
+        XCTAssertNotNil(cycle)
+        XCTAssertEqual(cycle!, 1)
+        XCTAssertEqual(clock[.pwm].mash, 0)
+        XCTAssertEqual(clock[.pwm].source, .plld)
+        XCTAssertEqual(clock[.pwm].divisor.integer, 500)
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 0)
+    }
+
+    /// Without MASH, a cycle of 58µs should be possible with the oscillator, but not exact.
+    func testConfigure58µsWithoutMASH() {
+        let cycle = clock[.pwm].configure(forCycle: 58, mash: 0)
+
+        XCTAssertNotNil(cycle)
+        XCTAssertEqual(cycle!, 57.96875, accuracy: 0.00001)
+        XCTAssertEqual(clock[.pwm].mash, 0)
+        XCTAssertEqual(clock[.pwm].source, .oscillator)
+        XCTAssertEqual(clock[.pwm].divisor.integer, 1113)
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 0)
+    }
+
+    /// With MASH, a cycle of 58µs should be exactly possible with the oscillator.
+    func testConfigure58µsWithMASH() {
+        let cycle = clock[.pwm].configure(forCycle: 58, mash: 1)
+
+        XCTAssertNotNil(cycle)
+        XCTAssertEqual(cycle!, 58, accuracy: 0.00001)
+        XCTAssertEqual(clock[.pwm].mash, 1)
+        XCTAssertEqual(clock[.pwm].source, .oscillator)
+        XCTAssertEqual(clock[.pwm].divisor.integer, 1113)
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 2458)
+    }
+
+    /// Check that when a particular value is given without a MASH, the closest clock is preferred,
+    /// but when a MASH is given, the one with the smaller divisor is preferred instead.
+    func testPrefersAccuracyThenSmallerDivisor() {
+        let _ = clock[.pwm].configure(forCycle: 4.453125, mash: 0)
+
+        XCTAssertEqual(clock[.pwm].source, .plld)
+        XCTAssertEqual(clock[.pwm].mash, 0)
+        XCTAssertEqual(clock[.pwm].divisor.integer, 2226)
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 0)
+
+        let _ = clock[.pwm].configure(forCycle: 4.453125, mash: 1)
+        XCTAssertEqual(clock[.pwm].source, .oscillator)
+        XCTAssertEqual(clock[.pwm].mash, 1)
+        XCTAssertEqual(clock[.pwm].divisor.integer, 85)
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 2048)
+    }
+
+    /// Check that we can configure for the goldilocks bit duration of 14.5µs.
+    func testConfigureGoldilocksCycle() {
+        let cycle = clock[.pwm].configure(forCycle: 14.5, mash: 0)
+
+        XCTAssertNotNil(cycle)
+
+        XCTAssertEqual(cycle!, 14.48, accuracy: 0.01)
+
+        XCTAssertEqual(clock[.pwm].source, .oscillator)
+        XCTAssertEqual(clock[.pwm].mash, 0)
+        XCTAssertEqual(clock[.pwm].divisor.integer, 278)
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 0)
+    }
+
+    /// A cycle of 250µs should not be possible.
+    func testConfigure250µsNotPossible() {
+        let cycle = clock[.pwm].configure(forCycle: 250, mash: 0)
+
+        XCTAssertNil(cycle)
+    }
+
+    /// A cycle of 0.001µs should not be possible without MASH.
+    func testConfigureTinyNotPossible() {
+        let cycle = clock[.pwm].configure(forCycle: 0.001, mash: 0)
+
+        XCTAssertNil(cycle)
+    }
+
+    /// A cycle of 0.001µs should be possible with MASH.
+    func testConfigureTinyPossibleWithMASH() {
+        let cycle = clock[.pwm].configure(forCycle: 0.001, mash: 1)
+
+        XCTAssertNotNil(cycle)
+    }
+
+
+    // MARK: configure(forFrequency:mash:)
+
+    /// Check that we can configure for a target frequency.
+    func testConfigureFrequencyForOscillator() {
+        let frequency = clock[.pwm].configure(forFrequency: 4.8, mash: 0)
+
+        XCTAssertNotNil(frequency)
+        XCTAssertEqual(frequency!, 4.8, accuracy: 0.0001)
+        XCTAssertEqual(clock[.pwm].source, .oscillator)
+        XCTAssertEqual(clock[.pwm].mash, 0)
+        XCTAssertEqual(clock[.pwm].divisor.integer, 4)
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 0)
+    }
+
+    /// Check that we can configure for a target frequency that will need the PPLD and a MASH.
+    func testConfigureFrequencyForPLLD() {
+        let frequency = clock[.pwm].configure(forFrequency: 144, mash: 1)
+
+        XCTAssertNotNil(frequency)
+        XCTAssertEqual(frequency!, 144, accuracy: 0.01)
+        XCTAssertEqual(clock[.pwm].source, .plld)
+        XCTAssertEqual(clock[.pwm].mash, 1)
+        XCTAssertEqual(clock[.pwm].divisor.integer, 3)
+        XCTAssertEqual(clock[.pwm].divisor.fractional, 1934)
+    }
+
 }
 
 class ClockControlTests : XCTestCase {
