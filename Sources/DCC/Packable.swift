@@ -45,7 +45,7 @@ extension UInt16 : Packable {}
 extension UInt32 : Packable {}
 extension UInt64 : Packable {}
 
-extension Array : Packable where Element : Packable {
+extension Array : Packable where Element == Packable {
 
     // Provide conformance to `Packable` for Arrays of `Packable` by iterating their elements.
     public func add<T : Packer>(into packer: inout T) {

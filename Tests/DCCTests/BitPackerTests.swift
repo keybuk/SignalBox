@@ -87,11 +87,20 @@ class BitPackerTests : XCTestCase {
         XCTAssertEqual(packer.bytes, [ 0b11111111 ])
     }
 
-    /// Test that we can add an homogenous array of packable things.
+    /// Test that we can add a heterogeneous array of packable things.
+    func testArrayOfPackable() {
+        let values: [Packable] = [ true, false, 0b11110000 as UInt8, 0b11001100_01010101 as UInt16 ]
+        var packer = BitPacker<UInt32>()
+        packer.add(values)
+
+        XCTAssertEqual(packer.bytes, [ 0b10111100_00110011_00010101_01000000 ])
+    }
+
+    /// Test that we can add an homogenous array of packable things by forcing the array type.
     func testArrayOfPackables() {
         let values: [UInt8] = [ 0b11110000, 0b11001100, 0b10101010, 0b11100010 ]
         var packer = BitPacker<UInt32>()
-        packer.add(values)
+        packer.add(values as [Packable])
 
         XCTAssertEqual(packer.bytes, [ 0b11110000_11001100_10101010_11100010 ])
     }
