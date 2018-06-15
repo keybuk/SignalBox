@@ -34,9 +34,7 @@ public struct MultiFunctionPacket : Packet {
         // - only one cv access
         // - optional decoder acknowledgement
 
-        for instruction in instructions {
-            instruction.add(into: &packer)
-        }
+        packer.add(instructions as [Packable])
         
         return packer.bytes
     }
