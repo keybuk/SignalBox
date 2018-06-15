@@ -777,8 +777,9 @@ class ClockTests : XCTestCase {
     /// Test that can we turn the divisor into a string.
     func testDivisorDescriptioon() {
         clock[.generalPurpose0].divisor = ClockDivisor(upperBound: 28.3)
-        
-        XCTAssertEqual("\(clock[.generalPurpose0].divisor)", "\(28.2998 as Float)")
+
+        let description = "\(clock[.generalPurpose0].divisor)"
+        XCTAssertEqual(description[..<description.index(description.startIndex, offsetBy: 7)], "28.2998")
     }
 
 
