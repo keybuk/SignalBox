@@ -13,7 +13,7 @@ public protocol Packet : Packable {
 
 }
 
-public extension Packet {
+extension Packet {
     
     public func add<T : Packer>(into packer: inout T) {
         for byte in bytes {

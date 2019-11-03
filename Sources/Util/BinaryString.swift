@@ -5,7 +5,7 @@
 //  Created by Scott James Remnant on 6/7/18.
 //
 
-public extension FixedWidthInteger {
+extension FixedWidthInteger {
     
     /// Returns the individual bytes of the integer.
     private var bytes: [UInt8] {

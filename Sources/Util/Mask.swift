@@ -5,7 +5,7 @@
 //  Created by Scott James Remnant on 6/7/18.
 //
 
-public extension FixedWidthInteger {
+extension FixedWidthInteger {
 
     /// Create a bit mask
     ///
