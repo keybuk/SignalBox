@@ -7,8 +7,6 @@
 
 import Util
 
-public typealias BytePacker = BitPacker<UInt8>
-
 /// Packs fields as bit fields into an array of bytes.
 ///
 /// `BitPacker` may be used to create arrays of bytes by sourcing values of individual bits from

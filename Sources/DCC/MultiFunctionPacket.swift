@@ -11,7 +11,7 @@ public struct MultiFunctionPacket : Packet {
     public var instructions: [MultiFunctionInstruction]
     
     public var bytes: [UInt8] {
-        var packer = BytePacker()
+        var packer = BitPacker<UInt8>()
 
         switch address {
         case 0:
