@@ -119,12 +119,6 @@ public struct Packet : Equatable {
         
         return .multiFunction(address: address, bytes: [ byte ])
     }
-    
-
-    
-    public static func ==(lhs: Packet, rhs: Packet) -> Bool {
-        return lhs.bytes == rhs.bytes
-    }
 
 }
 

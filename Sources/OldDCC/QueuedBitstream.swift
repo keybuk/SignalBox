@@ -193,12 +193,13 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         
         /// Set of delayed events.
         let delayedEvents: DelayedEvents
-        
-        var hashValue: Int {
+
+        func hash(into hasher: inout Hasher) {
             // Range is not included in the hash value since it has unusual equality rules.
-            return index.hashValue ^ delayedEvents.hashValue
+            hasher.combine(index)
+            hasher.combine(delayedEvents)
         }
-        
+
         static func ==(lhs: BitstreamState, rhs: BitstreamState) -> Bool {
             return lhs.index == rhs.index && lhs.delayedEvents == rhs.delayedEvents && (lhs.range == rhs.range || lhs.range == 0)
         }
@@ -207,7 +208,6 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
 
     /// Helper structure to encapsulate an ordered queue of delayed `BitstreamEvent`.
     struct DelayedEvents : Hashable {
-        
         /// Set of events being delayed, along with the current delay.
         var events: [(event: BitstreamEvent, delay: Int)] = []
         
@@ -237,20 +237,21 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
             
             return dueEvents
         }
-        
-        var hashValue: Int {
-            return events.reduce(0) {
-                $0 ^ $1.event.hashValue ^ $1.delay.hashValue
+
+        func hash(into hasher: inout Hasher) {
+            events.forEach {
+                hasher.combine($0.event)
+                hasher.combine($0.delay)
             }
         }
-        
+
         static func ==(lhs: DelayedEvents, rhs: DelayedEvents) -> Bool {
             guard lhs.events.count == rhs.events.count else { return false }
-            
+
             for (lhsEvent, rhsEvent) in zip(lhs.events, rhs.events) {
                 guard lhsEvent.event == rhsEvent.event && lhsEvent.delay == rhsEvent.delay else { return false }
             }
-            
+
             return true
         }
         
@@ -638,14 +639,5 @@ public struct Breakpoint : Hashable {
 
     /// Set of delayed events that are pending at this point in the stream.
     let delayedEvents: QueuedBitstream.DelayedEvents
-    
-    public var hashValue: Int {
-        return controlBlockOffset.hashValue ^ range.hashValue ^ delayedEvents.hashValue
-    }
-
-    public static func ==(lhs: Breakpoint, rhs: Breakpoint) -> Bool {
-        return lhs.controlBlockOffset == rhs.controlBlockOffset && lhs.range == rhs.range && lhs.delayedEvents == rhs.delayedEvents
-    }
 
 }
-

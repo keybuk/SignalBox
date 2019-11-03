@@ -439,52 +439,5 @@ public enum BitstreamEvent : Hashable {
     
     /// The bitstream may be broken early at this point after the first full transmission.
     case breakpoint
-    
-    public var hashValue: Int {
-        switch self {
-        case let .data(word, size):
-            return 0 ^ Int(word) ^ size
-        case .railComCutoutStart:
-            return 1
-        case .railComCutoutEnd:
-            return 2
-        case .debugStart:
-            return 3
-        case .debugEnd:
-            return 4
-        case .loopStart:
-            return 5
-        case .breakpoint:
-            return 6
-        }
-    }
-    
-    public static func ==(lhs: BitstreamEvent, rhs: BitstreamEvent) -> Bool {
-        switch (lhs, rhs) {
-        case let (.data(lhsWord, lhsSize), .data(rhsWord, rhsSize)):
-            return lhsWord == rhsWord && lhsSize == rhsSize
-        case (.railComCutoutStart, .railComCutoutStart):
-            return true
-        case (.railComCutoutEnd, .railComCutoutEnd):
-            return true
-        case (.debugStart, .debugStart):
-            return true
-        case (.debugEnd, .debugEnd):
-            return true
-        case (.loopStart, .loopStart):
-            return true
-        case (.breakpoint, .breakpoint):
-            return true
-
-        case (.data(_, _), _),
-             (.railComCutoutStart, _),
-             (.railComCutoutEnd, _),
-             (.debugStart, _),
-             (.debugEnd, _),
-             (.loopStart, _),
-             (.breakpoint, _):
-            return false
-        }
-    }
 
 }
