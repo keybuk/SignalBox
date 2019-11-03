@@ -60,7 +60,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that sourceIgnoreReads defaults to false when the SRC_IGNORE bit of the transfer information is not set.
     func testDefaultSourceIgnoreReads() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.sourceIgnoreReads, false)
     }
@@ -97,7 +97,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that sourceWaitsForDataRequest defaults to false when the SRC_DREQ bit of the transfer information is not set.
     func testDefaultSourceWaitsForDataRequest() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.sourceWaitsForDataRequest, false)
     }
@@ -134,7 +134,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that sourceWideReads defaults to false when the SRC_WIDTH bit of the transfer information is not set.
     func testDefaultSourceWideReads() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.sourceWideReads, false)
     }
@@ -171,7 +171,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that incrementSourceAddress defaults to false when the SRC_INC bit of the transfer information is not set.
     func testDefaultIncrementSourceAddress() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.incrementSourceAddress, false)
     }
@@ -208,7 +208,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that destinationIgnoreWrites defaults to false when the DEST_IGNORE bit of the transfer information is not set.
     func testDefaultDestinationIgnoreWrites() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.destinationIgnoreWrites, false)
     }
@@ -245,7 +245,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that destinationWaitsForDataRequest defaults to false when the DEST_DREQ bit of the transfer information is not set.
     func testDefaultDestinationWaitsForDataRequest() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.destinationWaitsForDataRequest, false)
     }
@@ -282,7 +282,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that destinationWideWrites defaults to false when the DEST_WIDTH bit of the transfer information is not set.
     func testDefaultDestinationWideWrites() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.destinationWideWrites, false)
     }
@@ -319,7 +319,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that incrementDestinationAddress defaults to false when the DEST_INC bit of the transfer information is not set.
     func testDefaultIncrementDestinationAddress() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.incrementDestinationAddress, false)
     }
@@ -356,7 +356,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that noWideBursts defaults to false when the NO_WIDE_BURSTS bit of the transfer information is not set.
     func testDefaultNoWideBursts() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.noWideBursts, false)
     }
@@ -528,7 +528,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that waitForWriteResponse defaults to false when the WAIT_RESP bit of the transfer information is not set.
     func testDefaultWaitForWriteResponse() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.waitForWriteResponse, false)
     }
@@ -565,7 +565,7 @@ class DMAControlBlockTests : XCTestCase {
 
     /// Test that is2D defaults to false when the TDMODE bit of the transfer information is not set.
     func testDefaultIs2DMode() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
 
         XCTAssertEqual(controlBlock.is2D, false)
     }
@@ -602,7 +602,7 @@ class DMAControlBlockTests : XCTestCase {
     
     /// Test that raiseInterrupt defaults to false when the INTEN bit of the transfer information is not set.
     func testDefaultRaiseInterrupt() {
-        var controlBlock = DMAControlBlock()
+        let controlBlock = DMAControlBlock()
         
         XCTAssertEqual(controlBlock.raiseInterrupt, false)
     }
