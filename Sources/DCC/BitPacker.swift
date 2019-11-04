@@ -7,21 +7,17 @@
 
 import Util
 
-/// Packs fields as bit fields into an array of bytes.
+/// Packs fields as bit fields into an array of fixed width integers.
 ///
-/// `BitPacker` may be used to create arrays of bytes by sourcing values of individual bits from
-/// other values, packing them into the larger structure.
+/// `BitPacker` may be used to create arrays of integers by sourcing values of individual bits from other values, packing them into
+/// the larger structure.
 public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
-    
-    /// Packed bytes.
-    public var bytes: [ResultType]
+    // FIXME: rename this field.
+    /// Packed results.
+    public var bytes: [ResultType] = []
     
     /// Number of bits remaining in the final byte.
     public var bitsRemaining = 0
-    
-    public init() {
-        bytes = []
-    }
     
     /// Add a field with the contents of a value.
     ///
@@ -53,16 +49,13 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
             bytes[bytes.index(before: bytes.endIndex)] |= bits << bitsRemaining
         } while length > 0
     }
-
 }
 
 // MARK: Debugging
 
 extension BitPacker : CustomDebugStringConvertible {
-
     public var debugDescription: String {
         let bitsString = bytes.map({ $0.binaryString }).joined(separator: " ")
         return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
-
 }
