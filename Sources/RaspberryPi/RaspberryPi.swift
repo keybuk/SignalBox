@@ -44,12 +44,10 @@ public enum RaspberryPi {
         }
 
         // Read the raw ranges data as an array of big endian 32-bit integers.
-        let addresses = rangesData.withUnsafeBytes { (values: UnsafePointer<UInt32>) -> [UInt32] in
-            let count = rangesData.count / MemoryLayout<UInt32>.stride
-            let buffer = UnsafeBufferPointer(start: values, count: count)
-            return Array(buffer.map({ UInt32(bigEndian: $0) }))
-        }
-        
+        var addresses: [UInt32] = Array(repeating: 0, count: rangesData.count / MemoryLayout<UInt32>.stride)
+        _ = addresses.withUnsafeMutableBytes { rangesData.copyBytes(to: $0) }
+        addresses = addresses.map { $0.bigEndian }
+
         // Array contains triplets of bus address, physical address, range size.
         for index in stride(from: addresses.startIndex, to: addresses.endIndex, by: 3) {
             if addresses[index] == RaspberryPi.peripheralBusAddress {
