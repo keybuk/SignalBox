@@ -165,7 +165,7 @@ public struct SignalTiming {
             throw Error.conformanceError(message: "Duration of RailCom cutout would be \(railComLength * pulseWidth)µs which is outside the valid range \(SignalTiming.railComRange)µs")
         }
 
-        railComCount = Int((Float(railComLength) / Float(oneBitLength * 2)).rounded(.awayFromZero))
+        railComCount = Int((railComLength / (oneBitLength * 2)).rounded(.awayFromZero))
 
         preambleCount = Self.preambleCountMin + railComCount
     }

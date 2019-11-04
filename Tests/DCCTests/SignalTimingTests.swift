@@ -207,6 +207,45 @@ class SignalTimingTests : XCTestCase {
         XCTAssertEqual(timing.preambleCount, 18)
     }
 
+
+    // MARK: 7µs tests
+
+    /// Test that when we use a pulseWidth of 7µs, the length of a one bit is 8 pulses (56µs).
+    func testSevenOneBit() {
+        let timing = try! SignalTiming(pulseWidth: 7)
+        XCTAssertEqual(timing.oneBitLength, 8)
+    }
+
+    /// Test that when we use a pulseWidth of 7µs, the length of a zero bit is 14 pulses (98µs).
+    func testSevenZeroBit() {
+        let timing = try! SignalTiming(pulseWidth: 7)
+        XCTAssertEqual(timing.zeroBitLength, 14)
+    }
+
+    /// Test that when we use a pulseWidth of 7µs, the length of the RailCom start delay is 4 pulses (28µs).
+    func testSevenRailComDelay() {
+        let timing = try! SignalTiming(pulseWidth: 7)
+        XCTAssertEqual(timing.railComDelayLength, 4)
+    }
+
+    /// Test that when we use a pulseWidth of 7µs, the length of a RailCom cutout is 65 pulses (455µs).
+    func testSevenRailCom() {
+        let timing = try! SignalTiming(pulseWidth: 7)
+        XCTAssertEqual(timing.railComLength, 65)
+    }
+
+    /// Test that when we use a pulseWidth of 7µs, RailCom requires 5 one bits because it has an odd number of pulses for the cutout and we can only output full one bits.
+    func testSevenRailComCount() {
+        let timing = try! SignalTiming(pulseWidth: 7)
+        XCTAssertEqual(timing.railComCount, 5)
+    }
+
+    /// Test that when we use a pulseWidth of 7µs, a preamble requires 19 one bits to account for the extra full bit for the cutout.
+    func testSevenPreambleCount() {
+        let timing = try! SignalTiming(pulseWidth: 7)
+        XCTAssertEqual(timing.preambleCount, 19)
+    }
+
     
     // MARK: failing tests
     
