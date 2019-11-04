@@ -6,15 +6,17 @@
 //
 
 extension FixedWidthInteger {
-    
     /// Returns the individual bytes of the integer.
     private var bytes: [UInt8] {
-        return stride(from: 0, to: Self.bitWidth, by: UInt8.bitWidth).map({ UInt8(truncatingIfNeeded: self >> $0) }).reversed()
+        stride(from: 0, to: Self.bitWidth, by: UInt8.bitWidth)
+            .map { UInt8(truncatingIfNeeded: self >> $0) }
+            .reversed()
     }
 
     /// Returns the integer in the form of a full-width binary string.
     public var binaryString: String {
-        return bytes.map({ String($0, radix: 2).leftPadding(toLength: $0.bitWidth, withPad: "0") }).joined()
+        bytes
+            .map { String($0, radix: 2).leftPadding(toLength: $0.bitWidth, withPad: "0") }
+            .joined()
     }
-
 }

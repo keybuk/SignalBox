@@ -6,7 +6,6 @@
 //
 
 extension FixedWidthInteger {
-
     /// Create a bit mask
     ///
     /// - Parameters:
@@ -15,7 +14,7 @@ extension FixedWidthInteger {
     /// - Returns: a mask with all bits except the right-most `bits` set.
     @inline(__always)
     public static func mask(except bits: Int) -> Self {
-        return ~0 << bits
+        ~0 << bits
     }
 
     /// Create a bit mask
@@ -26,7 +25,7 @@ extension FixedWidthInteger {
     /// - Returns: a mask with only the right-most `bits` set.
     @inline(__always)
     public static func mask(bits: Int) -> Self {
-        return ~Self.mask(except: bits)
+        ~Self.mask(except: bits)
     }
 
     /// Create a bit mask
@@ -38,7 +37,7 @@ extension FixedWidthInteger {
     /// - Returns: a mask with only `bits` set, offset `offset` bits from the right-most bit.
     @inline(__always)
     public static func mask(bits: Int, offset: Int) -> Self {
-        return Self.mask(bits: bits) << offset
+        Self.mask(bits: bits) << offset
     }
 
     /// Create a bit mask
@@ -50,7 +49,6 @@ extension FixedWidthInteger {
     /// - Returns:  a mask with all bits set except `bits` offset `offset` bits from the right-most bit.
     @inline(__always)
     public static func mask(except bits: Int, offset: Int) -> Self {
-        return ~Self.mask(bits: bits, offset: offset)
+        ~Self.mask(bits: bits, offset: offset)
     }
-
 }
