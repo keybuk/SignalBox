@@ -14,10 +14,14 @@ import Util
 public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
     // FIXME: rename this field.
     /// Packed results.
-    public var bytes: [ResultType] = []
+    public var bytes: [ResultType]
     
     /// Number of bits remaining in the final byte.
     public var bitsRemaining = 0
+
+    public init() {
+        bytes = []
+    }
     
     /// Add a field with the contents of a value.
     ///
