@@ -16,7 +16,7 @@ extension FixedWidthInteger {
     /// Returns the integer in the form of a full-width binary string.
     public var binaryString: String {
         bytes
-            .map { String($0, radix: 2).leftPadding(toLength: $0.bitWidth, withPad: "0") }
+            .map { String($0, radix: 2).leftPadding(toLength: $0.bitWidth, with: "0") }
             .joined()
     }
 }

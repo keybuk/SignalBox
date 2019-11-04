@@ -13,19 +13,19 @@ class LeftPaddingTests : XCTestCase {
 
     /// Make sure that String.leftPadding works as intended.
     func testLeftPadding() {
-        let padded = "foo".leftPadding(toLength: 5, withPad: " ")
+        let padded = "foo".leftPadding(toLength: 5, with: " ")
         XCTAssertEqual(padded, "  foo")
     }
 
     /// Make sure that String.leftPadding works when the length is already equal.
     func testLeftPaddingEqual() {
-        let padded = "foo".leftPadding(toLength: 3, withPad: " ")
+        let padded = "foo".leftPadding(toLength: 3, with: " ")
         XCTAssertEqual(padded, "foo")
     }
 
     /// Make sure that String.leftPadding works when the length is already greater.
     func testLeftPaddingGreater() {
-        let padded = "foobar".leftPadding(toLength: 3, withPad: " ")
+        let padded = "foobar".leftPadding(toLength: 3, with: " ")
         XCTAssertEqual(padded, "foobar")
     }
 

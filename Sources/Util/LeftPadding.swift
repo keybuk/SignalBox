@@ -7,7 +7,7 @@
 
 extension String {
     /// Returns a new string formed from by adding as many occurrences of `character` are necessary to the start to reach a length of `length`.
-    public func leftPadding(toLength length: Int, withPad character: Character) -> String {
+    public func leftPadding(toLength length: Int, with character: Character) -> String {
         String(repeating: String(character), count: max(0, length - self.count)) + self
     }
 }
