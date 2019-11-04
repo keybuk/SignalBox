@@ -17,26 +17,18 @@
 /// of the given width, required to send a zero bit or one bit, as well as the timing of any
 /// RailCom cutout.
 public struct SignalTiming {
-
     /// Recommended duration in microseconds of the high and low parts of a one bit.
     ///
     /// - Note:
     ///   NMRA S-9.1 defines this as the nominal duration for a one bit.
     public static let oneBit: Float = 58
     
-    /// Minimum permitted duration in microseconds of the high and low parts of a one bit.
+    /// Permitted duration in microseconds of the high and low parts of a one bit.
     ///
     /// - Note:
-    ///   NMRA S-9.1 defines this as the minimum permitted duration for the command station to send,
+    ///   NMRA S-9.1 defines this as the range of permitted durations for the command station to send,
     ///   while allowing decoders to be less strict.
-    public static let oneBitMin: Float = 55
-    
-    /// Maximum permitted duration in microseconds of the high and low parts of a one bit.
-    ///
-    /// - Note:
-    ///   NMRA S-9.1 defines this as the maximum permitted duration for the command station to send,
-    ///   while allowing decoders to be less strict.
-    public static let oneBitMax: Float = 61
+    public static let oneBitRange: ClosedRange<Float> = 55...61
     
     /// Recommended duration in microseconds of the high and low parts of a zero bit.
     ///
@@ -44,24 +36,20 @@ public struct SignalTiming {
     ///   NMRA S-9.1 defines this as the nominal "greater than or equal to" duration for a zero bit.
     public static let zeroBit: Float = 100
     
-    /// Minimum permitted duration in microseconds of the high and low parts of a zero bit.
+    /// Permitted duration in microseconds of the high and low parts of a zero bit.
     ///
     /// - Note:
-    ///   NMRA S-9.1 defines this as the minimum permitted duration for the command station to send,
+    ///   NMRA S-9.1 defines the minimum of permitted duration for the command station to send,
     ///   while allowing decoders to be less strict.
-    public static let zeroBitMin: Float = 95
-    
-    /// Maximum permitted duration in microseconds of the high and low parts of a zero bit.
     ///
-    /// - Note:
-    ///   NMRA S-9.1 specifies: Digital Command Station components shall transmit "0" bits with each
-    ///   part of the bit having a duration of between 95 and 9900 microseconds with the total bit
-    ///   duration of the "0" bit not exceeding 12000 microseconds.
+    ///   For the maximum it specifies that Digital Command Station components shall transmit "0"
+    ///   bits with each part of the bit having a duration of between 95 and 9900 microseconds with the
+    ///   total bit duration of the "0" bit not exceeding 12000 microseconds.
     ///
     ///   Since our transmission parts are always equal in length, this is half of the latter value.
-    public static let zeroBitMax: Float = 6000
+    public static let zeroBitRange: ClosedRange<Float> = 95...6000
     
-    /// Minimum permitted duration in microseconds before the start of the RailCom cutout.
+    /// Permitted duration in microseconds before the start of the RailCom cutout.
     ///
     /// No nomimal duration is defined by the standard, so this is the target we use when
     /// calculating bit lengths.
@@ -69,15 +57,11 @@ public struct SignalTiming {
     /// - Note:
     ///   NMRA S-9.1 specifies that the DCC signal must continue for at least 26µs after the packet
     ///   end bit, which delays the time for the start of the RailCom cutout.
-    public static let railComDelayMin: Float = 26
-    
-    /// Maximum permitted duration in microseconds before the start of the RailCom cutout.
     ///
-    /// - Note:
-    ///   Specified in NMRA S-9.3.2.
-    public static let railComDelayMax: Float = 32
+    ///   NMRA S-9.3.2 specifies the maximum delay.
+    public static let railComDelayRange: ClosedRange<Float> = 26...32
     
-    /// Minimum permitted duration in microseconds of the RailCom cutout.
+    /// Permitted duration in microseconds of the RailCom cutout.
     ///
     /// No nomimal duration is defined by the standard, so this is the target we use when
     /// calculating bit lengths.
@@ -85,14 +69,7 @@ public struct SignalTiming {
     /// - Note:
     ///   Specified in NMRA S-9.3.2 and is measured from the end of the Packet End Bit, and thus
     ///   includes the delay before the start of the RailCom cutout.
-    public static let railComMin: Float = 454
-    
-    /// Maximum permitted duration in microseconds of the RailCom cutout.
-    ///
-    /// - Note:
-    ///   Specified in NMRA S-9.3.2 and is measured from the end of the Packet End Bit, and thus
-    ///   includes the delay before the start of the RailCom cutout.
-    public static let railComMax: Float = 488
+    public static let railComRange: ClosedRange<Float> = 454...488
     
     /// Minimum count in bits of a preamble.
     ///
@@ -150,43 +127,36 @@ public struct SignalTiming {
     public init(pulseWidth: Float) throws {
         self.pulseWidth = pulseWidth
         
-        oneBitLength = Int((SignalTiming.oneBit - 1) / pulseWidth) + 1
-        zeroBitLength = Int((SignalTiming.zeroBit - 1) / pulseWidth) + 1
+        oneBitLength = Int((Self.oneBit - 1) / pulseWidth) + 1
+        zeroBitLength = Int((Self.zeroBit - 1) / pulseWidth) + 1
         
-        railComDelayLength = Int((SignalTiming.railComDelayMin - 1) / pulseWidth) + 1
-        railComLength = Int((SignalTiming.railComMin - 1) / pulseWidth) + 1
+        railComDelayLength = Int((Self.railComDelayRange.lowerBound - 1) / pulseWidth) + 1
+        railComLength = Int((Self.railComRange.lowerBound - 1) / pulseWidth) + 1
         
         railComCount = (railComLength - 1) / (oneBitLength * 2) + 1
         
-        preambleCount = SignalTiming.preambleCountMin + railComCount
+        preambleCount = Self.preambleCountMin + railComCount
         
         // Sanity check the lengths.
-        guard ((Float(oneBitLength) * pulseWidth) >= SignalTiming.oneBitMin) &&
-            ((Float(oneBitLength) * pulseWidth) <= SignalTiming.oneBitMax) else {
-                throw Error.conformanceError(message: "Duration of one bit would be \(Float(oneBitLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.oneBitMin)–\(SignalTiming.oneBitMax)µs")
+        guard Self.oneBitRange.contains(Float(oneBitLength) * pulseWidth) else {
+                throw Error.conformanceError(message: "Duration of one bit would be \(Float(oneBitLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.oneBitRange)µs")
         }
-        guard ((Float(zeroBitLength) * pulseWidth) >= SignalTiming.zeroBitMin) &&
-            ((Float(zeroBitLength) * pulseWidth) <= SignalTiming.zeroBitMax) else {
-                throw Error.conformanceError(message: "Duration of zero bit would be \(Float(zeroBitLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.zeroBitMin)–\(SignalTiming.zeroBitMax)µs")
+        guard Self.zeroBitRange.contains(Float(zeroBitLength) * pulseWidth) else {
+                throw Error.conformanceError(message: "Duration of zero bit would be \(Float(zeroBitLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.zeroBitRange)µs")
         }
-        guard ((Float(railComDelayLength) * pulseWidth) >= SignalTiming.railComDelayMin) &&
-            ((Float(railComDelayLength) * pulseWidth) <= SignalTiming.railComDelayMax) else {
-                throw Error.conformanceError(message: "Duration of pre-RailCom cutout delay would be \(Float(railComDelayLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.railComDelayMin)–\(SignalTiming.railComDelayMax)µs")
+        guard Self.railComDelayRange.contains(Float(railComDelayLength) * pulseWidth) else {
+                throw Error.conformanceError(message: "Duration of pre-RailCom cutout delay would be \(Float(railComDelayLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.railComDelayRange)µs")
         }
-        guard ((Float(railComLength) * pulseWidth) >= SignalTiming.railComMin) &&
-            ((Float(railComLength) * pulseWidth) <= SignalTiming.railComMax) else {
-                throw Error.conformanceError(message: "Duration of RailCom cutout would be \(Float(railComLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.railComMin)–\(SignalTiming.railComMax)µs")
+        guard Self.railComRange.contains(Float(railComLength) * pulseWidth) else {
+                throw Error.conformanceError(message: "Duration of RailCom cutout would be \(Float(railComLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.railComRange)µs")
         }
     }
-
 }
 
 // MARK: Debugging
 
 extension SignalTiming : CustomDebugStringConvertible {
-
     public var debugDescription: String {
         return "<\(type(of: self)) \(pulseWidth)µs, 1: \(oneBitLength), 0: \(zeroBitLength)>"
     }
-
 }
