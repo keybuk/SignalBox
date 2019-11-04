@@ -16,43 +16,42 @@ import Util
 /// results in an output of 58 consecutive 1 bits, followed by 58 consecutive 0 bits, representing
 /// the PWM pulse of the duration expected.
 public struct SignalPacker : Packer {
-    
-    public typealias Word = UInt32
+    public typealias ResultType = UInt32
     
     /// Timing values used for conversion.
     public var timing: SignalTiming
 
-    /// Packed words.
-    public var words: [Word]
+    /// Packed results.
+    public var results: [ResultType]
     
-    /// Number of bits remaining in the final word.
+    /// Number of bits remaining in the final result value.
     public var bitsRemaining = 0
     
     public init(timing: SignalTiming) {
         self.timing = timing
-        words = []
+        results = []
     }
     
     /// Duration in microseconds of the output.
     public var duration: Float {
-        let numberOfBits = words.count * Word.bitWidth - bitsRemaining
+        let numberOfBits = results.count * ResultType.bitWidth - bitsRemaining
         return Float(numberOfBits) * timing.pulseWidth
     }
 
     /// Add pulses for the contents of a value.
     ///
-    /// The length of the significant part of value`` is given in `length`. Only the least
+    /// The length of the significant part of `value` is given in `length`. Only the least
     /// significant `length` bits from `value` are used to create the output pulses.
     ///
-    /// New words are added whenever necessary to contain all of the fields, and fields may span
-    /// word boundaries, and be multiple words in length.
+    /// New result values are added whenever necessary to contain all of the fields, and fields may span
+    /// result boundaries, and be multiple result values in length.
     ///
     /// - parameters:
     ///   - value: value to add.
     ///   - length: length of the field.
     public mutating func add<T>(_ value: T, length: Int) where T : FixedWidthInteger {
-        assert(length > 0, "length must be greater than 0")
-        assert(length <= T.bitWidth, "length must be less than \(T.bitWidth)")
+        precondition(length > 0, "length must be greater than 0")
+        precondition(length <= T.bitWidth, "length must be less than or equal to \(T.bitWidth)")
         
         // Convert each input bit; there's no shortcut here for counting consecutive bits because
         // we always have to output a block of 1s and 0s for each one anyway.
@@ -62,7 +61,6 @@ public struct SignalPacker : Packer {
             
             add(pulseLength: pulseLength, high: true)
             add(pulseLength: pulseLength, high: false)
-
         }
     }
     
@@ -75,8 +73,8 @@ public struct SignalPacker : Packer {
         var pulseLength = pulseLength
         repeat {
             if bitsRemaining < 1 {
-                words.append(0)
-                bitsRemaining = Word.bitWidth
+                results.append(0)
+                bitsRemaining = ResultType.bitWidth
             }
             
             let chunkLength = min(pulseLength, bitsRemaining)
@@ -84,20 +82,17 @@ public struct SignalPacker : Packer {
             pulseLength -= chunkLength
 
             if high {
-                words[words.index(before: words.endIndex)] |= Word.mask(bits: chunkLength, offset: bitsRemaining)
+                results[results.index(before: results.endIndex)] |= ResultType.mask(bits: chunkLength, offset: bitsRemaining)
             }
         } while pulseLength > 0
     }
-    
 }
 
 // MARK: Debugging
 
 extension SignalPacker : CustomDebugStringConvertible {
-
     public var debugDescription: String {
-        let bitsString = words.map({ $0.binaryString }).joined(separator: " ")
+        let bitsString = results.map({ $0.binaryString }).joined(separator: " ")
         return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
-
 }
