@@ -51,7 +51,7 @@ public struct SignalTiming {
     
     /// Permitted duration in microseconds before the start of the RailCom cutout.
     ///
-    /// No nomimal duration is defined by the standard, so this is the target we use when
+    /// No nominal duration is defined by the standard, so the lower bound is the target we use when
     /// calculating bit lengths.
     ///
     /// - Note:
@@ -63,7 +63,7 @@ public struct SignalTiming {
     
     /// Permitted duration in microseconds of the RailCom cutout.
     ///
-    /// No nomimal duration is defined by the standard, so this is the target we use when
+    /// No nominal duration is defined by the standard, so the lower bound is the target we use when
     /// calculating bit lengths.
     ///
     /// - Note:
@@ -116,40 +116,58 @@ public struct SignalTiming {
     /// This includes sufficient bits for a complete preamble, and the RailCom cutout.
     public let preambleCount: Int
     
-    public enum Error : Swift.Error {
-        
+    public enum Error : Swift.Error {        
         /// Thown by SignalTiming.init when it cannot produce standards conformant timings
         /// from the given `pulseWidth`.
         case conformanceError(message: String)
-    
     }
 
     public init(pulseWidth: Float) throws {
         self.pulseWidth = pulseWidth
-        
-        oneBitLength = Int((Self.oneBit - 1) / pulseWidth) + 1
-        zeroBitLength = Int((Self.zeroBit - 1) / pulseWidth) + 1
-        
-        railComDelayLength = Int((Self.railComDelayRange.lowerBound - 1) / pulseWidth) + 1
-        railComLength = Int((Self.railComRange.lowerBound - 1) / pulseWidth) + 1
-        
-        railComCount = (railComLength - 1) / (oneBitLength * 2) + 1
-        
+
+        // The nominal one bit length is exactly in the middle of the permitted range, so
+        // schoolbook rounding will always pick the closest value, and if it's not within the
+        // valid range, neither will any alternative be.
+        let oneBitLength = (Self.oneBit / pulseWidth).rounded()
+        if Self.oneBitRange.contains(oneBitLength * pulseWidth) {
+            self.oneBitLength = Int(oneBitLength)
+        } else {
+            throw Error.conformanceError(message: "Duration of one bit would be \(oneBitLength * pulseWidth)µs which is outside the valid range \(SignalTiming.oneBitRange)µs")
+        }
+
+        // The nominal zero bit length is towards the start of a wide range; use schoolbook
+        // rounding to get the closest value, but if that falls outside of the range, try adding
+        // one to the result to fit it within the broader high side.
+        let zeroBitLength = (Self.zeroBit / pulseWidth).rounded()
+        if Self.zeroBitRange.contains(zeroBitLength * pulseWidth) {
+            self.zeroBitLength = Int(zeroBitLength)
+        } else if Self.zeroBitRange.contains((zeroBitLength + 1) * pulseWidth) {
+            self.zeroBitLength = Int(zeroBitLength + 1)
+        } else {
+            throw Error.conformanceError(message: "Duration of zero bit would be \(zeroBitLength * pulseWidth)µs which is outside the valid range \(SignalTiming.zeroBitRange)µs")
+        }
+
+        // Since we use the lower bound as the target, rounding away from zero is always the
+        // correct approach to attempting to get a result within the valid range.
+        let railComDelayLength = (Self.railComDelayRange.lowerBound / pulseWidth).rounded(.awayFromZero)
+        if Self.railComDelayRange.contains(railComDelayLength * pulseWidth) {
+            self.railComDelayLength = Int(railComDelayLength)
+        } else {
+            throw Error.conformanceError(message: "Duration of pre-RailCom cutout delay would be \(railComDelayLength * pulseWidth)µs which is outside the valid range \(SignalTiming.railComDelayRange)µs")
+        }
+
+        // Since we use the lower bound as the target, rounding away from zero is always the
+        // correct approach to attempting to get a result within the valid range.
+        let railComLength = (Self.railComRange.lowerBound / pulseWidth).rounded(.awayFromZero)
+        if Self.railComRange.contains(railComLength * pulseWidth) {
+            self.railComLength = Int(railComLength)
+        } else {
+            throw Error.conformanceError(message: "Duration of RailCom cutout would be \(railComLength * pulseWidth)µs which is outside the valid range \(SignalTiming.railComRange)µs")
+        }
+
+        railComCount = Int((Float(railComLength) / Float(oneBitLength * 2)).rounded(.awayFromZero))
+
         preambleCount = Self.preambleCountMin + railComCount
-        
-        // Sanity check the lengths.
-        guard Self.oneBitRange.contains(Float(oneBitLength) * pulseWidth) else {
-                throw Error.conformanceError(message: "Duration of one bit would be \(Float(oneBitLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.oneBitRange)µs")
-        }
-        guard Self.zeroBitRange.contains(Float(zeroBitLength) * pulseWidth) else {
-                throw Error.conformanceError(message: "Duration of zero bit would be \(Float(zeroBitLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.zeroBitRange)µs")
-        }
-        guard Self.railComDelayRange.contains(Float(railComDelayLength) * pulseWidth) else {
-                throw Error.conformanceError(message: "Duration of pre-RailCom cutout delay would be \(Float(railComDelayLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.railComDelayRange)µs")
-        }
-        guard Self.railComRange.contains(Float(railComLength) * pulseWidth) else {
-                throw Error.conformanceError(message: "Duration of RailCom cutout would be \(Float(railComLength) * pulseWidth)µs which is outside the valid range \(SignalTiming.railComRange)µs")
-        }
     }
 }
 
