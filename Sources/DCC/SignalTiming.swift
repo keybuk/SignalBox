@@ -77,7 +77,7 @@ public struct SignalTiming {
     ///   NMRA S-9.2 requires that the preamble consist of a minimum of 14 bits, while it permits
     ///   lower values only for the decoder. For service mode programming, NMRA S-9.2.3 specifies a
     ///   long preamble of 20 bits.
-    public static let preambleCountMin: Int = 14
+    public let preambleCount: Int = 14
     
     /// Duration in microseconds of a single pulse.
     public let pulseWidth: Float
@@ -111,12 +111,7 @@ public struct SignalTiming {
     /// the preamble.
     public let railComCount: Int
     
-    /// Count of bits for the preamble.
-    ///
-    /// This includes sufficient bits for a complete preamble, and the RailCom cutout.
-    public let preambleCount: Int
-    
-    public enum Error : Swift.Error {        
+    public enum Error : Swift.Error {
         /// Thown by SignalTiming.init when it cannot produce standards conformant timings
         /// from the given `pulseWidth`.
         case conformanceError(message: String)
@@ -166,8 +161,6 @@ public struct SignalTiming {
         }
 
         railComCount = Int((railComLength / (oneBitLength * 2)).rounded(.awayFromZero))
-
-        preambleCount = Self.preambleCountMin + railComCount
     }
 }
 

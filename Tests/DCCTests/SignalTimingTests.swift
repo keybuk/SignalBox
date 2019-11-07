@@ -43,12 +43,6 @@ class SignalTimingTests : XCTestCase {
         XCTAssertEqual(timing.railComCount, 4)
     }
 
-    /// Test that when we use a pulseWidth of 1µs, a preamble requires 18 one bits.
-    func testMicrosecondPreambleCount() {
-        let timing = try! SignalTiming(pulseWidth: 1)
-        XCTAssertEqual(timing.preambleCount, 18)
-    }
-
 
     // MARK: 0.1µs tests
 
@@ -80,12 +74,6 @@ class SignalTimingTests : XCTestCase {
     func testTenthRailComCount() {
         let timing = try! SignalTiming(pulseWidth: 1)
         XCTAssertEqual(timing.railComCount, 4)
-    }
-
-    /// Test that when we use a pulseWidth of 0.1µs, a preamble requires 18 one bits.
-    func testTenthPreambleCount() {
-        let timing = try! SignalTiming(pulseWidth: 1)
-        XCTAssertEqual(timing.preambleCount, 18)
     }
 
     
@@ -121,12 +109,6 @@ class SignalTimingTests : XCTestCase {
         XCTAssertEqual(timing.railComCount, 4)
     }
 
-    /// Test that when we use a pulseWidth of 10µs, a preamble requires 18 one bits.
-    func testTenPreambleCount() {
-        let timing = try! SignalTiming(pulseWidth: 10)
-        XCTAssertEqual(timing.preambleCount, 18)
-    }
-
     
     // MARK: 14.5µs tests
     
@@ -158,12 +140,6 @@ class SignalTimingTests : XCTestCase {
     func testGoldilocksRailComCount() {
         let timing = try! SignalTiming(pulseWidth: 14.5)
         XCTAssertEqual(timing.railComCount, 4)
-    }
-    
-    /// Test that when we use a pulseWidth of 14.5µs, a preamble requires 18 one bits.
-    func testGoldilocksPreambleCount() {
-        let timing = try! SignalTiming(pulseWidth: 14.5)
-        XCTAssertEqual(timing.preambleCount, 18)
     }
 
 
@@ -201,12 +177,6 @@ class SignalTimingTests : XCTestCase {
         XCTAssertEqual(timing.railComCount, 4)
     }
 
-    /// Test that when we use a pulseWidth of 29µs, a preamble requires 18 one bits.
-    func testDoublePreambleCount() {
-        let timing = try! SignalTiming(pulseWidth: 29)
-        XCTAssertEqual(timing.preambleCount, 18)
-    }
-
 
     // MARK: 7µs tests
 
@@ -238,12 +208,6 @@ class SignalTimingTests : XCTestCase {
     func testSevenRailComCount() {
         let timing = try! SignalTiming(pulseWidth: 7)
         XCTAssertEqual(timing.railComCount, 5)
-    }
-
-    /// Test that when we use a pulseWidth of 7µs, a preamble requires 19 one bits to account for the extra full bit for the cutout.
-    func testSevenPreambleCount() {
-        let timing = try! SignalTiming(pulseWidth: 7)
-        XCTAssertEqual(timing.preambleCount, 19)
     }
 
     
