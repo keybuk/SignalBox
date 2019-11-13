@@ -43,7 +43,7 @@ public struct Preamble : Packable {
     }
     
     public func add<T : Packer>(into packer: inout T) {
-        let count = withCutout ? timing.preambleCount : SignalTiming.preambleCountMin
+        let count = timing.preambleCount + (withCutout ? timing.railComCount : 0)
         if count <= UInt64.bitWidth {
             // FIXME: since Packer iterates the bits anyway, is this really an optimisation?
             packer.add(UInt64.mask(bits: count), length: count)
