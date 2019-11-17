@@ -90,8 +90,8 @@ public struct SignalPacker : Packer {
 
 // MARK: Debugging
 
-extension SignalPacker : CustomDebugStringConvertible {
-    public var debugDescription: String {
+extension SignalPacker : CustomStringConvertible {
+    public var description: String {
         let bitsString = results.map({ $0.binaryString }).joined(separator: " ")
         return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }

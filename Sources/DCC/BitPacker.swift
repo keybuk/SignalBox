@@ -57,8 +57,8 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
 
 // MARK: Debugging
 
-extension BitPacker : CustomDebugStringConvertible {
-    public var debugDescription: String {
+extension BitPacker : CustomStringConvertible {
+    public var description: String {
         let bitsString = results.map({ $0.binaryString }).joined(separator: " ")
         return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
