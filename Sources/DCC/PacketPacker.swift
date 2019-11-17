@@ -74,3 +74,11 @@ where SubPacker : Packer {
         return packer
     }
 }
+
+// MARK: Debugging
+
+extension PacketPacker : CustomStringConvertible {
+    public var description: String {
+        "<\(type(of: self)) \(packer), error: \(errorDetectionByte.binaryString) remaining: \(bitsRemaining)>"
+    }
+}
