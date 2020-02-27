@@ -9,8 +9,8 @@ import Util
 
 /// Packs fields as bit fields into an array of fixed width integers.
 ///
-/// `BitPacker` may be used to create arrays of integers by sourcing values of individual bits from other values, packing them into
-/// the larger structure.
+/// `BitPacker` may be used to create arrays of integers by sourcing values of individual bits from other
+/// values, packing them into the larger structure.
 public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
     // FIXME: rename this field.
     /// Packed results.

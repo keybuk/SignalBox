@@ -7,8 +7,8 @@
 
 /// A type that can pack its values using a Packer.
 ///
-/// Types can conform by packing their members through their own `Packable` conformance, or by using the `add(length:)`
-/// method of `Packer`.
+/// Types can conform by packing their members through their own `Packable` conformance, or by using
+/// the `add(length:)` method of `Packer`.
 public protocol Packable {
     /// Adds the values from this type into the given packer.
     ///
@@ -36,14 +36,15 @@ extension Bool : Packable {
 }
 
 extension FixedWidthInteger where Self : Packable {
-    // Provide conformance to `Packable` for all fixed width integers by using their bitWidth.
+    // Provide conformance to `Packable` for all fixed width integers by using
+    // their bitWidth.
     public func add<T : Packer>(into packer: inout T) {
         packer.add(self, length: bitWidth)
     }
 }
 
-// Extend the fixed-width integers, but exclude Int and UInt since their width varies by platform
-// and that kind of thing introduces bugs!
+// Extend the fixed-width integers, but exclude Int and UInt since their width
+// varies by platform and that kind of thing introduces bugs!
 extension Int8 : Packable {}
 extension Int16 : Packable {}
 extension Int32 : Packable {}
@@ -53,9 +54,11 @@ extension UInt16 : Packable {}
 extension UInt32 : Packable {}
 extension UInt64 : Packable {}
 
-// FIXME: get rid of this since we end up stuck choosing between heterogenous and homogenous arrays.
+// FIXME: get rid of this since we end up stuck choosing between heterogenous
+// and homogenous arrays.
 extension Array : Packable where Element == Packable {
-    // Provide conformance to `Packable` for Arrays of `Packable` by iterating their elements.
+    // Provide conformance to `Packable` for Arrays of `Packable` by iterating
+    // their elements.
     public func add<T : Packer>(into packer: inout T) {
         for element in self {
             element.add(into: &packer)

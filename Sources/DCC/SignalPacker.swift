@@ -53,8 +53,9 @@ public struct SignalPacker : Packer {
         precondition(length > 0, "length must be greater than 0")
         precondition(length <= T.bitWidth, "length must be less than or equal to \(T.bitWidth)")
         
-        // Convert each input bit; there's no shortcut here for counting consecutive bits because
-        // we always have to output a block of 1s and 0s for each one anyway.
+        // Convert each input bit; there's no shortcut here for counting
+        // consecutive bits because we always have to output a block of
+        // 1s and 0s for each one anyway.
         for offset in 0..<length {
             let bit = value >> (length - offset - 1) & 1
             let pulseLength = bit == 0 ? timing.zeroBitLength : timing.oneBitLength

@@ -32,7 +32,8 @@ extension Packet {
 
 public struct Preamble : Packable {
     
-    // FIXME: This is just a thought experiment, it might not be the best way to do preambles.
+    // FIXME: This is just a thought experiment, it might not be the best way
+    // to do preambles.
     
     public var timing: SignalTiming
     public var withCutout: Bool
@@ -45,7 +46,8 @@ public struct Preamble : Packable {
     public func add<T : Packer>(into packer: inout T) {
         let count = timing.preambleCount + (withCutout ? timing.railComCount : 0)
         if count <= UInt64.bitWidth {
-            // FIXME: since Packer iterates the bits anyway, is this really an optimisation?
+            // FIXME: since Packer iterates the bits anyway, is this really an
+            // optimisation?
             packer.add(UInt64.mask(bits: count), length: count)
         } else {
             for _ in 0..<count {

@@ -9,14 +9,14 @@ import Foundation
 
 /// Pass-through `Packer` for DCC packets.
 ///
-/// `PacketPacker` passes values added to it through another `Packer` while inserting byte separation bits and accumulatiing
-/// the error detection byte.
+/// `PacketPacker` passes values added to it through another `Packer` while inserting byte separation
+/// bits and accumulatiing the error detection byte.
 ///
-/// Values added should conform to the more strict structure of DCC address and instruction bytes, resulting in exact multiples of
-/// eight bits.
+/// Values added should conform to the more strict structure of DCC address and instruction bytes, resulting
+/// in exact multiples of eight bits.
 ///
-/// Additionally to add the accumulated error detection byte and return the internal copy of the wrapped `Packer`, `finish`
-/// must be called.
+/// Additionally to add the accumulated error detection byte and return the internal copy of the wrapped
+/// `Packer`, `finish` must be called.
 ///
 /// # Example:
 ///      var signalPacker = SignalPacker(timing: SignalTiming(pulseWidth: 14.5))
@@ -62,8 +62,8 @@ where SubPacker : Packer {
 
     /// Returns the internal copy of the wrapped `Packer`.
     ///
-    /// Adds the error detection byte and packet end-bit, and then returns the internal copy of `packer` which has had the
-    /// called `add(:length:)` methods called on it.
+    /// Adds the error detection byte and packet end-bit, and then returns the internal copy of `packer`
+    /// which has had the called `add(:length:)` methods called on it.
     public mutating func finish() -> SubPacker {
         precondition(bitsRemaining == 0, "Packet must consist of whole bytes")
 
