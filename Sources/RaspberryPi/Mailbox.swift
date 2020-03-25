@@ -85,8 +85,10 @@ public final class Mailbox {
         
         buffer.replaceSubrange(5..<(5 + values.count), with: values)
         buffer[5 + values.count] = 0
-        
-        let result = ioctl(fileHandle.fileDescriptor, Mailbox.propertyIoctl, UnsafeMutableRawPointer(mutating: buffer))
+
+        let result = buffer.withUnsafeMutableBytes {
+            ioctl(fileHandle.fileDescriptor, Mailbox.propertyIoctl, $0.baseAddress!)
+        }
         guard result == 0 else { throw OSError(errno: errno) }
         
         switch buffer[1] {
