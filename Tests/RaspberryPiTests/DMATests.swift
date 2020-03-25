@@ -40,25 +40,39 @@ class DMALayoutTests : XCTestCase {
 
 class DMATests : XCTestCase {
 
-    var registers: ContiguousArray<DMA.Registers> = []
-    var pointers: [UnsafeMutablePointer<DMA.Registers>] = []
-    var interruptStatusRegister = DMABitField()
-    var enableRegister = DMABitField()
+    var registers: [UnsafeMutablePointer<DMA.Registers>] = []
+    var interruptStatusRegister: UnsafeMutablePointer<DMABitField>!
+    var enableRegister: UnsafeMutablePointer<DMABitField>!
 
     var dma: DMA!
 
     override func setUp() {
-        registers = ContiguousArray(repeating: DMA.Registers(), count: DMA.count)
-        pointers = registers.indices.map({ UnsafeMutablePointer(&registers[$0]) })
-        interruptStatusRegister = DMABitField()
-        enableRegister = DMABitField()
-        dma = DMA(registers: pointers, interruptStatusRegister: &interruptStatusRegister, enableRegister: &enableRegister)
+        for _ in 0..<DMA.count {
+            let register = UnsafeMutablePointer<DMA.Registers>.allocate(capacity: 1)
+            register.initialize(to: DMA.Registers())
+            registers.append(register)
+        }
+
+        interruptStatusRegister = UnsafeMutablePointer<DMABitField>.allocate(capacity: 1)
+        interruptStatusRegister.initialize(to: DMABitField())
+
+        enableRegister = UnsafeMutablePointer<DMABitField>.allocate(capacity: 1)
+        enableRegister.initialize(to: DMABitField())
+
+        dma = DMA(registers: registers, interruptStatusRegister: interruptStatusRegister, enableRegister: enableRegister)
     }
 
     override func tearDown() {
         dma = nil
-        pointers.removeAll()
+
+        registers.forEach { $0.deallocate() }
         registers.removeAll()
+
+        interruptStatusRegister.deallocate()
+        interruptStatusRegister = nil
+
+        enableRegister.deallocate()
+        enableRegister = nil
     }
 
     
@@ -66,14 +80,14 @@ class DMATests : XCTestCase {
     func testFirstChannel() {
         dma[0].reset()
 
-        XCTAssertNotEqual(registers[0].controlStatus.rawValue, 0)
+        XCTAssertNotEqual(registers[0].pointee.controlStatus.rawValue, 0)
     }
 
     /// Test that a modification to the last channel goes to the last set of registers.
     func testLastChannel() {
         dma[15].reset()
 
-        XCTAssertNotEqual(registers[15].controlStatus.rawValue, 0)
+        XCTAssertNotEqual(registers[15].pointee.controlStatus.rawValue, 0)
     }
 
 
@@ -83,22 +97,22 @@ class DMATests : XCTestCase {
     func testSetIsEnabled() {
         dma[0].isEnabled = true
 
-        XCTAssertEqual(enableRegister.field & 1, 1)
+        XCTAssertEqual(enableRegister.pointee.field & 1, 1)
     }
 
     /// Test that we can disable a DMA channel.
     func testClearIsEnabled() {
         // Corrupt the field so we can see it go to zero.
-        enableRegister.field = ~0
+        enableRegister.pointee.field = ~0
 
         dma[0].isEnabled = false
 
-        XCTAssertEqual(enableRegister.field & 1, 0)
+        XCTAssertEqual(enableRegister.pointee.field & 1, 0)
     }
 
     /// Test that we can get the status of an enabled DMA channel.
     func testGetIsEnabled() {
-        enableRegister.field = 1
+        enableRegister.pointee.field = 1
 
         XCTAssertEqual(dma[0].isEnabled, true)
     }
@@ -113,7 +127,7 @@ class DMATests : XCTestCase {
 
     /// Test that we can get the interrupt status of an DMA channel.
     func testGetInterruptStatus() {
-        interruptStatusRegister.field = 1
+        interruptStatusRegister.pointee.field = 1
 
         XCTAssertEqual(dma[0].interruptStatus, true)
     }
@@ -130,7 +144,7 @@ class DMATests : XCTestCase {
     func testReset() {
         dma[0].reset()
 
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 31) & 1, 1)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 31) & 1, 1)
     }
 
 
@@ -140,7 +154,7 @@ class DMATests : XCTestCase {
     func testAbort() {
         dma[0].abort()
 
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 30) & 1, 1)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 30) & 1, 1)
     }
     
     
@@ -150,21 +164,21 @@ class DMATests : XCTestCase {
     func testSetDisableDebugPause() {
         dma[0].disableDebugPause = true
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 29) & 1, 1)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 29) & 1, 1)
     }
 
     /// Test that we can clear the debugPauseDisabled bit of the control/status register.
     func testClearDisableDebugPause() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: ~0)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: ~0)
         
         dma[0].disableDebugPause = false
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 29) & 1, 0)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 29) & 1, 0)
     }
     
     /// Test that we can test for the debugPauseDisabled bit of the control/status register.
     func testGetDisableDebugPause() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 29)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 29)
         
         XCTAssertEqual(dma[0].disableDebugPause, true)
     }
@@ -181,21 +195,21 @@ class DMATests : XCTestCase {
     func testSetWaitForOutstandingWrites() {
         dma[0].waitForOutstandingWrites = true
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 28) & 1, 1)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 28) & 1, 1)
     }
     
     /// Test that we can clear the waitForOutstandingWrites bit of the control/status register.
     func testClearWaitForOutstandingWrites() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: ~0)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: ~0)
         
         dma[0].waitForOutstandingWrites = false
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 28) & 1, 0)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 28) & 1, 0)
     }
     
     /// Test that we can test for the waitForOutstandingWrites bit of the control/status register.
     func testGetWaitForOutstandingWrites() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 28)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 28)
         
         XCTAssertEqual(dma[0].waitForOutstandingWrites, true)
     }
@@ -212,32 +226,32 @@ class DMATests : XCTestCase {
     func testSetPanicPriorityLevel() {
         dma[0].panicPriorityLevel = 7
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 20) & ~(~0 << 4), 7)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 20) & ~(~0 << 4), 7)
     }
     
     /// Test that when we set the panicPriorityLevel bits, all are cleared.
     func testPanicPriorityLevelIdempotent() {
         // Corrupt the bits of the register.
-        registers[0].controlStatus = DMAControlStatus(rawValue: ~0)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: ~0)
 
         dma[0].panicPriorityLevel = 3
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 20) & ~(~0 << 4), 3)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 20) & ~(~0 << 4), 3)
     }
     
     /// Test that when we set the panicPriorityLevel bits, all other bits are left alone.
     func testPanicPriorityLevelDiscrete() {
         // Corrupt the bits of the register.
-        registers[0].controlStatus = DMAControlStatus(rawValue: ~0)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: ~0)
         
         dma[0].panicPriorityLevel = 3
         
-        XCTAssertEqual(registers[0].controlStatus.rawValue | (~(~0 << 4) << 20), ~0)
+        XCTAssertEqual(registers[0].pointee.controlStatus.rawValue | (~(~0 << 4) << 20), ~0)
     }
 
     /// Test that we can get the panicPriorityLevel bits of the control/status register.
     func testGetPanicPriorityLevel() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 9 << 20)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 9 << 20)
 
         XCTAssertEqual(dma[0].panicPriorityLevel, 9)
     }
@@ -249,32 +263,32 @@ class DMATests : XCTestCase {
     func testSetPriorityLevel() {
         dma[0].priorityLevel = 7
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 16) & ~(~0 << 4), 7)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 16) & ~(~0 << 4), 7)
     }
     
     /// Test that when we set the priorityLevel bits, all are cleared.
     func testPriorityLevelIdempotent() {
         // Corrupt the bits of the register.
-        registers[0].controlStatus = DMAControlStatus(rawValue: ~0)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: ~0)
         
         dma[0].priorityLevel = 3
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 16) & ~(~0 << 4), 3)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 16) & ~(~0 << 4), 3)
     }
     
     /// Test that when we set the priorityLevel bits, all other bits are left alone.
     func testPriorityLevelDiscrete() {
         // Corrupt the bits of the register.
-        registers[0].controlStatus = DMAControlStatus(rawValue: ~0)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: ~0)
         
         dma[0].priorityLevel = 3
         
-        XCTAssertEqual(registers[0].controlStatus.rawValue | (~(~0 << 4) << 16), ~0)
+        XCTAssertEqual(registers[0].pointee.controlStatus.rawValue | (~(~0 << 4) << 16), ~0)
     }
     
     /// Test that we can get the priorityLevel bits of the control/status register.
     func testGetPriorityLevel() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 9 << 16)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 9 << 16)
         
         XCTAssertEqual(dma[0].priorityLevel, 9)
     }
@@ -284,7 +298,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the errorDetected bit of the control/status register.
     func testGetIsErrorDetected() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 8)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 8)
         
         XCTAssertEqual(dma[0].isErrorDetected, true)
     }
@@ -299,7 +313,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the waitingForOutstandingWrites bit of the control/status register.
     func testGetWaitingForOutstandingWrites() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 6)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 6)
         
         XCTAssertEqual(dma[0].isWaitingForOutstandingWrites, true)
     }
@@ -314,7 +328,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the pausedByDataRequest bit of the control/status register.
     func testGetIsPausedByDataRequest() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 5)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 5)
         
         XCTAssertEqual(dma[0].isPausedByDataRequest, true)
     }
@@ -329,7 +343,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the paused bit of the control/status register.
     func testGetIsPaused() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 4)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 4)
         
         XCTAssertEqual(dma[0].isPaused, true)
     }
@@ -344,7 +358,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the requestingData bit of the control/status register.
     func testGetIsRequestingData() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 3)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 3)
         
         XCTAssertEqual(dma[0].isRequestingData, true)
     }
@@ -359,7 +373,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the interrupt bit of the control/status register.
     func testGetIsInterruptRaised() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 2)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 2)
         
         XCTAssertEqual(dma[0].isInterruptRaised, true)
     }
@@ -374,14 +388,14 @@ class DMATests : XCTestCase {
     func testClearIsInterruptRaised() {
         dma[0].isInterruptRaised = false
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 2) & 1, 1)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 2) & 1, 1)
     }
 
     /// Test that setting isInterruptRaised to true is ignored.
     func testIsInterruptRaisedNoop() {
         dma[0].isInterruptRaised = true
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 2) & 1, 0)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 2) & 1, 0)
     }
     
 
@@ -389,7 +403,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the transferComplete bit of the control/status register.
     func testGetIsComplete() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1 << 1)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1 << 1)
         
         XCTAssertEqual(dma[0].isComplete, true)
     }
@@ -405,14 +419,14 @@ class DMATests : XCTestCase {
     func testClearIsComplete() {
         dma[0].isComplete = false
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 1) & 1, 1)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 1) & 1, 1)
     }
     
     /// Test that setting isComplete to true is ignored.
     func testIsCompleteNoop() {
         dma[0].isComplete = true
         
-        XCTAssertEqual((registers[0].controlStatus.rawValue >> 1) & 1, 0)
+        XCTAssertEqual((registers[0].pointee.controlStatus.rawValue >> 1) & 1, 0)
     }
 
     
@@ -422,21 +436,21 @@ class DMATests : XCTestCase {
     func testSetIsActive() {
         dma[0].isActive = true
         
-        XCTAssertEqual(registers[0].controlStatus.rawValue & 1, 1)
+        XCTAssertEqual(registers[0].pointee.controlStatus.rawValue & 1, 1)
     }
     
     /// Test that we can clear the active bit of the control/status register.
     func testClearIsActive() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: ~0)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: ~0)
         
         dma[0].isActive = false
         
-        XCTAssertEqual(registers[0].controlStatus.rawValue & 1, 0)
+        XCTAssertEqual(registers[0].pointee.controlStatus.rawValue & 1, 0)
     }
     
     /// Test that we can test for the active bit of the control/status register.
     func testGetIsActive() {
-        registers[0].controlStatus = DMAControlStatus(rawValue: 1)
+        registers[0].pointee.controlStatus = DMAControlStatus(rawValue: 1)
         
         XCTAssertEqual(dma[0].isActive, true)
     }
@@ -453,12 +467,12 @@ class DMATests : XCTestCase {
     func testSetControlBlockAddress() {
         dma[0].controlBlockAddress = 0xcafe0000
         
-        XCTAssertEqual(registers[0].controlBlockAddress, 0xcafe0000)
+        XCTAssertEqual(registers[0].pointee.controlBlockAddress, 0xcafe0000)
     }
     
     /// Test that we can get the control block address.
     func testGetControlBlockAddress() {
-        registers[0].controlBlockAddress = 0xbeef0000
+        registers[0].pointee.controlBlockAddress = 0xbeef0000
         
         XCTAssertEqual(dma[0].controlBlockAddress, 0xbeef0000)
     }
@@ -468,13 +482,13 @@ class DMATests : XCTestCase {
     
     /// Test that a DMAControlBlock is synthesized from the registers that contain its data.
     func testGetControlBlock() {
-        registers[0].controlBlockAddress = 0xdead0000
-        registers[0].transferInformation = DMATransferInformation(rawValue: 0xbeefcafe)
-        registers[0].sourceAddress = 0xc0ffee99
-        registers[0].destinationAddress = 0x0ddba11
-        registers[0].transferLength = 0xca11ab1e
-        registers[0].stride = 0xf005ba11
-        registers[0].nextControlBlockAddress = 0xbedabb1e
+        registers[0].pointee.controlBlockAddress = 0xdead0000
+        registers[0].pointee.transferInformation = DMATransferInformation(rawValue: 0xbeefcafe)
+        registers[0].pointee.sourceAddress = 0xc0ffee99
+        registers[0].pointee.destinationAddress = 0x0ddba11
+        registers[0].pointee.transferLength = 0xca11ab1e
+        registers[0].pointee.stride = 0xf005ba11
+        registers[0].pointee.nextControlBlockAddress = 0xbedabb1e
         
         let controlBlock = dma[0].controlBlock
         
@@ -489,7 +503,7 @@ class DMATests : XCTestCase {
 
     /// Test that nil is returned for controlBlock when there is no controlBlockAddress.
     func testGetControlBlockNil() {
-        registers[0].controlBlockAddress = 0
+        registers[0].pointee.controlBlockAddress = 0
         
         XCTAssertNil(dma[0].controlBlock)
     }
@@ -499,7 +513,7 @@ class DMATests : XCTestCase {
 
     /// Test that we can test for the LITE bit of the debug register.
     func testGetIsLite() {
-        registers[0].debug = DMADebug(rawValue: 1 << 28)
+        registers[0].pointee.debug = DMADebug(rawValue: 1 << 28)
         
         XCTAssertEqual(dma[0].isLite, true)
     }
@@ -511,28 +525,28 @@ class DMATests : XCTestCase {
     
     /// Test that we can get the VERSION field of the debug register.
     func testGetVersion() {
-        registers[0].debug = DMADebug(rawValue: 2 << 25)
+        registers[0].pointee.debug = DMADebug(rawValue: 2 << 25)
         
         XCTAssertEqual(dma[0].version, 2)
     }
     
     /// Test that we can get the DMA_STATE field of the debug register.
     func testGetStateMachineState() {
-        registers[0].debug = DMADebug(rawValue: 1 << 16)
+        registers[0].pointee.debug = DMADebug(rawValue: 1 << 16)
         
         XCTAssertEqual(dma[0].stateMachineState, 1)
     }
 
     /// Test that we can get the DMA_ID field of the debug register.
     func testGetAxiIdentifier() {
-        registers[0].debug = DMADebug(rawValue: 135 << 8)
+        registers[0].pointee.debug = DMADebug(rawValue: 135 << 8)
         
         XCTAssertEqual(dma[0].axiIdentifier, 135)
     }
     
     /// Test that we can get the OUTSTANDING_WRITES field of the debug register.
     func testGetNumberOfOutstandingWrites() {
-        registers[0].debug = DMADebug(rawValue: 13 << 4)
+        registers[0].pointee.debug = DMADebug(rawValue: 13 << 4)
         
         XCTAssertEqual(dma[0].numberOfOutstandingWrites, 13)
     }
@@ -541,7 +555,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the READ_ERROR bit of the debug register.
     func testGetIsReadError() {
-        registers[0].debug = DMADebug(rawValue: 1 << 2)
+        registers[0].pointee.debug = DMADebug(rawValue: 1 << 2)
         
         XCTAssertEqual(dma[0].isReadError, true)
     }
@@ -556,14 +570,14 @@ class DMATests : XCTestCase {
     func testClearIsReadError() {
         dma[0].isReadError = false
         
-        XCTAssertEqual((registers[0].debug.rawValue >> 2) & 1, 1)
+        XCTAssertEqual((registers[0].pointee.debug.rawValue >> 2) & 1, 1)
     }
     
     /// Test that setting isReadError to true is ignored.
     func testIsReadErrorNoop() {
         dma[0].isReadError = true
         
-        XCTAssertEqual((registers[0].debug.rawValue >> 2) & 1, 0)
+        XCTAssertEqual((registers[0].pointee.debug.rawValue >> 2) & 1, 0)
     }
 
     
@@ -571,7 +585,7 @@ class DMATests : XCTestCase {
     
     /// Test that we can test for the FIFO_ERROR bit of the debug register.
     func testGetIsFifoError() {
-        registers[0].debug = DMADebug(rawValue: 1 << 1)
+        registers[0].pointee.debug = DMADebug(rawValue: 1 << 1)
         
         XCTAssertEqual(dma[0].isFifoError, true)
     }
@@ -586,21 +600,21 @@ class DMATests : XCTestCase {
     func testClearIsFifoError() {
         dma[0].isFifoError = false
         
-        XCTAssertEqual((registers[0].debug.rawValue >> 1) & 1, 1)
+        XCTAssertEqual((registers[0].pointee.debug.rawValue >> 1) & 1, 1)
     }
     
     /// Test that setting isFifoError to true is ignored.
     func testIsFifoErrorNoop() {
         dma[0].isFifoError = true
         
-        XCTAssertEqual((registers[0].debug.rawValue >> 1) & 1, 0)
+        XCTAssertEqual((registers[0].pointee.debug.rawValue >> 1) & 1, 0)
     }
 
     
     // MARK: isReadLastNotSetError
     /// Test that we can test for the READ_LAST_NOT_SET_ERROR bit of the debug register.
     func testGetIsReadLastNotSetError() {
-        registers[0].debug = DMADebug(rawValue: 1)
+        registers[0].pointee.debug = DMADebug(rawValue: 1)
         
         XCTAssertEqual(dma[0].isReadLastNotSetError, true)
     }
@@ -615,14 +629,14 @@ class DMATests : XCTestCase {
     func testClearIsReadLastNotSetError() {
         dma[0].isReadLastNotSetError = false
         
-        XCTAssertEqual(registers[0].debug.rawValue & 1, 1)
+        XCTAssertEqual(registers[0].pointee.debug.rawValue & 1, 1)
     }
     
     /// Test that setting isReadLastNotSetError to true is ignored.
     func testIsReadLastNotSetErrorNoop() {
         dma[0].isReadLastNotSetError = true
         
-        XCTAssertEqual(registers[0].debug.rawValue & 1, 0)
+        XCTAssertEqual(registers[0].pointee.debug.rawValue & 1, 0)
     }
 
 }
