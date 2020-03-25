@@ -59,7 +59,7 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
 
 extension BitPacker : CustomStringConvertible {
     public var description: String {
-        let bitsString = results.map({ $0.binaryString }).joined(separator: " ")
+        let bitsString = results.map(\.binaryString).joined(separator: " ")
         return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
 }

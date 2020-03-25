@@ -277,10 +277,10 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         guard memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
 
         // Keep track of the current range register value, since we don't know what it was prior to this bitstream beginning, use zero so that the first data event will always set it correctly.
-        var range = breakpoint.map({ $0.range }) ?? 0
+        var range = breakpoint.map(\.range) ?? 0
         
         // Also keep track the set of GPIO events that are being delayed so that they line up with the correct PWM word.
-        var delayedEvents = breakpoint.map({ $0.delayedEvents }) ?? DelayedEvents()
+        var delayedEvents = breakpoint.map(\.delayedEvents) ?? DelayedEvents()
         
         // For efficiency, we collect multiple consecutive words of data together into a single control block, and only break where necessary. For loop unrolling we track the bitstream state at the point that the `words` array began.
         var words: [UInt32] = []
