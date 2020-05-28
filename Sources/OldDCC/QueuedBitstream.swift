@@ -150,15 +150,10 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
         controlBlock.nextControlBlockAddress = UInt32(MemoryLayout<DMAControlBlock>.stride * (controlBlocks.count + 1))
         controlBlocks.append(controlBlock)
 
-        data.append(0)
-        data.append(0)
-        data.append(0)
-        data.append(0)
-        
-//        data.append(gpioSet.field0)
-//        data.append(gpioSet.field1)
-//        data.append(gpioClear.field0)
-//        data.append(gpioClear.field1)
+        data.append(gpioSet.field0)
+        data.append(gpioSet.field1)
+        data.append(gpioClear.field0)
+        data.append(gpioClear.field1)
     }
     
     /// Adjusts the last control block's `nextControlBlockAddress`.
@@ -593,24 +588,23 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
                 description += "  \(offset): Range \(data[dataIndex]) → \(next)\(bp)\n"
             case GPIO.busAddress + 0x1c:
                 // GPIO.
-                break
-//                let setField = GPIOBitField(field0: data[dataIndex], field1: data[dataIndex + 1])
-//                let clearField = GPIOBitField(field0: data[dataIndex + 2], field1: data[dataIndex + 3])
-//
-//                description += "  \(offset): GPIO → \(next)\(bp)\n"
-//                if setField[Driver.railComGPIO] {
-//                    description += "    ↑ RailCom\n"
-//                }
-//                if setField[Driver.debugGPIO] {
-//                    description += "    ↑ Debug\n"
-//                }
-//
-//                if clearField[Driver.railComGPIO] {
-//                    description += "    ↓ RailCom\n"
-//                }
-//                if clearField[Driver.debugGPIO] {
-//                    description += "    ↓ Debug\n"
-//                }
+                let setField = GPIOBitField(field0: data[dataIndex], field1: data[dataIndex + 1])
+                let clearField = GPIOBitField(field0: data[dataIndex + 2], field1: data[dataIndex + 3])
+
+                description += "  \(offset): GPIO → \(next)\(bp)\n"
+                if setField[Driver.railComGPIO] {
+                    description += "    ↑ RailCom\n"
+                }
+                if setField[Driver.debugGPIO] {
+                    description += "    ↑ Debug\n"
+                }
+
+                if clearField[Driver.railComGPIO] {
+                    description += "    ↓ RailCom\n"
+                }
+                if clearField[Driver.debugGPIO] {
+                    description += "    ↓ Debug\n"
+                }
             default:
                 description += "  \(offset): Unknown → \(next)\(bp)\n"
             }

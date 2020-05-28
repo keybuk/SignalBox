@@ -25,9 +25,9 @@ import Util
 ///     gpio.registers.pointee.outputSet = outputSet
 ///
 public struct GPIOBitField : Equatable, Hashable {
-    
-    internal var field0: UInt32
-    internal var field1: UInt32
+    // FIXME: exposed for OldDCC.QueuedBitstream only.
+    public var field0: UInt32
+    public var field1: UInt32
     private var reserved: UInt32
     
     public subscript(index: Int) -> Bool {
@@ -61,5 +61,11 @@ public struct GPIOBitField : Equatable, Hashable {
         field1 = 0
         reserved = 0
     }
-    
+
+    // FIXME: exposed for OldDCC.QueuedBitstream only.
+    public init(field0: UInt32, field1: UInt32) {
+        self.field0 = field0
+        self.field1 = field1
+        reserved = 0
+    }
 }
