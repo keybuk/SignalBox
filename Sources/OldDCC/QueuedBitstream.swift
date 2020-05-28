@@ -554,6 +554,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
             dataBase = memory.busAddress + UInt32(MemoryLayout<DMAControlBlock>.stride * controlBlocks.count)
             
             description += "  committed at \(memory.busAddress.hexString)\n"
+            description += "  data at \(dataBase.hexString)\n"
         } else {
             controlBlocksBase = 0
             dataBase = 0
@@ -606,7 +607,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
                     description += "    ↓ Debug\n"
                 }
             default:
-                description += "  \(offset): Unknown → \(next)\(bp)\n"
+                description += "  \(offset): Unknown \(controlBlock.destinationAddress.hexString) → \(next)\(bp)\n"
             }
         }
         
