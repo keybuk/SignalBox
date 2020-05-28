@@ -43,7 +43,7 @@ public class Driver {
     public static let debugGPIO = 19
     
     /// DMA channel to use.
-    public static let dmaChannel = 4
+    public static let dmaChannel = 5
     
     /// Clock source to use.
     ///
