@@ -9,7 +9,9 @@ let package = Package(
         .library(name: "Util", targets: ["RaspberryPi"]),
         .library(name: "RaspberryPi", targets: ["RaspberryPi"]),
         .library(name: "DCC", targets: ["DCC"]),
-        ],
+
+        .executable(name: "TestGPIO", targets: ["TestGPIO"]),
+    ],
     targets: [
         .target(name: "Util"),
         .testTarget(name: "UtilTests", dependencies: ["Util"]),
@@ -22,5 +24,7 @@ let package = Package(
 
         .target(name: "OldDCC", dependencies: ["Util", "RaspberryPi"]),
         .target(name: "OldPrototype", dependencies: ["OldDCC"]),
-        ]
+
+        .target(name: "TestGPIO", dependencies: ["RaspberryPi"]),
+    ]
 )
