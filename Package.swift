@@ -13,6 +13,7 @@ let package = Package(
         .executable(name: "TestGPIO", targets: ["TestGPIO"]),
         .executable(name: "TestPWM", targets: ["TestPWM"]),
         .executable(name: "TestDMA", targets: ["TestDMA"]),
+        .executable(name: "TestRaspberryPi", targets: ["TestRaspberryPi"]),
     ],
     targets: [
         .target(name: "Util"),
@@ -30,5 +31,6 @@ let package = Package(
         .target(name: "TestGPIO", dependencies: ["RaspberryPi"]),
         .target(name: "TestPWM", dependencies: ["RaspberryPi"]),
         .target(name: "TestDMA", dependencies: ["RaspberryPi"]),
+        .target(name: "TestRaspberryPi", dependencies: ["RaspberryPi"]),
     ]
 )
