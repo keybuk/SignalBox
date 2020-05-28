@@ -417,7 +417,7 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
                 controlBlocks[index].sourceAddress += memory.busAddress + UInt32(controlBlocksSize)
             }
             if controlBlocks[index].destinationAddress < RaspberryPi.peripheralBusAddress {
-//                controlBlocks[index].destinationAddress += memory.busAddress + UInt32(controlBlocksSize)
+                controlBlocks[index].destinationAddress += memory.busAddress + UInt32(controlBlocksSize)
             }
             if controlBlocks[index].nextControlBlockAddress > 0 {
                 controlBlocks[index].nextControlBlockAddress += memory.busAddress
