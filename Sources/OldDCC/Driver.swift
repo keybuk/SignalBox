@@ -133,18 +133,11 @@ public class Driver {
         pwm[2].useFifo = false
         pwm.clearFifo()
 
-        // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
+        // Stop the PWM clock.
         let clock = try Clock()
         clock[.pwm].isEnabled = false
         while clock[.pwm].isRunning {}
 
-        clock[.pwm].source = Driver.clockSource
-        clock[.pwm].mash = 0
-        clock[.pwm].divisor = ClockDivisor(integer: divisor, fractional: 0)
-
-        clock[.pwm].isEnabled = true
-        while !clock[.pwm].isRunning {}
-        
         // Make sure that the DMA Engine is enabled, abort any existing use of it, and clear error state.
         let dma = try DMA()
         dma[Driver.dmaChannel].isEnabled = true
@@ -158,23 +151,34 @@ public class Driver {
 
         // Set the DCC GPIO for PWM output.
         let gpio = try GPIO()
+        gpio[Driver.dccGPIO].value = false
         gpio[Driver.dccGPIO].function = Driver.dccGPIOFunction
-        
+
         // Set the RailCom GPIO for output and clear.
         gpio[Driver.railComGPIO].function = .output
         gpio[Driver.railComGPIO].value = false
-        
+
         // Set the debug GPIO for output and clear.
         gpio[Driver.debugGPIO].function = .output
         gpio[Driver.debugGPIO].value = false
-        
-        // Enable the PWM, using the FIFO in serializer mode, and DREQ signals sent to the DMA Engine.
+
+        // Set the PWM to use the FIFO in serializer mode, and DREQ signals sent to the DMA Engine.
         pwm.isDMAEnabled = true
         pwm.dataRequestThreshold = 1
         pwm.panicThreshold = 1
         pwm[1].useFifo = true
         pwm[1].mode = .serializer
+
+        // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
+        clock[.pwm].source = Driver.clockSource
+        clock[.pwm].mash = 0
+        clock[.pwm].divisor = ClockDivisor(integer: divisor, fractional: 0)
+
+        // Enable the PWM.
         pwm[1].isEnabled = true
+
+        clock[.pwm].isEnabled = true
+        while !clock[.pwm].isRunning {}
 
         // Set the DMA Engine priority levels.
         dma[Driver.dmaChannel].priorityLevel = 8
@@ -196,19 +200,28 @@ public class Driver {
     ///         driver.shutdown()
     ///     }
     public func shutdown() throws {
-        // Disable the PWM channel.
-        let pwm = try PWM()
-        pwm[1].isEnabled = false
-        pwm.isDMAEnabled = false
+        // Stop the DMA Engine.
+        let dma = try DMA()
+        dma[Driver.dmaChannel].isActive = false
+        dma[Driver.dmaChannel].abort()
 
         // Stop the clock.
         let clock = try Clock()
         clock[.pwm].isEnabled = false
 
-        // Stop the DMA Engine.
-        let dma = try DMA()
-        dma[Driver.dmaChannel].isActive = false
-        dma[Driver.dmaChannel].abort()
+        // Disable the PWM channel.
+        let pwm = try PWM()
+        pwm[1].isEnabled = false
+        pwm.isDMAEnabled = false
+
+        // Restore the DCC GPIO to output, and clear all pins.
+        let gpio = try GPIO()
+        gpio[Driver.dccGPIO].value = false
+        gpio[Driver.dccGPIO].function = .output
+
+        gpio[Driver.railComGPIO].value = false
+
+        gpio[Driver.debugGPIO].value = false
 
         // Clear the bitstream queue to free the uncached memory associated with each bitstream, also cancel any pending tasks and wait for them to ensure blocks aren't holding references as well.
         isRunning = false
@@ -216,15 +229,6 @@ public class Driver {
         dispatchQueue.sync() {
             bitstreamQueue.removeAll()
         }
-        
-        // Restore the DCC GPIO to output, and clear all pins.
-        let gpio = try GPIO()
-        gpio[Driver.dccGPIO].function = .output
-        gpio[Driver.dccGPIO].value = false
-
-        gpio[Driver.railComGPIO].value = false
-        
-        gpio[Driver.debugGPIO].value = false
     }
     
     /// Interval between watchdog checks.
@@ -237,7 +241,7 @@ public class Driver {
         if let pwm = try? PWM() {
             if pwm.isBusError {
                 // Always seems to be set, and doesn't go away *shrug*
-                //print("PWM Bus Error")
+//                print("PWM Bus Error")
                 pwm.isBusError = false
             }
 
