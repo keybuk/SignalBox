@@ -49,15 +49,14 @@ func functionPacket(_ function: Int, value: Bool) -> Packet {
         return .function9To12(address: locoAddress, f9: false, f10: false, f11: value, f12: false)
     case 12:
         return .function9To12(address: locoAddress, f9: false, f10: false, f11: false, f12: value)
-        
+
     default:
         return .idle
     }
 }
 
 var driver = Driver()
-try
-    driver.startup()
+try driver.startup()
 
 var startupBitstream = Bitstream(bitDuration: driver.bitDuration)
 for _ in 0..<20 {
@@ -129,11 +128,11 @@ loop: while true {
     default:
         print("?")
     }
-    
+
     if let packet = packet {
         var bitstream = Bitstream(bitDuration: driver.bitDuration)
         bitstream.append(operationsModePacket: packet, debug: debug)
-        
+
         try! driver.queue(bitstream: bitstream)
     }
     packet = nil
