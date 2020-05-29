@@ -310,33 +310,25 @@ public class Driver {
         try dispatchQueue.sync {
             let dma = try DMA()
             let dmaActive = dma[Driver.dmaChannel].isActive
-            print("DMA \(dmaActive)")
 
             var activateBitstream: QueuedBitstream? = nil
             if requiresPowerOn {
-                print("Requires power on")
                 activateBitstream = try queue(bitstream: powerOnBitstream, repeating: false, removePreviousBitstream: !bitstreamQueue.isEmpty, removeThisBitstream: false)
                 requiresPowerOn = false
-                print("Required power on")
             }
             
             try queue(bitstream: bitstream, repeating: repeating, removePreviousBitstream: true, removeThisBitstream: false, completionHandler: completionHandler)
-            print("Queued")
 
             if !repeating {
-                print("Requires power off")
                 requiresPowerOn = true
                 try queue(bitstream: powerOffBitstream, repeating: false, removePreviousBitstream: true, removeThisBitstream: true)
-                print("Required power off")
             }
             
             // Activate the DMA if this is the first bitstream in the queue.
             if !dmaActive {
-                print("Activate DMA")
                 dma[Driver.dmaChannel].controlBlockAddress = activateBitstream!.busAddress
                 dma[Driver.dmaChannel].isActive = true
             }
-            print("Done")
         }
     }
     
@@ -362,22 +354,14 @@ public class Driver {
         }
 
         // Generate the new bitstream based on transferring from the breakpoints of the last one.
-        print("Start")
         var queuedBitstream = QueuedBitstream()
         if let previousBitstream = bitstreamQueue.last {
-            print("Previous")
             let transferOffsets = try queuedBitstream.transfer(from: previousBitstream, into: bitstream, repeating: repeating)
-            print("Transfer from")
             try queuedBitstream.commit()
-            print("Committed")
             previousBitstream.transfer(to: queuedBitstream, at: transferOffsets)
-            print("Transfer to")
         } else {
-            print("new")
             try queuedBitstream.parseBitstream(bitstream, repeating: repeating)
-            print("Parsed")
             try queuedBitstream.commit()
-            print("Committed")
         }
         
         // Once the new bitstream is transmitting, remove the first one from the queue... strictly speaking this isn't necessarily the one we were transmitting just now, but it doesn't matter as long as this is called the right number of times by all the queued blocks—we'll ultimately end up with just queuedBitstream in the queue.
