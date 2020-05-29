@@ -407,8 +407,16 @@ public struct QueuedBitstream : CustomDebugStringConvertible, Equatable {
     public mutating func commit() throws {
         guard self.memory == nil else { fatalError("Queued bitstream already committed to uncached memory.") }
 
+        // When we initializeMemory from data, and data is not a multiple of 8 bytes, we get
+        // a Bus Error. I suspect something inside Swift's Builtin.copyArray is doing a wrong
+        // optimization since UInt32 should be 4-byte aligned.
+        if !data.count.isMultiple(of: 2) {
+            data.append(0)
+        }
+
         let controlBlocksSize = MemoryLayout<DMAControlBlock>.stride * controlBlocks.count
         let dataSize = MemoryLayout<UInt32>.stride * data.count
+        assert(dataSize.isMultiple(of: MemoryLayout<Int>.stride), "Bus Error would occur if data doesn't fit into an Int array")
 
         let memory = try UncachedMemory(minimumSize: controlBlocksSize + dataSize)
 
