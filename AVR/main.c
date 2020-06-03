@@ -11,6 +11,7 @@
 
 #include "uart.h"
 
+
 #define DCC       PORTD2
 
 #define ENABLE    PORTC1
@@ -63,16 +64,28 @@ static inline void init() {
 //
 //    __    __   _   _        __    __    _   _
 // __|  |__|  |_| |_| |  or  |  |__|  |__| |_| |_  =>  0011
+//
+// We use a single timer to both measure the time in microseconds between
+// edges, and to detect a loss of signal.
+//
+// TIMER1 counts the number of 0.5µs ticks in TCNT1, and the INT0 (D2) ISR
+// is fired on edges, storing this value in `edge` for the main loop to
+// retrieve. TCNT1 is then reset to zero, to begin counting again for the
+// next edge.
+//
+// The value of TOP for TIMER1 is set to the maximum permitted time for a
+// zero-bit high or low period, when exceeeded the timer ISR is triggered
+// indicating a loss of signal.
+
+volatile unsigned int edge;
 
 // INT0 Interrupt.
 // Fires when the input signal on INT0 (D2) changes.
 //
-// Reads TCNT0 and resets it, clears the no signal status.
+// Reads TCNT1 and resets it, clears any loss of signal status.
 ISR(INT0_vect)
 {
-    unsigned int i;
-
-    i = TCNT1;
+    edge = TCNT1;
     TCNT1 = 0;
 
     PORTC |= _BV(ENABLE);
@@ -87,6 +100,24 @@ ISR(TIMER1_COMPA_vect)
 {
     PORTC &= ~_BV(ENABLE);
     PORTC |= _BV(BRAKE);
+}
+
+// Wait for an edge and return the length.
+static inline unsigned int wait_for_edge() {
+    unsigned int length;
+    uint8_t sreg;
+
+    while (!edge)
+        ;
+
+    sreg = SREG;
+    cli();
+
+    length = edge;
+    edge = 0;
+
+    SREG = sreg;
+    return length;
 }
 
 
