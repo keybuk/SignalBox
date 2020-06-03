@@ -22,9 +22,9 @@ void uputs(const char *str);
 void uprintf(const char *format, ...);
 #else  // DEBUG
 static inline void uart_init() {}
-static inline void uputc(char) {}
-static inline void uputs(const char *) {}
-static inline void uprintf(const char *, ...) {}
+static inline void uputc(char ch) {}
+static inline void uputs(const char *str) {}
+static inline void uprintf(const char *format, ...) {}
 #endif  // DEBUG
 
 #endif  // SIGNALBOX_UART_H
