@@ -6,10 +6,17 @@ CC      = avr-gcc
 OBJCOPY = avr-objcopy
 AVRDUDE = avrdude
 
-CFLAGS  = -Og -mmcu=$(AVRCHIP) -Wall -Wno-maybe-uninitialized -g
+CFLAGS  = -mmcu=$(AVRCHIP) -Wall -Wno-maybe-uninitialized
 LDFLAGS = -mmcu=$(AVRCHIP)
 DEFINES = -DF_CPU=16000000UL
 LIBS    = -Wl,-u,vfprintf -lprintf_flt -lm
+
+ifeq ($(strip $(DEBUG)),0)
+CFLAGS  += -Os
+else
+CFLAGS  += -Og -g
+DEFINES += -DDEBUG=1
+endif
 
 AVRDUDEFLAGS = -p $(AVRCHIP)
 ifneq ($(strip $(AVRPROG)),)
@@ -22,7 +29,7 @@ endif
 
 all: booster.hex
 
-booster.elf: main.o
+booster.elf: main.o uart.o
 	$(CC) $(LDFLAGS) $(LIBS) -o $@ $^
 
 
