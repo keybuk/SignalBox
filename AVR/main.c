@@ -25,27 +25,9 @@
 
 // MARK: Initialization.
 
-static inline void init() {
-    // Configure INT0 to generate interrupts for any logical change.
-    EICRA |= _BV(ISC00);
-    EIMSK |= _BV(INT0);
-
-    // To analyze the DCC signal we need a timer on which we can measure, with
-    // reasonable precision, the time in microseconds between edges. Set up TIMER1
-    // in CTC mode with 0.5µs (8 prescale) ticks, and a TOP of the maximum permitted
-    // length of a high or low period (10,000µs).
-    //
-    // We'll reset TCNT1 whenever an edge in the input is detected, meaning a timer
-    // interrupt is generated when the maximum length of a zero-bit high or low period
-    // has been exceeded, indicating loss of signal.
-    TCCR1A = 0;
-    TCCR1B = _BV(WGM12);
-    TCCR1C = 0;
-    TIMSK1 = _BV(OCIE1A);
-    TCNT1 = 0;
-    OCR1A = 10000 * 2;
-    TCCR1B |= _BV(CS11);
-
+static inline void
+output_init()
+{
     // Use C1-3 as outputs for Enabled, Brake and PWM respectively. Set
     // the initial pattern to "No Signal" mode.
     DDRC |= _BV(DDC1) | _BV(DDC2) | _BV(DDC3);
@@ -80,6 +62,35 @@ static inline void init() {
 // The value of TOP for TIMER1 is set to the maximum permitted time for a
 // zero-bit high or low period, when exceeeded the timer ISR is triggered
 // indicating a loss of signal.
+
+static inline void
+dcc_init()
+{
+    // Configure INT0 to generate interrupts for any logical change.
+    EICRA |= _BV(ISC00);
+    EIMSK |= _BV(INT0);
+
+    // To analyze the DCC signal we need a timer on which we can measure, with
+    // reasonable precision, the time in microseconds between edges. Set up TIMER1
+    // in CTC mode with 0.5µs (8 prescale) ticks, and a TOP of the maximum permitted
+    // length of a high or low period (10,000µs).
+    //
+    // We'll reset TCNT1 whenever an edge in the input is detected, meaning a timer
+    // interrupt is generated when the maximum length of a zero-bit high or low period
+    // has been exceeded, indicating loss of signal.
+    TCCR1A = 0;
+    TCCR1B = _BV(WGM12);
+    TCCR1C = 0;
+    TIMSK1 = _BV(OCIE1A);
+    OCR1A = 10000 * 2;
+}
+
+static inline void
+dcc_timer_start()
+{
+    TCNT1 = 0;
+    TCCR1B |= _BV(CS11);
+}
 
 volatile unsigned int edge;
 
@@ -134,11 +145,16 @@ enum parser_state {
     PACKET_B
 };
 
-int main() {
+int
+main()
+{
     cli();
-    init();
+    output_init();
+    dcc_init();
     uart_init();
     sei();
+
+    dcc_timer_start();
 
     enum parser_state state = SEEKING_PREAMBLE;
     int preamble_half_bits = 0, last_bit;
