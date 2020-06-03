@@ -7,7 +7,6 @@
 
 #include <avr/interrupt.h>
 #include <avr/io.h>
-#include <util/delay.h>
 
 #include "uart.h"
 
@@ -48,9 +47,9 @@ static inline void init() {
     PORTC &= ~_BV(ENABLE);
     PORTC |= _BV(BRAKE) | _BV(PWM);
 
-    // Flash the builtin LED.
+    // Turn on the builtin LED.
     DDRB |= _BV(DDB5);
-    PORTB &= ~_BV(PB5);
+    PORTB |= _BV(PB5);
 }
 
 
@@ -129,7 +128,5 @@ int main() {
     sei();
 
     for (;;) {
-            _delay_ms(1000);
-            PORTB ^= _BV(PB5);
     }
 }
