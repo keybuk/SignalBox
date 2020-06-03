@@ -13,7 +13,7 @@
 
 #define DCC       PORTD2
 
-#define DIRENABLE PORTC1
+#define ENABLE    PORTC1
 #define BRAKE     PORTC2
 #define PWM       PORTC3
 
@@ -41,10 +41,10 @@ static inline void init() {
     OCR1A = 10000 / 4;
     TCCR1B |= _BV(CS11) | _BV(CS10);
 
-    // Use C1-3 as outputs for Direction Enabled, Brake and PWM respectively. Set
+    // Use C1-3 as outputs for Enabled, Brake and PWM respectively. Set
     // the initial pattern to "No Signal" mode.
     DDRC |= _BV(DDC1) | _BV(DDC2) | _BV(DDC3);
-    PORTC &= ~_BV(DIRENABLE);
+    PORTC &= ~_BV(ENABLE);
     PORTC |= _BV(BRAKE) | _BV(PWM);
 
     // Flash the builtin LED.
@@ -75,7 +75,7 @@ ISR(INT0_vect)
     i = TCNT1;
     TCNT1 = 0;
 
-    PORTC |= _BV(DIRENABLE);
+    PORTC |= _BV(ENABLE);
     PORTC &= ~_BV(BRAKE);
 }
 
@@ -85,7 +85,7 @@ ISR(INT0_vect)
 // Indicates a timeout waiting for the input signal to change.
 ISR(TIMER1_COMPA_vect)
 {
-    PORTC &= ~_BV(DIRENABLE);
+    PORTC &= ~_BV(ENABLE);
     PORTC |= _BV(BRAKE);
 }
 
