@@ -45,7 +45,7 @@ booster.elf: main.o uart.o
 clean:
 	-rm *.hex *.elf *.o
 
-flash_%: %.hex
+flash: booster.hex
 	$(AVRDUDE) $(AVRDUDEFLAGS) -U flash:w:$<
 
 .PHONY: all clean
