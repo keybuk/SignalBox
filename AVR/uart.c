@@ -20,7 +20,9 @@
 volatile char ubuffer[UBUFFER_SIZE];
 volatile uint8_t uput, usend;
 
-void uart_init() {
+void
+uart_init()
+{
     // Configure USART for 250kbps (0x03) 8n1 operation, enable the
     // interrupt for receiving (but leaving reciving itself disabled until
     // a cutout) and enable transmitting (but again leave it disabled until
@@ -31,17 +33,23 @@ void uart_init() {
     UBRR0L = 0x03;
 }
 
-void uputc(char ch) {
+void
+uputc(char ch)
+{
     ubuffer[uput++] = ch;
     UCSR0B |= _BV(UDRIE0);
 }
 
-void uputs(const char *str) {
+void
+uputs(const char *str)
+{
     while (*str)
         uputc(*str++);
 }
 
-void uprintf(const char *format, ...) {
+void
+uprintf(const char *format, ...)
+{
     char data[UBUFFER_SIZE];
     va_list args;
 
@@ -55,7 +63,8 @@ void uprintf(const char *format, ...) {
 
 // USART Data Register Empty Interrupt
 // Fires when the USART is ready to transmit a byte.
-ISR(USART_UDRE_vect) {
+ISR(USART_UDRE_vect)
+{
     if (uput != usend) {
         UDR0 = ubuffer[usend++];
     } else {

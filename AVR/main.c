@@ -118,7 +118,9 @@ ISR(TIMER1_COMPA_vect)
 }
 
 // Wait for an edge and return the length.
-static inline unsigned int wait_for_edge() {
+static inline unsigned int
+wait_for_edge()
+{
     unsigned int length;
     uint8_t sreg;
 
