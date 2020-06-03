@@ -8,6 +8,8 @@
 #include <avr/interrupt.h>
 #include <avr/io.h>
 
+#include <stdint.h>
+
 #include "uart.h"
 
 
@@ -16,6 +18,9 @@
 #define ENABLE    PORTC1
 #define BRAKE     PORTC2
 #define PWM       PORTC3
+
+// Absolute delta between two unsigned values.
+#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
 
 
 // MARK: Initialization.
@@ -122,11 +127,130 @@ static inline unsigned int wait_for_edge() {
 
 // MARK: Main Loop
 
+enum parser_state {
+    SEEKING_PREAMBLE,
+    PACKET_START,
+    PACKET_A,
+    PACKET_B
+};
+
 int main() {
     cli();
     init();
+    uart_init();
     sei();
 
+    enum parser_state state = SEEKING_PREAMBLE;
+    int preamble_half_bits = 0, last_bit;
+    unsigned int last_length;
+    uint8_t bitmask, byte, check_byte;
     for (;;) {
+        // Wait for an edge from the input ISR and copy the length of the period.
+        //
+        // The specification says to allow 52-64µs periods for a one-bit, and
+        // 90-10,000µs for zero-bit. The upper-bound is already handled by timer,
+        // so only check for too-short or intermediate invalid period lengths.
+        unsigned int length = wait_for_edge();
+        int bit;
+        if (length >= 90 * 2) {
+            bit = 0;
+        } else if ((length >= 52 * 2) && (length <= 64 * 2)) {
+            bit = 1;
+        } else {
+            // On an invalid bit length, attempt to resynchronize.
+            preamble_half_bits = 0;
+            state = SEEKING_PREAMBLE;
+            uprintf("\aBAD LEN %u\r\n", length);
+            continue;
+        }
+
+        // Each bit has two periods, how we react to each depends on whether we've
+        // detected the end of the preamble (and thus sychronized the phase), and
+        // which phase that is.
+        switch (state) {
+            case SEEKING_PREAMBLE:
+                // When we're looking for a preamble, we're looking for the first
+                // stretch of at least 10 full one-bits, terminated by a full
+                // zero-bit.
+                if (bit) {
+                    ++preamble_half_bits;
+                } else if (preamble_half_bits >= 20) {
+                    // End of preamble found, the next state is to consume the
+                    // second half of the zero bit.
+                    state = PACKET_START;
+                } else {
+                    preamble_half_bits = 0;
+                }
+                break;
+            case PACKET_START:
+                // If we see anything other than a zero high or low period here it means
+                // we misdetected a period as a zero that shouldn't be, so return
+                // back to seeking the preamble.
+                if (bit) {
+                    preamble_half_bits = 0;
+                    state = SEEKING_PREAMBLE;
+                } else {
+                    bitmask = 1 << 7;
+                    check_byte = 0;
+                    state = PACKET_A;
+                }
+                break;
+            case PACKET_A:
+                // First period in a bit, save which bit it was and the length,
+                // so we can double-check in the second phase next cycle.
+                last_bit = bit;
+                last_length = length;
+                state = PACKET_B;
+                break;
+            case PACKET_B:
+                if (last_bit != bit) {
+                    // Bits must match between phases; if they don't, we've probably
+                    // gone out of phase, so resynchronize again.
+                    preamble_half_bits = 0;
+                    state = SEEKING_PREAMBLE;
+                    uprintf(" \aBAD MATCH %c%c\r\n", last_bit ? 'H' : 'L', bit ? 'H': 'L');
+                } else if (bit && DELTA(length, last_length) > 6 * 2) {
+                    // Double-check the delta of one-bit phases, if we go out of spec,
+                    // treat it the same as if we had non-matching bits and
+                    // resynchronize the phase.
+                    preamble_half_bits = 0;
+                    state = SEEKING_PREAMBLE;
+                    uprintf(" \aBAD DELTA %u %u\r\n", last_length, length);
+                } else if (bitmask) {
+                    // Within the packet there are eight bits to a byte, followed by
+                    // a zero-bit or a one-bit that determines whether more bytes
+                    // follow, or a preamble.
+                    if (bit) {
+                        byte |= bitmask;
+                    } else {
+                        byte &= ~bitmask;
+                    }
+                    bitmask >>= 1;
+                    state = PACKET_A;
+                    uputc(bit ? '1' : '0');
+                } else if (!bit) {
+                    // Zero-bit goes between bytes, accumulate the check byte
+                    // and prepare for the next.
+                    check_byte ^= byte;
+                    bitmask = 1 << 7;
+                    state = PACKET_A;
+                    uputc(' ');
+                } else if (byte != check_byte) {
+                    // Check byte doesn't match, but we otherwise kept sychronisation.
+                    // Assume we can carry on, and go back to dumb preamble seeking mode
+                    // and hope the next time the packet is sent, it comes in fine.
+                    preamble_half_bits = 0;
+                    state = SEEKING_PREAMBLE;
+                    uputs(" \aERR\r\n");
+                } else {
+                    // Check byte matches the error check byte in the stream.
+                    // Now we've reached the end of a packet, and go back into
+                    // dumb preamble seeking mode.
+                    state = SEEKING_PREAMBLE;
+                    preamble_half_bits = 0;
+                    uputs(" OK\r\n");
+                }
+                break;
+        }
     }
 }
