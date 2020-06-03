@@ -103,7 +103,6 @@ ISR(INT0_vect)
     edge = TCNT1;
     TCNT1 = 0;
 
-    PORTC |= _BV(ENABLE);
     PORTC &= ~_BV(BRAKE);
 }
 
@@ -113,7 +112,6 @@ ISR(INT0_vect)
 // Indicates a timeout waiting for the input signal to change.
 ISR(TIMER1_COMPA_vect)
 {
-    PORTC &= ~_BV(ENABLE);
     PORTC |= _BV(BRAKE);
 }
 
@@ -138,6 +136,97 @@ wait_for_edge()
 }
 
 
+// MARK: RailCom Cutout Generation
+
+// RailCom Cutout
+// --------------
+// The RailCom cutout is a gap in the DCC signal where no power is present
+// on the track, during which the decoder can transmit its own signal.
+//
+//    _   _              _   _
+//  _| |_| '-++--++++-._| |_| |_
+//
+// We generate the cutout after we see the packet end bit to a valid packet,
+// starting TIMER0 which triggers ISRs when the delay time for the cutout start
+// and end (as measured from the end of the packet end bit) have passed.
+
+// Inherent 6-8µs processing delay after the end of the packet end bit for
+// code in the main loop and here to happen, subtracted from timer vlaues to get the
+// right result.
+#define RAILCOM_DELAY 8
+
+static inline void
+railcom_init()
+{
+    // For the RailCom cutout we need to measure both the time until cutout start and
+    // end, and we need a reasonable degree of consistency, as for example a 64 prescale
+    // would have a ≤4µs variance between delays as we can't reset the prescaler since it's
+    // shared with TIMER1 which measures the incoming DCC signal.
+    //
+    // Instead we use TIMER0 with 0.5µs (8 prescale) ticks, but since it's an 8-bit timer
+    // and we can't simply count to 454µs at that scale, we also count overflows. The timer
+    // is set to Normal mode, with OCIE0 set to the delay for the cutout start, and OCIE0B
+    // set to the (modulus) delay for the cutout end. Both generate interrupts, but both
+    // also check the value of `timer_ovf_count` which is incremented by the overflow ISR.
+    TCCR0A = 0;
+    TCCR0B = 0;
+    TIMSK0 = _BV(OCIE0A) | _BV(OCIE0B) | _BV(TOIE0);
+    OCR0A = (26 - RAILCOM_DELAY) * 2;
+    OCR0B = ((454 - RAILCOM_DELAY) * 2) % 256;
+}
+
+volatile int timer0_ovf_count;
+
+static inline void
+railcom_timer_start()
+{
+    timer0_ovf_count = 0;
+    TCNT0 = 0;
+    TCCR0B |= _BV(CS01);
+}
+
+static inline void
+railcom_timer_stop()
+{
+    TCCR0B &= ~(_BV(CS02) | _BV(CS01) | _BV(CS00));
+}
+
+// TIMER0 Comparison Interrupt A.
+// Fires when TIMER0 reaches OCR0A.
+//
+// Starts the RailCom cutout in the first timer period.
+ISR(TIMER0_COMPA_vect)
+{
+    if (timer0_ovf_count == 0) {
+        PORTC &= ~_BV(ENABLE);
+        PORTC |= _BV(BRAKE);
+    }
+}
+
+// TIMER0 Comparison Interrupt B.
+// Fires when TIMER0 reaches OCR0B.
+//
+// Stops the RailCom cutout and timer in the correct timer period.
+ISR(TIMER0_COMPB_vect)
+{
+    if (timer0_ovf_count == ((454 - RAILCOM_DELAY) * 2) / 256) {
+        PORTC |= _BV(ENABLE);
+        PORTC &= ~_BV(BRAKE);
+
+        railcom_timer_stop();
+    }
+}
+
+// TIMER0 Overflow Interrupt.
+// Fires when TIMER0 reaches MAX.
+//
+// Increments the overflow count, allowing us to count periods of 128µs and longer.
+ISR(TIMER0_OVF_vect)
+{
+    ++timer0_ovf_count;
+}
+
+
 // MARK: Main Loop
 
 enum parser_state {
@@ -153,6 +242,7 @@ main()
     cli();
     output_init();
     dcc_init();
+    railcom_init();
     uart_init();
     sei();
 
@@ -262,6 +352,8 @@ main()
                     uputs(" \aERR\r\n");
                 } else {
                     // Check byte matches the error check byte in the stream.
+                    railcom_timer_start();
+
                     // Now we've reached the end of a packet, and go back into
                     // dumb preamble seeking mode.
                     state = SEEKING_PREAMBLE;
