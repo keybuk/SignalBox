@@ -94,6 +94,8 @@ output_set()
 // zero-bit high or low period, when exceeeded the timer ISR is triggered
 // indicating a loss of signal.
 
+#define DCC  PD2
+
 static inline void
 dcc_init()
 {
@@ -276,6 +278,10 @@ int
 main()
 {
     cli();
+    // To save power, enable pull-ups on all pins we're not using as input.
+    PORTB = PORTC = ~0;
+    PORTD = ~_BV(DCC);
+
     output_init();
     dcc_init();
     railcom_init();
