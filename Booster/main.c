@@ -111,11 +111,14 @@ input_init()
 ISR(INT1_vect)
 {
     if (!bit_is_set(PIND, THERMAL)) {
-        condition |= _BV(OVERHEAT);
-    } else {
+        if (!bit_is_set(condition, OVERHEAT)) {
+            condition |= _BV(OVERHEAT);
+            output_set();
+        }
+    } else if (bit_is_set(condition, OVERHEAT)) {
         condition &= ~_BV(OVERHEAT);
+        output_set();
     }
-    output_set();
 }
 
 // ADC Interrupt.
@@ -204,8 +207,10 @@ ISR(INT0_vect)
     edge = TCNT1;
     TCNT1 = 0;
 
-    condition &= ~_BV(NO_SIGNAL);
-    output_set();
+    if (bit_is_set(condition, NO_SIGNAL)) {
+        condition &= ~_BV(NO_SIGNAL);
+        output_set();
+    }
 }
 
 // TIMER1 Comparison Interrupt.
@@ -214,8 +219,10 @@ ISR(INT0_vect)
 // Indicates a timeout waiting for the input signal to change.
 ISR(TIMER1_COMPA_vect)
 {
-    condition |= _BV(NO_SIGNAL);
-    output_set();
+    if (!bit_is_set(condition, NO_SIGNAL)) {
+        condition |= _BV(NO_SIGNAL);
+        output_set();
+    }
 }
 
 // Wait for an edge and return the length.
