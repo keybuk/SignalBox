@@ -13,30 +13,61 @@
 #include "uart.h"
 
 
-#define DCC       PORTD2
+// MARK: H-Bridge Outputs.
 
-#define ENABLE    PORTC1
-#define BRAKE     PORTC2
-#define PWM       PORTC3
+// Outputs
+// -------
+// The H-Bridge receives the DCC signal directly with the AVR only monitoring
+// it passively, but we do need to control braking of the H-Bridge during
+// exception conditions.
+//
+// CONDITION       PWM DIR BRAKE DRIVERS
+// Normal           H   X    L   Controlled by DIR
+// Exception        L   X    H   None, DIR ignored
+//
+// BRAKE is always the opposite of PWM. H-Bridge outputs when BRAKE or PWM only are
+// used short either the sourcing or sink output transistors. Shorting is inappropriate
+// for overheat or overload where we need the load on the H-Bridge to go away;
+// doesn't provide a useful circuit for RailCom responses so can't be used for the cutout;
+// and isn't especially helpful over no outputs for a loss of signal either.
+//
+// Since the different conditions can overlap, we take care to track the
+// conditions active on the pins rather than just toggling the pins directly.
+// For example a loss of signal can occur during a RailCom cutout, and we don't
+// want the end of cutout timer turning the power back on while we don't have a signal.
 
-// Absolute delta between two unsigned values.
-#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
-
-
-// MARK: Initialization.
+#define BRAKE  PORTC1
+#define PWM    PORTC2
 
 static inline void
 output_init()
 {
-    // Use C1-3 as outputs for Enabled, Brake and PWM respectively. Set
-    // the initial pattern to "No Signal" mode.
-    DDRC |= _BV(DDC1) | _BV(DDC2) | _BV(DDC3);
-    PORTC &= ~_BV(ENABLE);
-    PORTC |= _BV(BRAKE) | _BV(PWM);
+    // Use C1 and C2 as outputs for PWM and BRAKE respectively.
+    DDRC |= _BV(DDC1) | _BV(DDC2);
+}
 
-    // Turn on the builtin LED.
-    DDRB |= _BV(DDB5);
-    PORTB |= _BV(PB5);
+enum condition {
+    NORMAL    = 0,
+    CUTOUT    = 1 << 0,
+    NO_SIGNAL = 1 << 1
+};
+
+volatile int condition = NO_SIGNAL;
+
+__attribute__((always_inline))
+static inline void
+output_set()
+{
+    // Clear PWM before BRAKE to consistently short by source rather than
+    // letting the DIR pin decide whether short by source or sink. Likewise
+    // release BRAKE first for the same reason.
+    if (condition) {
+        PORTC &= ~_BV(PWM);
+        PORTC |= _BV(BRAKE);
+    } else {
+        PORTC &= ~_BV(BRAKE);
+        PORTC |= _BV(PWM);
+    }
 }
 
 
@@ -103,7 +134,8 @@ ISR(INT0_vect)
     edge = TCNT1;
     TCNT1 = 0;
 
-    PORTC &= ~_BV(BRAKE);
+    condition &= ~_BV(NO_SIGNAL);
+    output_set();
 }
 
 // TIMER1 Comparison Interrupt.
@@ -112,7 +144,8 @@ ISR(INT0_vect)
 // Indicates a timeout waiting for the input signal to change.
 ISR(TIMER1_COMPA_vect)
 {
-    PORTC |= _BV(BRAKE);
+    condition |= _BV(NO_SIGNAL);
+    output_set();
 }
 
 // Wait for an edge and return the length.
@@ -150,10 +183,10 @@ wait_for_edge()
 // starting TIMER0 which triggers ISRs when the delay time for the cutout start
 // and end (as measured from the end of the packet end bit) have passed.
 
-// Inherent 6-8µs processing delay after the end of the packet end bit for
-// code in the main loop and here to happen, subtracted from timer vlaues to get the
-// right result.
-#define RAILCOM_DELAY 8
+// Inherent processing delay between the packet end bit coming from the input source
+// and any changes we make to the H-Bridge Output pins to take effect. Subtracted from
+// timer values to get the right period for the RailCom cutout.
+#define RAILCOM_DELAY 12
 
 static inline void
 railcom_init()
@@ -198,8 +231,8 @@ railcom_timer_stop()
 ISR(TIMER0_COMPA_vect)
 {
     if (timer0_ovf_count == 0) {
-        PORTC &= ~_BV(ENABLE);
-        PORTC |= _BV(BRAKE);
+        condition |= _BV(CUTOUT);
+        output_set();
     }
 }
 
@@ -210,8 +243,8 @@ ISR(TIMER0_COMPA_vect)
 ISR(TIMER0_COMPB_vect)
 {
     if (timer0_ovf_count == ((454 - RAILCOM_DELAY) * 2) / 256) {
-        PORTC |= _BV(ENABLE);
-        PORTC &= ~_BV(BRAKE);
+        condition &= ~_BV(CUTOUT);
+        output_set();
 
         railcom_timer_stop();
     }
@@ -236,6 +269,9 @@ enum parser_state {
     PACKET_B
 };
 
+// Absolute delta between two unsigned values.
+#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
+
 int
 main()
 {
@@ -246,6 +282,7 @@ main()
     uart_init();
     sei();
 
+    output_set();
     dcc_timer_start();
 
     enum parser_state state = SEEKING_PREAMBLE;
