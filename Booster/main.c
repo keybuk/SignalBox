@@ -13,7 +13,7 @@
 #include "uart.h"
 
 
-// MARK: H-Bridge Outputs.
+// MARK: H-Bridge Outputs
 
 // Outputs
 // -------
@@ -47,9 +47,9 @@ output_init()
 }
 
 enum condition {
-    NORMAL    = 0,
-    CUTOUT    = 1 << 0,
-    NO_SIGNAL = 1 << 1
+    NORMAL,
+    CUTOUT,
+    NO_SIGNAL
 };
 
 volatile int condition = NO_SIGNAL;
