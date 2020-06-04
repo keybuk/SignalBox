@@ -1,6 +1,6 @@
 //
 //  main.c
-//  SignalBox
+//  Booster
 //
 //  Created by Scott James Remnant on 6/1/20.
 //
