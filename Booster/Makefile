@@ -11,11 +11,12 @@ LDFLAGS = -mmcu=$(AVRCHIP)
 DEFINES = -DF_CPU=16000000UL
 LIBS    = -Wl,-u,vfprintf -lprintf_flt -lm
 
-ifeq ($(strip $(DEBUG)),0)
-CFLAGS  += -Os
-else
+DEBUG = y
+ifeq ($(strip $(DEBUG)),y)
 CFLAGS  += -Og -g
 DEFINES += -DDEBUG=1
+else
+CFLAGS  += -Os
 endif
 
 AVRDUDEFLAGS = -p $(AVRCHIP)
