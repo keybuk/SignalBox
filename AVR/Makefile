@@ -28,9 +28,12 @@ AVRDUDEFLAGS += -P $(AVRPORT)
 endif
 
 
-all: detector.hex
+all: booster.hex detector.hex
 
-detector.elf: main.o uart.o
+booster.elf: booster.o uart.o
+	$(CC) $(LDFLAGS) $(LIBS) -o $@ $^
+
+detector.elf: detector.o uart.o
 	$(CC) $(LDFLAGS) $(LIBS) -o $@ $^
 
 
@@ -46,7 +49,7 @@ detector.elf: main.o uart.o
 clean:
 	-rm *.hex *.elf *.o
 
-flash: detector.hex
+flash_%: %.hex
 	$(AVRDUDE) $(AVRDUDEFLAGS) -U flash:w:$<
 
 .PHONY: all clean

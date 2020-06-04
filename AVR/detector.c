@@ -1,6 +1,6 @@
 //
-//  main.c
-//  Detector
+//  detector.c
+//  SignalBox
 //
 //  Created by Scott James Remnant on 06/05/17.
 //
@@ -9,9 +9,9 @@
 #include <avr/interrupt.h>
 #include <avr/io.h>
 
-#include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
+
+#include "uart.h"
 
 
 #if BOOSTER && DETECTOR
@@ -53,45 +53,6 @@ volatile uint8_t brake;
 #define CUTOUT    PD3
 #endif // DETECTOR
 
-
-// MARK: -
-// MARK: Debug UART Output.
-
-#define BUFFER_SIZE 256
-volatile char ubuffer[BUFFER_SIZE];
-volatile uint8_t uput, usend;
-
-static inline void uputc(char ch) {
-    ubuffer[uput++] = ch;
-    UCSR0B |= _BV(UDRIE0);
-}
-
-static inline void uputs(const char *str) {
-    while (*str)
-        uputc(*str++);
-}
-
-static inline void uprintf(const char *format, ...) {
-    char data[BUFFER_SIZE];
-    va_list args;
-    
-    va_start(args, format);
-    vsnprintf(data, BUFFER_SIZE, format, args);
-    va_end(args);
-    
-    data[BUFFER_SIZE - 1] = '\0';
-    uputs(data);
-}
-
-// USART Data Register Empty Interrupt
-// Fires when the USART is ready to transmit a byte.
-ISR(USART_UDRE_vect) {
-    if (uput != usend) {
-        UDR0 = ubuffer[usend++];
-    } else {
-        UCSR0B &= ~_BV(UDRIE0);
-    }
-}
 
 #define TIMER0_PRESCALE (_BV(CS01) | _BV(CS00))
 #define TIMER1_PRESCALE (_BV(CS11))
