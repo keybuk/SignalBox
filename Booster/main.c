@@ -50,7 +50,8 @@ enum condition {
     NORMAL,
     CUTOUT,
     NO_SIGNAL,
-    OVERHEAT
+    OVERHEAT,
+    OVERLOAD
 };
 
 volatile int condition = NO_SIGNAL;
@@ -81,6 +82,9 @@ output_set()
 
 #define THERMAL  PORTD3
 
+// Overload threshold of 3A, where we pull the power.
+#define HARD_OVERLOAD  512
+
 static inline void
 input_init()
 {
@@ -93,6 +97,11 @@ input_init()
         condition |= _BV(OVERHEAT);
         output_set();
     }
+
+    // Configure the ADC in free-running mode, reading from ADC0, generating
+    // interrupts on new data, and with a clock pre-scalar of 128 (125kHz).
+    ADMUX = _BV(REFS0);
+    ADCSRA = _BV(ADEN) | _BV(ADSC) | _BV(ADATE) | _BV(ADIE) | _BV(ADPS2) | _BV(ADPS1) | _BV(ADPS0);
 }
 
 // INT1 Interrupt.
@@ -107,6 +116,26 @@ ISR(INT1_vect)
         condition &= ~_BV(OVERHEAT);
     }
     output_set();
+}
+
+// ADC Interrupt.
+// Fires when a new analog value is ready to be read.
+//
+// Reads the value and checks it for overload.
+ISR(ADC_vect)
+{
+    int value = ADCL;
+    value |= (ADCH << 8);
+
+    if (value >= HARD_OVERLOAD) {
+        if (!bit_is_set(condition, OVERLOAD)) {
+            condition |= _BV(OVERLOAD);
+            output_set();
+        }
+    } else if (bit_is_set(condition, OVERLOAD)) {
+        condition &= ~_BV(OVERLOAD);
+        output_set();
+    }
 }
 
 
