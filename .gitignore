@@ -2,6 +2,6 @@
 /.build
 /.swiftpm
 /*.xcodeproj
-/Booster/**/*.o
-/Booster/**/*.elf
-/Booster/**/*.hex
+/AVR/**/*.o
+/AVR/**/*.elf
+/AVR/**/*.hex
