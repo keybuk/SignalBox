@@ -14,55 +14,6 @@
 #include "uart.h"
 
 
-#define DCC       PD2
-
-// Input parser states.
-#define SEEKING_PREAMBLE 0
-#define PACKET_START     1
-#define PACKET_A         2
-#define PACKET_B         3
-#define BYTE_END         4
-
-#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
-
-volatile uint8_t cutout;
-
-#define CUTOUT    PD3
-
-
-#define TIMER0_PRESCALE (_BV(CS01) | _BV(CS00))
-#define TIMER1_PRESCALE (_BV(CS11))
-#define TIMER2_PRESCALE (_BV(CS22) | _BV(CS21) | _BV(CS20))
-
-// MARK: -
-// MARK: Initialization.
-
-static inline void init() {
-    // To analyze the DCC signal we need a timer on which we can count,
-    // with reasonable precision, microseconds. Set up TIMER0 for 4µs
-    // ticks (64 prescale) which is reasonable enough.
-    TCCR0A = _BV(WGM01) | _BV(WGM00);
-    TCCR0B = TIMER0_PRESCALE;
-    TIMSK0 = _BV(TOIE0);
-    
-    // Configure INT0 and INT1 to generate interrupts for any logical change.
-    // For the booster INT1 is the Thermal Sense Flag from the H-Bridge, for
-    // the detector it's the RailCom cutout flag.
-    EICRA |= _BV(ISC00);// | _BV(ISC10);
-    EIMSK |= _BV(INT0);// | _BV(INT1);
-    
-    // Configure USART for 250kbps (0x03) 8n1 operation, enable the
-    // interrupt for receiving (but leaving reciving itself disabled until
-    // a cutout) and enable transmitting (but again leave it disabled until
-    // we have something to transmit).
-    UCSR0B = _BV(RXCIE0) | _BV(TXEN0);
-    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
-    UBRR0H = 0;
-    UBRR0L = 0x03;
-}
-
-
-// MARK: -
 // MARK: DCC Signal Input
 
 // DCC Signal Timing
@@ -74,59 +25,114 @@ static inline void init() {
 //    __    __   _   _        __    __    _   _
 // __|  |__|  |_| |_| |  or  |  |__|  |__| |_| |_  =>  0011
 //
-// We use a pair of interrupts to measure the time, in microseconds, between
-// edges. TIMER0 counts the number of 4µs ticks in TCNT0, and the ISR counts
-// the number of times it overflows; thus we can combine the two values to
-// calculate the number of microseconds that have passed.
+// We use a single timer to both measure the time in microseconds between
+// edges, and to detect a loss of signal.
 //
-// INT0 is fired on the edges, and makes this calculation, comparing it to the
-// previous edge time, and storing the result in `delta`. The `edge` flag is
-// set on each new edge.
+// TIMER1 counts the number of 0.5µs ticks in TCNT1, and the INT0 (D2) ISR
+// is fired on edges, storing this value in `edge` for the main loop to
+// retrieve. TCNT1 is then reset to zero, to begin counting again for the
+// next edge.
 //
-// When operating as a Booster, we also use TIMER2 to detect a loss of input
-// signal. TCNT2 is reset on each fire of INT0, so that should TIMER2 reach
-// TOP, it means the input signal has stopped changing and we can assume its
-// loss.
+// The value of TOP for TIMER1 is set to the maximum permitted time for a
+// zero-bit high or low period, when exceeeded the timer ISR is triggered
+// indicating a loss of signal.
 
-volatile unsigned long timer0_ovf_count;
+#define DCC  PD2
 
-// TIMER0 Overflow Interrupt.
-//
-// Keep count of overflows, store in `timer0_ovf_count`.
-ISR(TIMER0_OVF_vect)
+static inline void
+dcc_init()
 {
-    ++timer0_ovf_count;
+    // Configure INT0 to generate interrupts for any logical change.
+    EICRA |= _BV(ISC00);
+    EIMSK |= _BV(INT0);
+
+    // To analyze the DCC signal we need a timer on which we can measure, with
+    // reasonable precision, the time in microseconds between edges. Set up TIMER1
+    // in CTC mode with 0.5µs (8 prescale) ticks, and a TOP of the maximum permitted
+    // length of a high or low period (10,000µs).
+    //
+    // We'll reset TCNT1 whenever an edge in the input is detected, meaning a timer
+    // interrupt is generated when the maximum length of a zero-bit high or low period
+    // has been exceeded, indicating loss of signal.
+    TCCR1A = 0;
+    TCCR1B = _BV(WGM12);
+    TCCR1C = 0;
+    TIMSK1 = _BV(OCIE1A);
+    OCR1A = 10000 * 2;
 }
 
-volatile unsigned long last_micros, delta;
-volatile uint8_t edge;
-
-static inline unsigned long micros() {
-    unsigned long ovf;
-    uint8_t tcnt;
-    
-    ovf = timer0_ovf_count;
-    tcnt = TCNT0;
-    
-    // Check if the timer has overflowed without ticking.
-    if (bit_is_set(TIFR0, TOV0) && (tcnt != 0xff))
-        ++ovf;
-    
-    return (ovf << 10) | (tcnt << 2);
+static inline void
+dcc_timer_start()
+{
+    TCNT1 = 0;
+    TCCR1B |= _BV(CS11);
 }
+
+volatile unsigned int edge;
 
 // INT0 Interrupt.
 // Fires when the input signal on INT0 (D2) changes.
 //
-// Tracks the deltas between edges using TIMER0.
+// Reads TCNT1 and resets it, clears any loss of signal status.
 ISR(INT0_vect)
 {
-    unsigned long this_micros;
+    // TODO: should indicate overflow?
+    edge = TCNT1;
+    TCNT1 = 0;
+}
+
+// TIMER1 Comparison Interrupt.
+// Fires when TIMER1 reaches TOP.
+//
+// Indicates a timeout waiting for the input signal to change.
+ISR(TIMER1_COMPA_vect)
+{
+    // TODO: should mark overflow?
+}
+
+// Wait for an edge and return the length.
+static inline unsigned int
+wait_for_edge()
+{
+    unsigned int length;
+    uint8_t sreg;
+
+    while (!edge)
+        ;
+
+    sreg = SREG;
+    cli();
+
+    length = edge;
+    edge = 0;
+
+    SREG = sreg;
+    return length;
+}
+
+
+volatile uint8_t cutout;
+
+#define CUTOUT    PD3
+
+
+// MARK: -
+// MARK: Initialization.
+
+static inline void init() {
+    // Configure INT1 to generate interrupts for any logical change to the RailCom
+    // cutout flag.
+    EICRA |= _BV(ISC10);
+    EIMSK |= _BV(INT1);
     
-    this_micros = micros();
-    delta = this_micros - last_micros;
-    edge = 1;
-    last_micros = this_micros;
+    // Configure USART for 250kbps (0x03) 8n1 operation, enable the
+    // interrupt for receiving (but leaving reciving itself disabled until
+    // a cutout) and enable transmitting (but again leave it disabled until
+    // we have something to transmit).
+    UCSR0B = _BV(RXCIE0) | _BV(TXEN0);
+    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
+    UBRR0H = 0;
+    UBRR0L = 0x03;
 }
 
 
@@ -237,46 +243,55 @@ ISR(USART_RX_vect) {
 //                  +--byte end bits--+    packet end bit
 //
 
-int main()
+enum parser_state {
+    SEEKING_PREAMBLE,
+    PACKET_START,
+    PACKET_A,
+    PACKET_B
+};
+
+// Absolute delta between two unsigned values.
+#define DELTA(_a, _b) ((_a) > (_b) ? (_a) - (_b) : (_b) - (_a))
+
+int
+main()
 {
     cli();
+    // To save power, enable pull-ups on all pins we're not using as input.
+    PORTB = PORTC = ~0;
+    PORTD = ~_BV(DCC);
+
+    dcc_init();
     init();
+    uart_init();
     sei();
     
     uputs("Running\r\n");
     
-    unsigned long last_length;
-    int state = SEEKING_PREAMBLE, preamble_half_bits = 0, last_bit;
+    enum parser_state state = SEEKING_PREAMBLE;
+    int preamble_half_bits = 0, last_bit;
+    unsigned int last_length;
     uint8_t bitmask, byte, check_byte;
     for (;;) {
-        unsigned long length;
-        
-        // Wait for an edge from the input ISR, and copy its length.
-        while (!edge)
-            ;
-        cli();
-        length = delta;
-        edge = 0;
-        sei();
-        
-        // The specification says to allow 52-64µs for a one-bit, and
-        // 90-10,000µs for a zero-bit; since our timer resolution is only 4µs
-        // we allow +/- that on top.
+        // Wait for an edge from the input ISR and copy the length of the period.
+        //
+        // The specification says to allow 52-64µs periods for a one-bit, and
+        // 90-10,000µs for zero-bit. The upper-bound is already handled by timer,
+        // so only check for too-short or intermediate invalid period lengths.
+        unsigned int length = wait_for_edge();
         int bit;
-        if (length >= 48 && length <= 68) {
-            bit = 1;
-        } else if (length >= 84 && length <= 10004) {
+        if (length >= 90 * 2) {
             bit = 0;
+        } else if ((length >= 52 * 2) && (length <= 64 * 2)) {
+            bit = 1;
         } else {
             // On an invalid bit length, attempt to resynchronize.
             preamble_half_bits = 0;
             state = SEEKING_PREAMBLE;
-            
-            if (!cutout)
-                uprintf("\aBAD len %luus\r\n", length);
+            uprintf("\aBAD LEN %u\r\n", length);
             continue;
         }
-        
+
         // Each bit has two periods, how we react to each depends on whether we've
         // detected the end of the preamble (and thus sychronized the phase), and
         // which phase that is.
@@ -296,15 +311,15 @@ int main()
                 }
                 break;
             case PACKET_START:
-                // If we see anything other than a zero half-bit here it means
+                // If we see anything other than a zero high or low period here it means
                 // we misdetected a period as a zero that shouldn't be, so return
                 // back to seeking the preamble.
                 if (bit) {
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                 } else {
-                    check_byte = 0;
                     bitmask = 1 << 7;
+                    check_byte = 0;
                     state = PACKET_A;
                 }
                 break;
@@ -321,18 +336,14 @@ int main()
                     // gone out of phase, so resynchronize again.
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
-                    
-                    if (!cutout)
-                        uprintf("\aBAD match %c%c\r\n", last_bit ? 'H' : 'L', bit ? 'H' : 'L');
-                } else if (bit && DELTA(length, last_length) > 12) {
+                    uprintf(" \aBAD MATCH %c%c\r\n", last_bit ? 'H' : 'L', bit ? 'H': 'L');
+                } else if (bit && DELTA(length, last_length) > 6 * 2) {
                     // Double-check the delta of one-bit phases, if we go out of spec,
                     // treat it the same as if we had non-matching bits and
                     // resynchronize the phase.
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
-                    
-                    if (!cutout)
-                        uprintf("\aBAD delta %luus\r\n", DELTA(length, last_length));
+                    uprintf(" \aBAD DELTA %u %u\r\n", last_length, length);
                 } else if (bitmask) {
                     // Within the packet there are eight bits to a byte, followed by
                     // a zero-bit or a one-bit that determines whether more bytes
@@ -354,7 +365,8 @@ int main()
                     uputc(' ');
                 } else if (byte != check_byte) {
                     // Check byte doesn't match, but we otherwise kept sychronisation.
-                    // Assume we can carry on.
+                    // Assume we can carry on, and go back to dumb preamble seeking mode
+                    // and hope the next time the packet is sent, it comes in fine.
                     preamble_half_bits = 0;
                     state = SEEKING_PREAMBLE;
                     uputs(" \aERR\r\n");
@@ -366,7 +378,6 @@ int main()
                     preamble_half_bits = 0;
                     uputs(" OK\r\n");
                 }
-                
                 break;
         }
     }
