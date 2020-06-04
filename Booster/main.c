@@ -49,7 +49,8 @@ output_init()
 enum condition {
     NORMAL,
     CUTOUT,
-    NO_SIGNAL
+    NO_SIGNAL,
+    OVERHEAT
 };
 
 volatile int condition = NO_SIGNAL;
@@ -68,6 +69,44 @@ output_set()
         PORTC &= ~_BV(BRAKE);
         PORTC |= _BV(PWM);
     }
+}
+
+
+// MARK: H-Bridge Inputs
+
+// Inputs
+// ------
+// The H-Bridge provides us two inputs, an active-low THERMAL flag on D3 which we
+// use an ISR to watch, and a current sense we place on ADC0 to detect overloads.
+
+#define THERMAL  PORTD3
+
+static inline void
+input_init()
+{
+    // Configure INT1 to generate interrupts for any logical change.
+    EICRA |= _BV(ISC10);
+    EIMSK |= _BV(INT1);
+
+    // Check for initial overhead condition.
+    if (!bit_is_set(PIND, THERMAL)) {
+        condition |= _BV(OVERHEAT);
+        output_set();
+    }
+}
+
+// INT1 Interrupt.
+// Fires when the THERMAL signal on INT1 (D3) changes.
+//
+// The THERMAL pin is active-low when an OVERHEAD condition exists.
+ISR(INT1_vect)
+{
+    if (!bit_is_set(PIND, THERMAL)) {
+        condition |= _BV(OVERHEAT);
+    } else {
+        condition &= ~_BV(OVERHEAT);
+    }
+    output_set();
 }
 
 
@@ -283,6 +322,7 @@ main()
     PORTD = ~_BV(DCC);
 
     output_init();
+    input_init();
     dcc_init();
     railcom_init();
     uart_init();
