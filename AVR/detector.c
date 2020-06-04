@@ -143,15 +143,6 @@ railcom_init()
     // Configure INT1 to generate interrupts for any logical change.
     EICRA |= _BV(ISC10);
     EIMSK |= _BV(INT1);
-
-    // Configure USART for 250kbps (0x03) 8n1 operation, enable the
-    // interrupt for receiving (but leaving reciving itself disabled until
-    // a cutout) and enable transmitting (but again leave it disabled until
-    // we have something to transmit).
-    UCSR0B = _BV(RXCIE0) | _BV(TXEN0);
-    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
-    UBRR0H = 0;
-    UBRR0L = 0x03;
 }
 
 volatile int rx;
@@ -257,8 +248,8 @@ main()
     PORTD = ~(_BV(DCC) | _BV(CUTOUT));
 
     dcc_init();
-    railcom_init();
     uart_init();
+    railcom_init();
     sei();
     
     uputs("Running\r\n");
