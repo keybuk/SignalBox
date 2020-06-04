@@ -111,31 +111,6 @@ wait_for_edge()
 }
 
 
-volatile uint8_t cutout;
-
-#define CUTOUT    PD3
-
-
-// MARK: -
-// MARK: Initialization.
-
-static inline void init() {
-    // Configure INT1 to generate interrupts for any logical change to the RailCom
-    // cutout flag.
-    EICRA |= _BV(ISC10);
-    EIMSK |= _BV(INT1);
-    
-    // Configure USART for 250kbps (0x03) 8n1 operation, enable the
-    // interrupt for receiving (but leaving reciving itself disabled until
-    // a cutout) and enable transmitting (but again leave it disabled until
-    // we have something to transmit).
-    UCSR0B = _BV(RXCIE0) | _BV(TXEN0);
-    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
-    UBRR0H = 0;
-    UBRR0L = 0x03;
-}
-
-
 // MARK: RailCom Input
 
 // RailCom Input
@@ -160,7 +135,26 @@ static inline void init() {
 // Whether receiving data is enabled is toggled by the INT1 interrupt so
 // that noise outside of the cutout is ignored.
 
-volatile uint8_t rx;
+#define CUTOUT  PD3
+
+static inline void
+railcom_init()
+{
+    // Configure INT1 to generate interrupts for any logical change.
+    EICRA |= _BV(ISC10);
+    EIMSK |= _BV(INT1);
+
+    // Configure USART for 250kbps (0x03) 8n1 operation, enable the
+    // interrupt for receiving (but leaving reciving itself disabled until
+    // a cutout) and enable transmitting (but again leave it disabled until
+    // we have something to transmit).
+    UCSR0B = _BV(RXCIE0) | _BV(TXEN0);
+    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
+    UBRR0H = 0;
+    UBRR0L = 0x03;
+}
+
+volatile int rx;
 
 // INT1 Interrupt.
 // Fires when the input signal on INT1 (D3) changes.
@@ -169,7 +163,7 @@ volatile uint8_t rx;
 // not. Toggle whether RX is enabled on the USART accordingly.
 ISR(INT1_vect)
 {
-    cutout = bit_is_set(PIND, CUTOUT);
+    int cutout = bit_is_set(PIND, CUTOUT);
     
     if (cutout) {
         UCSR0B |= _BV(RXEN0);
@@ -187,7 +181,8 @@ ISR(INT1_vect)
 // Fires when a newly received byte is available in UDR0.
 //
 // Collate RailCom response bytes.
-ISR(USART_RX_vect) {
+ISR(USART_RX_vect)
+{
     uint8_t status, data;
     
     status = UCSR0A;
@@ -259,10 +254,10 @@ main()
     cli();
     // To save power, enable pull-ups on all pins we're not using as input.
     PORTB = PORTC = ~0;
-    PORTD = ~_BV(DCC);
+    PORTD = ~(_BV(DCC) | _BV(CUTOUT));
 
     dcc_init();
-    init();
+    railcom_init();
     uart_init();
     sei();
     
