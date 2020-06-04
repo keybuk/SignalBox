@@ -339,6 +339,45 @@ ISR(TIMER0_OVF_vect)
 
 // MARK: Main Loop
 
+// Main Loop
+// ---------
+// There are two basic passes to analyzing the incoming DCC signal.
+//
+// The first is to determine the phase; when we start to receive incoming
+// half-bits, we do not yet know whether the signal is in high-low or
+// low-high order, and thus do not know whether an edge is a boundary
+// between bits, or between a single bit's high and low parts.
+//
+// To synchronize we need to look for a point at which the period length
+// changes between that of a one-bit and a zero-bit:
+//
+//                   :
+//   _   _   _   _    __    __   _   _
+// _| |_| |_| |_| |__|  |__|  |_| |_| |
+//                   :
+//         length change means we
+//         must be now in Phase A
+//
+// Since the preamble that marks the start of a packet is a train of
+// one-bits followed by a zero-bit, we can combine both phase synchronization
+// and preamble detection into one pass. A suitably long sequence of one-bits
+// followed by the first period of a zero-bit gives us both the phase of the
+// signal and the start of a packet.
+//
+//
+// The second pass is packet and byte extraction. Due to the different byte
+// and packet end bits, the packet structure can be followed logically and
+// byte and packet boundaries followed provided the input conforms to
+// specification. The final byte is always a check byte, which we compare
+// against an accumulated xor of the previous bytes in the packet.
+//
+//    ?    preamble.   byte     byte  check byte
+//        +--------+ +------+ +------+ +------+
+// 1101000111111111101010101001111000000101101011111...
+//                  :        :        :        :
+//                  +--byte end bits--+    packet end bit
+//
+
 enum parser_state {
     SEEKING_PREAMBLE,
     PACKET_START,
