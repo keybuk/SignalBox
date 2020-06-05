@@ -9,18 +9,18 @@ import Foundation
 import Dispatch
 import RaspberryPi
 
-// Set GPIO12 to output.
+// Set GPIO18 to output.
 let gpio = try! GPIO()
-gpio[12].value = false
-gpio[12].function = .output
+gpio[18].value = false
+gpio[18].function = .output
 
-debugPrint(gpio[12])
+debugPrint(gpio[18])
 
 var cancelled = false
 DispatchQueue.global(qos: .background).async {
     repeat {
         usleep(500)
-        gpio[12].value.toggle()
+        gpio[18].value.toggle()
     } while !cancelled
 }
 
@@ -30,7 +30,7 @@ let _ = readLine()
 cancelled = true
 
 // Shutdown
-gpio[12].value = false
-gpio[12].function = .input
+gpio[18].value = false
+gpio[18].function = .input
 
 print("Bye!")

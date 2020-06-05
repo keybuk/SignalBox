@@ -133,21 +133,23 @@ public class Driver {
         pwm[2].useFifo = false
         pwm.clearFifo()
 
+        // Set the PWM to use the FIFO in serializer mode, and DREQ signals sent to the DMA Engine.
+        pwm.isDMAEnabled = true
+        pwm.dataRequestThreshold = 1
+        pwm.panicThreshold = 1
+        pwm[1].useFifo = true
+        pwm[1].mode = .serializer
+        pwm[1].range = 32
+
         // Stop the PWM clock.
         let clock = try Clock()
         clock[.pwm].isEnabled = false
         while clock[.pwm].isRunning {}
 
-        // Make sure that the DMA Engine is enabled, abort any existing use of it, and clear error state.
-        let dma = try DMA()
-        dma[Driver.dmaChannel].isEnabled = true
-        dma[Driver.dmaChannel].isActive = false
-        dma[Driver.dmaChannel].abort()
-
-        dma[Driver.dmaChannel].reset()
-        dma[Driver.dmaChannel].isReadError = false
-        dma[Driver.dmaChannel].isFifoError = false
-        dma[Driver.dmaChannel].isReadLastNotSetError = false
+        // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
+        clock[.pwm].source = Driver.clockSource
+        clock[.pwm].mash = 0
+        clock[.pwm].divisor = ClockDivisor(integer: divisor, fractional: 0)
 
         // Set the DCC GPIO for PWM output.
         let gpio = try GPIO()
@@ -162,27 +164,27 @@ public class Driver {
         gpio[Driver.debugGPIO].function = .output
         gpio[Driver.debugGPIO].value = false
 
-        // Set the PWM to use the FIFO in serializer mode, and DREQ signals sent to the DMA Engine.
-        pwm.isDMAEnabled = true
-        pwm.dataRequestThreshold = 1
-        pwm.panicThreshold = 1
-        pwm[1].useFifo = true
-        pwm[1].mode = .serializer
+        // Make sure that the DMA Engine is enabled, abort any existing use of it, and clear error state.
+        let dma = try DMA()
+        dma[Driver.dmaChannel].isEnabled = true
+        dma[Driver.dmaChannel].isActive = false
+        dma[Driver.dmaChannel].abort()
 
-        // Set the PWM clock, using the oscillator as a source. In order to ensure consistent timings, use an integer divisor only.
-        clock[.pwm].source = Driver.clockSource
-        clock[.pwm].mash = 0
-        clock[.pwm].divisor = ClockDivisor(integer: divisor, fractional: 0)
-
-        // Enable the PWM.
-        pwm[1].isEnabled = true
-
-        clock[.pwm].isEnabled = true
-        while !clock[.pwm].isRunning {}
+        dma[Driver.dmaChannel].reset()
+        dma[Driver.dmaChannel].isReadError = false
+        dma[Driver.dmaChannel].isFifoError = false
+        dma[Driver.dmaChannel].isReadLastNotSetError = false
 
         // Set the DMA Engine priority levels.
         dma[Driver.dmaChannel].priorityLevel = 8
         dma[Driver.dmaChannel].panicPriorityLevel = 8
+
+        // Start the Clock.
+        clock[.pwm].isEnabled = true
+        while !clock[.pwm].isRunning {}
+
+        // Enable the PWM.
+        pwm[1].isEnabled = true
 
         isRunning = true
         DispatchQueue.global().asyncAfter(deadline: .now() + Driver.watchdogInterval, execute: watchdog)
@@ -200,6 +202,16 @@ public class Driver {
     ///         driver.shutdown()
     ///     }
     public func shutdown() throws {
+        // Restore the DCC GPIO to output.
+        let gpio = try GPIO()
+        gpio[Driver.dccGPIO].value = false
+        gpio[Driver.dccGPIO].function = .output
+
+        // Disable the PWM channel.
+        let pwm = try PWM()
+        pwm[1].isEnabled = false
+        pwm.isDMAEnabled = false
+
         // Stop the DMA Engine.
         let dma = try DMA()
         dma[Driver.dmaChannel].isActive = false
@@ -209,18 +221,9 @@ public class Driver {
         let clock = try Clock()
         clock[.pwm].isEnabled = false
 
-        // Disable the PWM channel.
-        let pwm = try PWM()
-        pwm[1].isEnabled = false
-        pwm.isDMAEnabled = false
-
-        // Restore the DCC GPIO to output, and clear all pins.
-        let gpio = try GPIO()
+        // Clear all GPIO pins.
         gpio[Driver.dccGPIO].value = false
-        gpio[Driver.dccGPIO].function = .output
-
         gpio[Driver.railComGPIO].value = false
-
         gpio[Driver.debugGPIO].value = false
 
         // Clear the bitstream queue to free the uncached memory associated with each bitstream, also cancel any pending tasks and wait for them to ensure blocks aren't holding references as well.
