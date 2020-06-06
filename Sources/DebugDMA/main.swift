@@ -18,6 +18,7 @@ let clock = try Clock()
 debugPrint(clock[.pwm])
 
 let pwm = try PWM()
+debugPrint(pwm)
 debugPrint(pwm[1])
 
 let dma = try DMA()
