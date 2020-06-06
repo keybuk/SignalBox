@@ -25,10 +25,10 @@ let clock = try! Clock()
 clock[.pwm].isEnabled = false
 while clock[.pwm].isRunning {}
 
-// Set the PWM clock to 0.1ms ticks.
+// Set the PWM clock to 0.1ms ber byte.
 clock[.pwm].source = .oscillator
 clock[.pwm].mash = 0
-clock[.pwm].divisor = ClockDivisor(integer: 1_920, fractional: 0)
+clock[.pwm].divisor = ClockDivisor(integer: 1_920 / 8, fractional: 0)
 
 // Set GPIO18 to output from PWM1.
 let gpio = try! GPIO()
@@ -37,13 +37,20 @@ gpio[18].function = .alternateFunction5
 
 // Grab DMA 5.
 let dma = try! DMA()
+dma[5].isEnabled = true
 dma[5].isActive = false
+dma[5].abort()
 dma[5].reset()
 
 // Allocate a data area for control blocks and data.
-let memory = try! UncachedMemory(minimumSize: MemoryLayout<DMAControlBlock>.stride + MemoryLayout<UInt32>.stride * 256)
-let controlBlock = memory.pointer.bindMemory(to: DMAControlBlock.self, capacity: 1)
-let words = memory.pointer.advanced(by: MemoryLayout<DMAControlBlock>.stride).bindMemory(to: UInt32.self, capacity: 256)
+let memory = try! UncachedMemory(minimumSize: MemoryLayout<DMAControlBlock>.stride * 16 + MemoryLayout<UInt32>.stride * 256)
+let controlBlock = memory.pointer
+    .bindMemory(to: DMAControlBlock.self, capacity: 16)
+let words = memory.pointer
+    .advanced(by: MemoryLayout<DMAControlBlock>.stride * 16)
+    .bindMemory(to: UInt32.self, capacity: 256)
+
+let wordsAddress = memory.busAddress + UInt32(MemoryLayout<DMAControlBlock>.stride * 16)
 
 // Fill the memory with the binary of 0...255, shift left because PWM uses the MSB of the data.
 // (We output 8-bits of number, and an 8-bit gap of 0 because the serializer range is 16-bits).
@@ -53,13 +60,12 @@ for i in 0...255 {
 
 controlBlock[0].peripheral = .pwm
 controlBlock[0].waitForWriteResponse = true
-controlBlock[0].sourceAddress = memory.busAddress + UInt32(MemoryLayout<DMAControlBlock>.stride)
+controlBlock[0].sourceAddress = wordsAddress
 controlBlock[0].incrementSourceAddress = true
 controlBlock[0].destinationAddress = PWM.busAddress + 0x18 /* MemoryLayout.offset(of: \PWM.Registers.fifoInput) */
 controlBlock[0].destinationWaitsForDataRequest = true
 controlBlock[0].transferLength = UInt32(MemoryLayout<UInt32>.stride) * 256
 controlBlock[0].nextControlBlockAddress = memory.busAddress
-
 
 // Start the Clock.
 clock[.pwm].isEnabled = true

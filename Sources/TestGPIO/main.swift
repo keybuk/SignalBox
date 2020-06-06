@@ -19,7 +19,7 @@ debugPrint(gpio[18])
 var cancelled = false
 DispatchQueue.global(qos: .background).async {
     repeat {
-        usleep(500)
+        usleep(100)
         gpio[18].value.toggle()
     } while !cancelled
 }

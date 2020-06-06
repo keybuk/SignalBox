@@ -23,10 +23,10 @@ pwm[1].mode = .serializer
 pwm[1].range = 8
 pwm[1].data = 0b11001010_11111111_11111111_11111111
 
-// Set the PWM clock to 0.1ms ticks.
+// Set the PWM clock to 0.1ms bits.
 clock[.pwm].source = .oscillator
 clock[.pwm].mash = 0
-clock[.pwm].divisor = ClockDivisor(integer: 1_920, fractional: 0)
+clock[.pwm].divisor = ClockDivisor(integer: 1_920 / 8, fractional: 0)
 
 // Set GPIO18 to output from PWM1.
 let gpio = try! GPIO()
