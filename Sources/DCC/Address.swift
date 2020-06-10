@@ -12,7 +12,7 @@ import Foundation
 /// DCC defines a number of different partitions of addresses.
 ///
 /// - Note: NMRA S-9.2.1 A.
-public enum Address : Packable, CustomStringConvertible {
+public enum Address : Hashable, Packable, CustomStringConvertible {
     /// Broadcast to all decoders.
     case broadcast
 

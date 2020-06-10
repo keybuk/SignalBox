@@ -82,4 +82,28 @@ class AddressTests : XCTestCase {
         XCTAssertEqual(packer.results, [ 0b10100011, 0b00110101 ])
     }
 
+    /// Check that two primary addresses of the same values are equal.
+    func testSameAddresses() {
+        let address1 = Address.primary(3)
+        let address2 = Address.primary(3)
+
+        XCTAssertEqual(address1, address2)
+    }
+
+    /// Check that two primary addresses of the different values are not equal.
+    func testDifferentAddresses() {
+        let address1 = Address.primary(3)
+        let address2 = Address.primary(125)
+
+        XCTAssertNotEqual(address1, address2)
+    }
+
+    /// Check that a primary and extended address of the same value are not equal.
+    func testAddressInequatability() {
+        let primaryAddress = Address.primary(3)
+        let extendedAddress = Address.extended(3)
+
+        XCTAssertNotEqual(primaryAddress, extendedAddress)
+    }
+
 }
