@@ -100,7 +100,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b10100011, 0b00110101 ])
+        XCTAssertEqual(packer.results, [ 0b10100011, 0b01000101 ])
     }
 
     /// Check that two broadcast addresses are equal.

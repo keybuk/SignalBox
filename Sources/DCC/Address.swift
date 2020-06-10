@@ -101,7 +101,9 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
             packer.add(0b10, length: 2)
             packer.add(address >> 5, length: 6)
             packer.add(0b0, length: 1)
-            packer.add(address >> 2, length: 3)
+            // Standard doesn't clarify whether these bits are ones complement or not,
+            // but the bits being 0 for the broadcast address strongly implies it.
+            packer.add(~address >> 2, length: 3)
             packer.add(0b0, length: 1)
             packer.add(address, length: 2)
             packer.add(0b1, length: 1)
