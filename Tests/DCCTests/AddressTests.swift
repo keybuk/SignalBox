@@ -82,68 +82,83 @@ class AddressTests : XCTestCase {
         XCTAssertEqual(packer.results, [ 0b10100011, 0b00110101 ])
     }
 
+    /// Check that two broadcast addresses are equal.
+    func testBroadcastSame() {
+        XCTAssertEqual(Address.broadcast, Address.broadcast)
+    }
+
     /// Check that two primary addresses of the same values are equal.
     func testSameAddresses() {
-        let address1 = Address.primary(3)
-        let address2 = Address.primary(3)
-
-        XCTAssertEqual(address1, address2)
+        XCTAssertEqual(Address.primary(3), Address.primary(3))
     }
 
     /// Check that two primary addresses of the different values are not equal.
     func testDifferentAddresses() {
-        let address1 = Address.primary(3)
-        let address2 = Address.primary(125)
-
-        XCTAssertNotEqual(address1, address2)
+        XCTAssertNotEqual(Address.primary(3), Address.primary(125))
     }
 
     /// Check that a primary and extended address of the same value are not equal.
-    func testAddressInequatability() {
-        let primaryAddress = Address.primary(3)
-        let extendedAddress = Address.extended(3)
-
-        XCTAssertNotEqual(primaryAddress, extendedAddress)
+    func testPrimaryExtendedPartition() {
+        XCTAssertNotEqual(Address.primary(3), Address.extended(3))
     }
 
     /// Check that primary addresses are comparable.
     func testPrimaryComparable() {
-        let address1 = Address.primary(3)
-        let address2 = Address.primary(125)
-
-        XCTAssertTrue(address1 < address2)
+        XCTAssertLessThan(Address.primary(3), Address.primary(125))
     }
 
     /// Check that extended addresses sort after primary addresses.
     func testPrimaryLessThanExtended() {
-        let address1 = Address.primary(125)
-        let address2 = Address.extended(3)
+        XCTAssertLessThan(Address.primary(125), Address.extended(3))
+    }
 
-        XCTAssertTrue(address1 < address2)
+    /// Check that broadcast addresses are less than any other.
+    func testBroadcastLowest() {
+        XCTAssertLessThan(Address.broadcast, Address.primary(125))
+        XCTAssertLessThan(Address.broadcast, Address.extended(1250))
+        XCTAssertLessThan(Address.broadcast, Address.accessory(310))
+        XCTAssertLessThan(Address.broadcast, Address.signal(1134))
     }
 
     /// Check that extended addresses are comparable.
     func testExtendedComparable() {
-        let address1 = Address.extended(3)
-        let address2 = Address.extended(125)
+        XCTAssertLessThan(Address.extended(3), Address.extended(125))
+    }
 
-        XCTAssertTrue(address1 < address2)
+    /// Check that an accessory and extended accessory address of the same value are not equal.
+    func testAccessoryPartition() {
+        XCTAssertNotEqual(Address.accessory(140), Address.signal(140))
     }
 
     /// Check that accessory addresses are comparable.
     func testAccessoryComparable() {
-        let address1 = Address.accessory(140)
-        let address2 = Address.accessory(310)
-
-        XCTAssertTrue(address1 < address2)
+        XCTAssertLessThan(Address.accessory(140), Address.accessory(310))
     }
 
     /// Check that signal addresses are comparable.
     func testSignalComparable() {
-        let address1 = Address.signal(650)
-        let address2 = Address.signal(1134)
+        XCTAssertLessThan(Address.signal(650), Address.signal(1134))
+    }
 
-        XCTAssertTrue(address1 < address2)
+    /// Check that accessory addresses sort earlier than signal addresses.
+    func testAccessoryLessThanSignal() {
+        XCTAssertLessThan(Address.accessory(310), Address.signal(113))
+    }
+
+    // MARK: description tests
+
+    /// Check that we can turn a primary address into a string.
+    func testPrimaryString() {
+        let address = Address.primary(3)
+
+        XCTAssertEqual("\(address)", "3")
+    }
+
+    /// Check that we can turn an extended address into a string and it's zero-padded to distinguish from a primary.
+    func testExtendedString() {
+        let address = Address.extended(3)
+
+        XCTAssertEqual("\(address)", "0003")
     }
 
 }
