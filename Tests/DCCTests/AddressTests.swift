@@ -82,7 +82,7 @@ class AddressTests : XCTestCase {
         XCTAssertEqual(packer.bitsRemaining, 4)
     }
 
-    /// Check the binary pattenr of the accessory broadcast address.
+    /// Check the binary pattern of the accessory broadcast address.
     func testAccessoryBroadcastAddress() {
         let address = Address.accessoryBroadcast
 
@@ -101,6 +101,16 @@ class AddressTests : XCTestCase {
         packer.add(address)
 
         XCTAssertEqual(packer.results, [ 0b10100011, 0b01000101 ])
+    }
+
+    /// Check the binary pattern of the extended accessory broadcast address.
+    func testSignalBroadcastAddress() {
+        let address = Address.signalBroadcast
+
+        var packer = BitPacker<UInt8>()
+        packer.add(address)
+
+        XCTAssertEqual(packer.results, [ 0b10111111, 0b00000111 ])
     }
 
     /// Check that two broadcast addresses are equal.
@@ -169,6 +179,11 @@ class AddressTests : XCTestCase {
     /// Check that accessory addresses sort earlier than signal addresses.
     func testAccessoryLessThanSignal() {
         XCTAssertLessThan(Address.accessory(310), Address.signal(113))
+    }
+
+    /// Check that extended accessory broadcast addresses are greater than extended accessory addresses.
+    func testSignalBroadcastSort() {
+        XCTAssertLessThan(Address.signal(1134), Address.signalBroadcast)
     }
 
     // MARK: description tests

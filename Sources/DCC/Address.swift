@@ -44,8 +44,11 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
     ///
     /// This address partition is primarily used for signal aspect control.
     ///
-    /// Address has range 1...2047, values outside this range are truncated by bit pattern.
+    /// Address has range 1...2046, values outside this range are truncated by bit pattern.
     case signal(Int)
+
+    /// Broadcast to extended accessory decoders.
+    case signalBroadcast
 
     public static func < (lhs: Address, rhs: Address) -> Bool {
         switch (lhs, rhs) {
@@ -63,6 +66,8 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
         case (.signal(let lhsAddress), .signal(let rhsAddress)):
             return lhsAddress < rhsAddress
         case (.signal(_), _): return true
+        case (.signalBroadcast, .signalBroadcast): return false
+        case (.signalBroadcast, _): return true
         case (.extended(let lhsAddress), .extended(let rhsAddress)):
             return lhsAddress < rhsAddress
         case (.extended(_), _): return true
@@ -91,13 +96,14 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
             packer.add(0b1, length: 1)
             packer.add(~address, length: 3)
         case .accessoryBroadcast:
+            // Effectively address 511 (0x1ff).
             packer.add(0b10, length: 2)
             packer.add(0b111111, length: 6)
             packer.add(0b1, length: 1)
             packer.add(~0b111, length: 3)  // 0b000
         case .signal(let address):
-            assert((1...2047).contains(address),
-                   "Signal address out of range 1...2047")
+            assert((1...2046).contains(address),
+                   "Signal address out of range 1...2046")
             packer.add(0b10, length: 2)
             packer.add(address >> 5, length: 6)
             packer.add(0b0, length: 1)
@@ -106,6 +112,16 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
             packer.add(~address >> 2, length: 3)
             packer.add(0b0, length: 1)
             packer.add(address, length: 2)
+            packer.add(0b1, length: 1)
+        case .signalBroadcast:
+            // Effectively address 2047 (0x7ff).
+            packer.add(0b10, length: 2)
+            packer.add(0b111111, length: 6)
+            packer.add(0b0, length: 1)
+            // Implied to be 0b111 in ones complement.
+            packer.add(~0b111, length: 3)  // 0b000
+            packer.add(0b0, length: 1)
+            packer.add(0b11, length: 2)
             packer.add(0b1, length: 1)
         }
     }
@@ -119,6 +135,7 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
         case .accessory(let address): return "Accessory(\(address))"
         case .accessoryBroadcast: return "Accessory(broadcast)"
         case .signal(let address): return "Signal(\(address))"
+        case .signalBroadcast: return "Signal(broadcast)"
         }
     }
 }
