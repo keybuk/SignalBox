@@ -34,8 +34,11 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
 
     /// Basic accessory decoder with 9-bit address.
     ///
-    /// Address has range 1...511, values outside this range are truncated by bit pattern.
+    /// Address has range 1...510, values outside this range are truncated by bit pattern.
     case accessory(Int)
+
+    /// Broadcast to basic accessory decoders.
+    case accessoryBroadcast
 
     /// Extended accessory decoder with 14-bit address.
     ///
@@ -55,6 +58,8 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
         case (.accessory(let lhsAddress), .accessory(let rhsAddress)):
             return lhsAddress < rhsAddress
         case (.accessory(_), _): return true
+        case (.accessoryBroadcast, .accessoryBroadcast): return false
+        case (.accessoryBroadcast, _): return true
         case (.signal(let lhsAddress), .signal(let rhsAddress)):
             return lhsAddress < rhsAddress
         case (.signal(_), _): return true
@@ -79,12 +84,17 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
             packer.add(0b11, length: 2)
             packer.add(address, length: 14)
         case .accessory(let address):
-            assert((1...511).contains(address),
+            assert((1...510).contains(address),
                    "Accessory address out of range 1...510")
             packer.add(0b10, length: 2)
             packer.add(address >> 3, length: 6)
             packer.add(0b1, length: 1)
             packer.add(~address, length: 3)
+        case .accessoryBroadcast:
+            packer.add(0b10, length: 2)
+            packer.add(0b111111, length: 6)
+            packer.add(0b1, length: 1)
+            packer.add(~0b111, length: 3)  // 0b000
         case .signal(let address):
             assert((1...2047).contains(address),
                    "Signal address out of range 1...2047")
@@ -105,6 +115,7 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
         case .extended(let address):
             return "\(address)".leftPadding(toLength: 4, with: "0")
         case .accessory(let address): return "Accessory(\(address))"
+        case .accessoryBroadcast: return "Accessory(broadcast)"
         case .signal(let address): return "Signal(\(address))"
         }
     }
