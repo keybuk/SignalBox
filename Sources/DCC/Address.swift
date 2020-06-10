@@ -9,23 +9,39 @@ import Foundation
 
 /// Decoder address.
 ///
-/// DCC defines a number of different partitions of addresses.
+/// To send instructions to a digital decoder, the instruction must be identified with the decoder's address. DCC defines a number of
+/// different partitions of addresses for both multi-function (locomotive) and accessory decoders. Each partition is a discrete
+/// namespace, the same numerical addresses in two different partitions address different decoders.
 ///
-/// - Note: NMRA S-9.2.1 A.
+/// Addresses are comparable within a partition, with each partition comparing separately to others by bit pattern value.
+///
+/// - Note:
+/// Primary address is defined by the baseline packet format in NMRA S-9.2 B, other address partitions are defined in
+/// NMRA S-9.2.1 A.
 public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
-    /// Broadcast to all decoders.
+    /// Broadcast to multi-function decoders.
     case broadcast
 
     /// Multi-function decoder with 7-bit address.
+    ///
+    /// Address has range 1...127, values outside this range are truncated by bit pattern.
     case primary(Int)
 
     /// Multi-function decoder with 14-bit address.
+    ///
+    /// Address has range 1...10239, values outside this range are truncated by bit pattern.
     case extended(Int)
 
-    /// Accessory decoder with 9-bit address.
+    /// Basic accessory decoder with 9-bit address.
+    ///
+    /// Address has range 1...511, values outside this range are truncated by bit pattern.
     case accessory(Int)
 
-    /// Accessory decoder with 14-bit address.
+    /// Extended accessory decoder with 14-bit address.
+    ///
+    /// This address partition is primarily used for signal aspect control.
+    ///
+    /// Address has range 1...2047, values outside this range are truncated by bit pattern.
     case signal(Int)
 
     public static func < (lhs: Address, rhs: Address) -> Bool {
