@@ -69,25 +69,25 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
         case .broadcast:
             packer.add(0, length: 8)
         case .primary(let address):
-            precondition((1...127).contains(address),
-                         "Primary address out of range 1...127")
+            assert((1...127).contains(address),
+                   "Primary address out of range 1...127")
             packer.add(0b0, length: 1)
             packer.add(address, length: 7)
         case .extended(let address):
-            precondition((1...10239).contains(address),
-                         "Extended address out of range 1...10239")
+            assert((1...10239).contains(address),
+                   "Extended address out of range 1...10239")
             packer.add(0b11, length: 2)
             packer.add(address, length: 14)
         case .accessory(let address):
-            precondition((1...511).contains(address),
-                         "Accessory address out of range 1...511")
+            assert((1...511).contains(address),
+                   "Accessory address out of range 1...511")
             packer.add(0b10, length: 2)
             packer.add(address >> 3, length: 6)
             packer.add(0b1, length: 1)
             packer.add(~address, length: 3)
         case .signal(let address):
-            precondition((1...2047).contains(address),
-                         "Signal address out of range 1...2047")
+            assert((1...2047).contains(address),
+                   "Signal address out of range 1...2047")
             packer.add(0b10, length: 2)
             packer.add(address >> 5, length: 6)
             packer.add(0b0, length: 1)
