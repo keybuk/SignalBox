@@ -51,6 +51,16 @@ class AddressTests : XCTestCase {
         XCTAssertEqual(packer.results, [ 0b11000100, 0b11100010 ])
     }
 
+    /// Check that zero is accepted as an extended address and that the binary pattern is correct, and not confused with broadcast.
+    func testZeroExtendedAddress() {
+        let address = Address.extended(0)
+
+        var packer = BitPacker<UInt8>()
+        packer.add(address)
+
+        XCTAssertEqual(packer.results, [ 0b11000000, 0b00000000 ])
+    }
+
     /// Check the binary pattern of an extended address in the overlapped space still contains two bytes.
     func testOverlappedExtendedAddress() {
         let address = Address.extended(3)

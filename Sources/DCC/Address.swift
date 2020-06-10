@@ -29,7 +29,7 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
 
     /// Multi-function decoder with 14-bit address.
     ///
-    /// Address has range 1...10239, values outside this range are truncated by bit pattern.
+    /// Address has range 0...10239, values outside this range are truncated by bit pattern.
     case extended(Int)
 
     /// Basic accessory decoder with 9-bit address.
@@ -74,13 +74,13 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
             packer.add(0b0, length: 1)
             packer.add(address, length: 7)
         case .extended(let address):
-            assert((1...10239).contains(address),
-                   "Extended address out of range 1...10239")
+            assert((0...10239).contains(address),
+                   "Extended address out of range 0...10239")
             packer.add(0b11, length: 2)
             packer.add(address, length: 14)
         case .accessory(let address):
             assert((1...511).contains(address),
-                   "Accessory address out of range 1...511")
+                   "Accessory address out of range 1...510")
             packer.add(0b10, length: 2)
             packer.add(address >> 3, length: 6)
             packer.add(0b1, length: 1)
