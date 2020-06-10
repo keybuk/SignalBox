@@ -106,4 +106,44 @@ class AddressTests : XCTestCase {
         XCTAssertNotEqual(primaryAddress, extendedAddress)
     }
 
+    /// Check that primary addresses are comparable.
+    func testPrimaryComparable() {
+        let address1 = Address.primary(3)
+        let address2 = Address.primary(125)
+
+        XCTAssertTrue(address1 < address2)
+    }
+
+    /// Check that extended addresses sort after primary addresses.
+    func testPrimaryLessThanExtended() {
+        let address1 = Address.primary(125)
+        let address2 = Address.extended(3)
+
+        XCTAssertTrue(address1 < address2)
+    }
+
+    /// Check that extended addresses are comparable.
+    func testExtendedComparable() {
+        let address1 = Address.extended(3)
+        let address2 = Address.extended(125)
+
+        XCTAssertTrue(address1 < address2)
+    }
+
+    /// Check that accessory addresses are comparable.
+    func testAccessoryComparable() {
+        let address1 = Address.accessory(140)
+        let address2 = Address.accessory(310)
+
+        XCTAssertTrue(address1 < address2)
+    }
+
+    /// Check that signal addresses are comparable.
+    func testSignalComparable() {
+        let address1 = Address.signal(650)
+        let address2 = Address.signal(1134)
+
+        XCTAssertTrue(address1 < address2)
+    }
+
 }

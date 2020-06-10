@@ -12,7 +12,7 @@ import Foundation
 /// DCC defines a number of different partitions of addresses.
 ///
 /// - Note: NMRA S-9.2.1 A.
-public enum Address : Hashable, Packable, CustomStringConvertible {
+public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
     /// Broadcast to all decoders.
     case broadcast
 
@@ -27,6 +27,26 @@ public enum Address : Hashable, Packable, CustomStringConvertible {
 
     /// Accessory decoder with 14-bit address.
     case signal(Int)
+
+    public static func < (lhs: Address, rhs: Address) -> Bool {
+        switch (lhs, rhs) {
+        case (.broadcast, .broadcast): return false
+        case (.broadcast, _): return true
+        case (.primary(let lhsAddress), .primary(let rhsAddress)):
+            return lhsAddress < rhsAddress
+        case (.primary(_), _): return true
+        // Accessories sorts between primary and extended.
+        case (.accessory(let lhsAddress), .accessory(let rhsAddress)):
+            return lhsAddress < rhsAddress
+        case (.accessory(_), _): return true
+        case (.signal(let lhsAddress), .signal(let rhsAddress)):
+            return lhsAddress < rhsAddress
+        case (.signal(_), _): return true
+        case (.extended(let lhsAddress), .extended(let rhsAddress)):
+            return lhsAddress < rhsAddress
+        case (.extended(_), _): return true
+        }
+    }
 
     public func add<T>(into packer: inout T) where T : Packer {
         switch self {
@@ -64,16 +84,12 @@ public enum Address : Hashable, Packable, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .broadcast:
-            return "broadcast"
-        case .primary(let address):
-            return "\(address)"
+        case .broadcast: return "broadcast"
+        case .primary(let address): return "\(address)"
         case .extended(let address):
             return "\(address)".leftPadding(toLength: 4, with: "0")
-        case .accessory(let address):
-            return "Accessory(\(address))"
-        case .signal(let address):
-            return "Signal(\(address))"
+        case .accessory(let address): return "Accessory(\(address))"
+        case .signal(let address): return "Signal(\(address))"
         }
     }
 }
