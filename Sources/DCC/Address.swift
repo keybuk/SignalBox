@@ -15,6 +15,9 @@ import Foundation
 ///
 /// Addresses are comparable within a partition, with each partition comparing separately to others by bit pattern value.
 ///
+/// `Address` conforms to `Packable` and produces complete 8-bit bytes, except for `.accessory(_)` which leaves
+/// 4-bits remaining in the second byte for identifying the command and pair.
+///
 /// - Note:
 /// Primary address is defined by the baseline packet format in NMRA S-9.2 B, other address partitions are defined in
 /// NMRA S-9.2.1 A.
