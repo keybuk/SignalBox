@@ -10,6 +10,8 @@ let package = Package(
         .library(name: "RaspberryPi", targets: ["RaspberryPi"]),
         .library(name: "DCC", targets: ["DCC"]),
 
+        .executable(name: "Prototype", targets: ["Prototype"]),
+
         .executable(name: "TestGPIO", targets: ["TestGPIO"]),
         .executable(name: "TestPWM", targets: ["TestPWM"]),
         .executable(name: "TestDMA", targets: ["TestDMA"]),
@@ -27,6 +29,8 @@ let package = Package(
 
         .target(name: "DCC", dependencies: ["Util"]),
         .testTarget(name: "DCCTests", dependencies: ["DCC"]),
+
+        .target(name: "Prototype", dependencies: ["DCC"]),
 
         .target(name: "OldDCC", dependencies: ["Util", "RaspberryPi"]),
         .target(name: "OldPrototype", dependencies: ["OldDCC"]),
