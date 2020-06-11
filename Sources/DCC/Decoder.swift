@@ -8,6 +8,15 @@
 import Foundation
 
 public struct Decoder {
-    var address: Address
-    var speed: Int
+    public let address: Address
+    public var speed: Int
+
+    public init(address: Address) {
+        self.address = address
+        self.speed = 0
+    }
+
+    public mutating func stop() {
+        speed = 0
+    }
 }
