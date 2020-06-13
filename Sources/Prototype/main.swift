@@ -33,6 +33,14 @@ loop: while true {
         } else {
             address = .primary(value)
         }
+    case "info":
+        guard let decoder = dispatcher.decoders[address] else {
+            print("Not dispatched")
+            break
+        }
+
+        print("Address: \(decoder.address)")
+        print("Speed:   \(decoder.speed)")
     case "speed":
         guard args.count >= 2,
             let value = Int(args[1])
@@ -41,15 +49,11 @@ loop: while true {
                 break
         }
 
-        var decoder = dispatcher.currentSettingsForDecoder(address: address) ??
-            Decoder(address: address)
-        decoder.speed = value
-        dispatcher.updateSettingsForDecoder(decoder)
+        dispatcher.decoders[address, default: Decoder(address: address)]
+            .speed = value
     case "stop":
-        var decoder = dispatcher.currentSettingsForDecoder(address: address) ??
-            Decoder(address: address)
-        decoder.stop()
-        dispatcher.updateSettingsForDecoder(decoder)
+        dispatcher.decoders[address, default: Decoder(address: address)]
+            .stop()
     default:
         print("Unknown command.")
         print("Commands: exit quit decoder speed stop")
