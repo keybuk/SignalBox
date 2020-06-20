@@ -21,7 +21,7 @@ import Foundation
 /// - Note:
 /// Primary address is defined by the baseline packet format in NMRA S-9.2 B, other address partitions are defined in
 /// NMRA S-9.2.1 A.
-public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
+public enum Address : Hashable {
     /// Broadcast to multi-function decoders.
     case broadcast
 
@@ -52,31 +52,9 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
 
     /// Broadcast to extended accessory decoders.
     case signalBroadcast
+}
 
-    public static func < (lhs: Address, rhs: Address) -> Bool {
-        switch (lhs, rhs) {
-        case (.broadcast, .broadcast): return false
-        case (.broadcast, _): return true
-        case (.primary(let lhsAddress), .primary(let rhsAddress)):
-            return lhsAddress < rhsAddress
-        case (.primary(_), _): return true
-        // Accessories sorts between primary and extended.
-        case (.accessory(let lhsAddress), .accessory(let rhsAddress)):
-            return lhsAddress < rhsAddress
-        case (.accessory(_), _): return true
-        case (.accessoryBroadcast, .accessoryBroadcast): return false
-        case (.accessoryBroadcast, _): return true
-        case (.signal(let lhsAddress), .signal(let rhsAddress)):
-            return lhsAddress < rhsAddress
-        case (.signal(_), _): return true
-        case (.signalBroadcast, .signalBroadcast): return false
-        case (.signalBroadcast, _): return true
-        case (.extended(let lhsAddress), .extended(let rhsAddress)):
-            return lhsAddress < rhsAddress
-        case (.extended(_), _): return true
-        }
-    }
-
+extension Address : Packable {
     public func add<T>(into packer: inout T) where T : Packer {
         switch self {
         case .broadcast:
@@ -128,7 +106,35 @@ public enum Address : Hashable, Comparable, Packable, CustomStringConvertible {
             packer.add(0b1, length: 1)
         }
     }
+}
 
+extension Address : Comparable {
+    public static func < (lhs: Address, rhs: Address) -> Bool {
+        switch (lhs, rhs) {
+        case (.broadcast, .broadcast): return false
+        case (.broadcast, _): return true
+        case (.primary(let lhsAddress), .primary(let rhsAddress)):
+            return lhsAddress < rhsAddress
+        case (.primary(_), _): return true
+        // Accessories sorts between primary and extended.
+        case (.accessory(let lhsAddress), .accessory(let rhsAddress)):
+            return lhsAddress < rhsAddress
+        case (.accessory(_), _): return true
+        case (.accessoryBroadcast, .accessoryBroadcast): return false
+        case (.accessoryBroadcast, _): return true
+        case (.signal(let lhsAddress), .signal(let rhsAddress)):
+            return lhsAddress < rhsAddress
+        case (.signal(_), _): return true
+        case (.signalBroadcast, .signalBroadcast): return false
+        case (.signalBroadcast, _): return true
+        case (.extended(let lhsAddress), .extended(let rhsAddress)):
+            return lhsAddress < rhsAddress
+        case (.extended(_), _): return true
+        }
+    }
+}
+
+extension Address : CustomStringConvertible {
     public var description: String {
         switch self {
         case .broadcast: return "broadcast"
