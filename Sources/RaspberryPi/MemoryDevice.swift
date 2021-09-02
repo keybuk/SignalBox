@@ -16,6 +16,12 @@ import Darwin
 
 // This is not defined on Darwin. Set to 0 to allow compilation to succeed.
 public let O_SYNC: Int32 = 0
+
+#if arch(arm64)
+// This is not defined on ARM64.
+public let PAGE_SIZE: Int32 = 4096
+public let PAGE_SHIFT: Int32 = 12
+#endif
 #endif
 
 /// Type permitting mapping of hardware registers.
