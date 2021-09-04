@@ -15,19 +15,18 @@ import Foundation
 /// Values added should conform to the more strict structure of DCC address and instruction bytes, resulting
 /// in exact multiples of eight bits.
 ///
-/// Additionally to add the accumulated error detection byte and return the internal copy of the wrapped
-/// `Packer`, `finish` must be called.
+/// `packedValues` is returned from the sub-packer, and includes the accumulated error detection byte. This
+/// can only be accessed when the values added confirm to DCC requirements.
 ///
-/// # Example:
-///      var signalPacker = SignalPacker(timing: SignalTiming(pulseWidth: 14.5))
+///      let signalPacker = SignalPacker(timing: SignalTiming(pulseWidth: 14.5))
 ///      var packer = PacketPacker(packer: signalPacker)
 ///      packer.add(0b10101100, 8)
-///      signalPacker = packer.finish()
-public struct PacketPacker<SubPacker> : Packer
-where SubPacker : Packer {
-    /// Wrapped `Packer` copy.
-    public var packer: SubPacker
-
+///      let values = packer.packedValues
+public struct PacketPacker<SubPacker>: Packer
+where SubPacker: Packer {
+    /// Internal wrapped `SubPacker` copy.
+    private var packer: SubPacker
+    
     /// Number of bits remaining in the current byte.
     private var bitsRemaining = 0
 
@@ -60,18 +59,18 @@ where SubPacker : Packer {
         } while length > 0
     }
 
-    /// Returns the internal copy of the wrapped `Packer`.
-    ///
-    /// Adds the error detection byte and packet end-bit, and then returns the internal copy of `packer`
-    /// which has had the called `add(:length:)` methods called on it.
-    public mutating func finish() -> SubPacker {
+    /// Returns the structure of packed values from the wrapped `Packer`.
+
+    /// Adds the error detection byte and packet end-bit, and may only be called when whole bytes have been packed.
+    public var packedValues: SubPacker.PackedValues {
         precondition(bitsRemaining == 0, "Packet must consist of whole bytes")
 
+        var packer = packer
         packer.add(0b0, length: 1)
         packer.add(errorDetectionByte)
         packer.add(0b1, length: 1)
 
-        return packer
+        return packer.packedValues
     }
 }
 

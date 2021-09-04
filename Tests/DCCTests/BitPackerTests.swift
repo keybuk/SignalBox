@@ -9,14 +9,14 @@ import XCTest
 
 import DCC
 
-class BitPackerTests : XCTestCase {
+class BitPackerTests: XCTestCase {
     
     /// Add a value to an unsigned type.
     func testUnsigndType() {
         var packer = BitPacker<UInt8>()
         packer.add(0b1111, length: 4)
         
-        XCTAssertEqual(packer.results, [ 0b11110000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b11110000 ])
     }
 
     /// Add a value to a signed type.
@@ -24,7 +24,7 @@ class BitPackerTests : XCTestCase {
         var packer = BitPacker<Int8>()
         packer.add(0b1111, length: 4)
         
-        XCTAssertEqual(packer.results, [ Int8(bitPattern: 0b11110000) ])
+        XCTAssertEqual(packer.packedValues, [ Int8(bitPattern: 0b11110000) ])
     }
 
     /// Add multiple values.
@@ -33,7 +33,7 @@ class BitPackerTests : XCTestCase {
         packer.add(0b1010, length: 4)
         packer.add(0b1111, length: 4)
         
-        XCTAssertEqual(packer.results, [ 0b10101111 ])
+        XCTAssertEqual(packer.packedValues, [ 0b10101111 ])
     }
 
     /// Adding a value can extend into a new byte.
@@ -42,7 +42,7 @@ class BitPackerTests : XCTestCase {
         packer.add(0b10, length: 2)
         packer.add(0b11111111, length: 8)
         
-        XCTAssertEqual(packer.results, [ 0b10111111, 0b11000000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b10111111, 0b11000000 ])
     }
     
     /// Add a value that is longer than a byte.
@@ -50,7 +50,7 @@ class BitPackerTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(0b11000011_11000011, length: 16)
         
-        XCTAssertEqual(packer.results, [ 0b011000011, 0b11000011 ])
+        XCTAssertEqual(packer.packedValues, [ 0b011000011, 0b11000011 ])
     }
 
     /// Add a single bit field with true.
@@ -58,7 +58,7 @@ class BitPackerTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(true)
         
-        XCTAssertEqual(packer.results, [ 0b10000000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b10000000 ])
     }
     
     /// Add a single bit field with false.
@@ -66,7 +66,7 @@ class BitPackerTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(false)
         
-        XCTAssertEqual(packer.results, [ 0b00000000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b00000000 ])
     }
 
     /// Add multiple single bit fields.
@@ -75,7 +75,7 @@ class BitPackerTests : XCTestCase {
         packer.add(false)
         packer.add(true)
         
-        XCTAssertEqual(packer.results, [ 0b01000000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b01000000 ])
     }
 
     /// Signed values should still have all bits accessible.
@@ -84,7 +84,7 @@ class BitPackerTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(value, length: 8)
         
-        XCTAssertEqual(packer.results, [ 0b11111111 ])
+        XCTAssertEqual(packer.packedValues, [ 0b11111111 ])
     }
 
     /// Test that we can add a heterogeneous array of packable things.
@@ -93,7 +93,7 @@ class BitPackerTests : XCTestCase {
         var packer = BitPacker<UInt32>()
         packer.add(values)
 
-        XCTAssertEqual(packer.results, [ 0b10111100_00110011_00010101_01000000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b10111100_00110011_00010101_01000000 ])
     }
 
     /// Test that we can add an homogenous array of packable things by forcing the array type.
@@ -102,7 +102,7 @@ class BitPackerTests : XCTestCase {
         var packer = BitPacker<UInt32>()
         packer.add(values as [Packable])
 
-        XCTAssertEqual(packer.results, [ 0b11110000_11001100_10101010_11100010 ])
+        XCTAssertEqual(packer.packedValues, [ 0b11110000_11001100_10101010_11100010 ])
     }
 
 }

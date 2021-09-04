@@ -36,7 +36,7 @@ public struct MultiFunctionPacket : Packet {
 
         packer.add(instructions as [Packable])
         
-        return packer.results
+        return packer.packedValues
     }
     
 }

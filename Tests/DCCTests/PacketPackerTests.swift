@@ -16,8 +16,7 @@ class PacketPackerTests: XCTestCase {
         var packer = PacketPacker(packer: BitPacker<UInt32>())
         packer.add(0b10101100, length: 8)
 
-        let subpacker = packer.finish()
-        XCTAssertEqual(subpacker.results, [0b0_10101100_0_10101100_1 << subpacker.bitsRemaining])
+        XCTAssertEqual(packer.packedValues, [0b0_10101100_0_10101100_1 << 13])
     }
 
     /// Test that we can add two bytes, and the error detection bit is an XOR of both.
@@ -26,8 +25,7 @@ class PacketPackerTests: XCTestCase {
         packer.add(0b10101100, length: 8)
         packer.add(0b01010110, length: 8)
 
-        let subpacker = packer.finish()
-        XCTAssertEqual(subpacker.results, [0b0_10101100_0_01010110_0_11111010_1 << subpacker.bitsRemaining])
+        XCTAssertEqual(packer.packedValues, [0b0_10101100_0_01010110_0_11111010_1 << 4])
     }
 
     /// Test that we can add values across the byte boundary, and the byte separator bit is inserted between.
@@ -37,8 +35,7 @@ class PacketPackerTests: XCTestCase {
         packer.add(0b11000101, length: 8)
         packer.add(0b0110, length: 4)
 
-        let subpacker = packer.finish()
-        XCTAssertEqual(subpacker.results, [0b0_10101100_0_01010110_0_11111010_1 << subpacker.bitsRemaining])
+        XCTAssertEqual(packer.packedValues, [0b0_10101100_0_01010110_0_11111010_1 << 4])
     }
 
 }

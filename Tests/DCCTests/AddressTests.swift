@@ -18,7 +18,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b00000000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b00000000 ])
     }
 
     /// Check the binary pattern of a primary address.
@@ -28,7 +28,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b00000011 ])
+        XCTAssertEqual(packer.packedValues, [ 0b00000011 ])
     }
 
     /// Check the binary pattern of an extended address that fits in the second byte.
@@ -38,7 +38,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b11000000, 0b11010010 ])
+        XCTAssertEqual(packer.packedValues, [ 0b11000000, 0b11010010 ])
     }
 
     /// Check the binary pattern of an extended address that requires both bytes.
@@ -48,7 +48,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b11000100, 0b11100010 ])
+        XCTAssertEqual(packer.packedValues, [ 0b11000100, 0b11100010 ])
     }
 
     /// Check that zero is accepted as an extended address and that the binary pattern is correct, and not confused with broadcast.
@@ -58,7 +58,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b11000000, 0b00000000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b11000000, 0b00000000 ])
     }
 
     /// Check the binary pattern of an extended address in the overlapped space still contains two bytes.
@@ -68,7 +68,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b11000000, 0b00000011 ])
+        XCTAssertEqual(packer.packedValues, [ 0b11000000, 0b00000011 ])
     }
 
     /// Check the binary pattern of an accessory address, including the one's complement part.
@@ -78,7 +78,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b10100110, 0b10010000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b10100110, 0b10010000 ])
         XCTAssertEqual(packer.bitsRemaining, 4)
     }
 
@@ -89,7 +89,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b10111111, 0b10000000 ])
+        XCTAssertEqual(packer.packedValues, [ 0b10111111, 0b10000000 ])
         XCTAssertEqual(packer.bitsRemaining, 4)
     }
 
@@ -100,7 +100,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b10100011, 0b01000101 ])
+        XCTAssertEqual(packer.packedValues, [ 0b10100011, 0b01000101 ])
     }
 
     /// Check the binary pattern of the extended accessory broadcast address.
@@ -110,7 +110,7 @@ class AddressTests : XCTestCase {
         var packer = BitPacker<UInt8>()
         packer.add(address)
 
-        XCTAssertEqual(packer.results, [ 0b10111111, 0b00000111 ])
+        XCTAssertEqual(packer.packedValues, [ 0b10111111, 0b00000111 ])
     }
 
     /// Check that two broadcast addresses are equal.

@@ -15,26 +15,26 @@ import Util
 /// Put simply, when initialized with a `SignalTiming.pulseWidth` of 1ms, a packed 1 bit value
 /// results in an output of 58 consecutive 1 bits, followed by 58 consecutive 0 bits, representing
 /// the PWM pulse of the duration expected.
-public struct SignalPacker : Packer {
-    public typealias ResultType = UInt32
+public struct SignalPacker: Packer {
+    public typealias WordType = UInt32
     
     /// Timing values used for conversion.
     public var timing: SignalTiming
 
     /// Packed results.
-    public var results: [ResultType]
+    public private(set) var packedValues: [WordType]
     
     /// Number of bits remaining in the final result value.
     public var bitsRemaining = 0
     
     public init(timing: SignalTiming) {
         self.timing = timing
-        results = []
+        packedValues = []
     }
     
     /// Duration in microseconds of the output.
     public var duration: Float {
-        let numberOfBits = results.count * ResultType.bitWidth - bitsRemaining
+        let numberOfBits = packedValues.count * WordType.bitWidth - bitsRemaining
         return Float(numberOfBits) * timing.pulseWidth
     }
 
@@ -74,8 +74,8 @@ public struct SignalPacker : Packer {
         var pulseLength = pulseLength
         repeat {
             if bitsRemaining < 1 {
-                results.append(0)
-                bitsRemaining = ResultType.bitWidth
+                packedValues.append(0)
+                bitsRemaining = WordType.bitWidth
             }
             
             let chunkLength = min(pulseLength, bitsRemaining)
@@ -83,7 +83,7 @@ public struct SignalPacker : Packer {
             pulseLength -= chunkLength
 
             if high {
-                results[results.index(before: results.endIndex)] |= ResultType.mask(bits: chunkLength, offset: bitsRemaining)
+                packedValues[packedValues.index(before: packedValues.endIndex)] |= WordType.mask(bits: chunkLength, offset: bitsRemaining)
             }
         } while pulseLength > 0
     }
@@ -93,7 +93,7 @@ public struct SignalPacker : Packer {
 
 extension SignalPacker : CustomStringConvertible {
     public var description: String {
-        let bitsString = results.map(\.binaryString).joined(separator: " ")
+        let bitsString = packedValues.map(\.binaryString).joined(separator: " ")
         return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
 }

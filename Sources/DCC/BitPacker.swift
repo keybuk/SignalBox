@@ -11,16 +11,15 @@ import Util
 ///
 /// `BitPacker` may be used to create arrays of integers by sourcing values of individual bits from other
 /// values, packing them into the larger structure.
-public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
-    // FIXME: rename this field.
-    /// Packed results.
-    public var results: [ResultType]
+public struct BitPacker<PackedValueType: FixedWidthInteger> : Packer {
+    /// The packed values as an array of fixed width integers.
+    public private(set) var packedValues: [PackedValueType]
     
     /// Number of bits remaining in the final result.
     public var bitsRemaining = 0
 
     public init() {
-        results = []
+        packedValues = []
     }
     
     /// Add a field with the contents of a value.
@@ -41,16 +40,16 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
         var length = length
         repeat {
             if bitsRemaining < 1 {
-                results.append(0)
-                bitsRemaining = ResultType.bitWidth
+                packedValues.append(0)
+                bitsRemaining = PackedValueType.bitWidth
             }
             
             let chunkLength = min(length, bitsRemaining)
             bitsRemaining -= chunkLength
             length -= chunkLength
             
-            let bits = ResultType(truncatingIfNeeded: (value >> length) & T.mask(bits: chunkLength))
-            results[results.index(before: results.endIndex)] |= bits << bitsRemaining
+            let bits = PackedValueType(truncatingIfNeeded: (value >> length) & T.mask(bits: chunkLength))
+            packedValues[packedValues.index(before: packedValues.endIndex)] |= bits << bitsRemaining
         } while length > 0
     }
 }
@@ -59,7 +58,7 @@ public struct BitPacker<ResultType : FixedWidthInteger> : Packer {
 
 extension BitPacker : CustomStringConvertible {
     public var description: String {
-        let bitsString = results.map(\.binaryString).joined(separator: " ")
+        let bitsString = packedValues.map(\.binaryString).joined(separator: " ")
         return "<\(type(of: self)) \(bitsString), remaining: \(bitsRemaining)>"
     }
 }
